@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">www.nicovideo.jp</domain>
+        <domain includeSubdomains="true">nicovideo.cdn.nimg.jp</domain>
+        <domain includeSubdomains="true">tn-skr1.smilevideo.jp</domain>
+        <domain includeSubdomains="true">tn-skr2.smilevideo.jp</domain>
+        <domain includeSubdomains="true">tn-skr3.smilevideo.jp</domain>
+        <domain includeSubdomains="true">tn-skr4.smilevideo.jp</domain>
+        <domain includeSubdomains="true">tn.smilevideo.jp</domain>
+        <domain includeSubdomains="true">timetag.main.jp</domain>
+        <domain includeSubdomains="true">192.168.100.101</domain>
+    </domain-config>
+</network-security-config>

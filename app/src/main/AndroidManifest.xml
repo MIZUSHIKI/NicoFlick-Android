@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="com.mizushiki.nicoflick_a">
+
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <application
+            android:allowBackup="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name"
+            android:networkSecurityConfig="@xml/network_security_config"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:supportsRtl="true"
+            android:theme="@style/AppTheme">
+        <activity android:name=".Activity_HowToExtend"
+                  android:screenOrientation="portrait"
+                  android:theme="@style/Theme.TranslucentBackground">
+        </activity>
+        <activity
+                android:name=".Activity_HowToGame"
+                android:screenOrientation="portrait"
+                android:theme="@style/Theme.TranslucentBackground">
+        </activity>
+        <activity
+                android:name=".Activity_RankingComment"
+                android:label="@string/title_activity_ranking_comment"
+                android:screenOrientation="portrait"
+                android:theme="@style/AppTheme.NoActionBar">
+        </activity>
+        <activity
+                android:name=".Activity_SelectorMenuTableForTag"
+                android:screenOrientation="portrait">
+        </activity>
+        <activity
+                android:name=".Activity_SelectorMenu"
+                android:screenOrientation="portrait"
+                android:theme="@style/Theme.TranslucentBackgroundClear">
+        </activity>
+        <activity
+                android:name=".Activity_Result"
+                android:screenOrientation="portrait">
+        </activity>
+        <activity
+                android:name=".Activity_GameMenu"
+                android:screenOrientation="portrait"
+                android:theme="@style/Theme.TranslucentBackground">
+        </activity>
+        <activity
+                android:name=".Activity_GameView"
+                android:screenOrientation="portrait"
+                android:windowSoftInputMode="stateAlwaysVisible">
+        </activity>
+        <activity
+                android:name=".Activity_Settings"
+                android:screenOrientation="portrait">
+        </activity>
+        <activity
+                android:name=".Activity_Selector"
+                android:screenOrientation="portrait">
+        </activity>
+        <activity
+                android:name=".MainActivity"
+                android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

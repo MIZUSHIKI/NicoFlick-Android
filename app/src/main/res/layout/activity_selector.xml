@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:coverflow="http://schemas.android.com/apk/res-auto"
+        xmlns:tools="http://schemas.android.com/tools"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context=".Activity_Selector">
+
+    <it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow
+            android:id="@+id/coverflow"
+            android:layout_width="0dp"
+            android:layout_height="400dp"
+            coverflow:coverHeight="132dp"
+            coverflow:coverWidth="240dp"
+            coverflow:spacing="0.4"
+            coverflow:circlePathRadius="5"
+            coverflow:circlePathRadiusInMatrixSpace="5000"
+            coverflow:layout_constraintTop_toTopOf="parent"
+            coverflow:layout_constraintEnd_toEndOf="parent" coverflow:layout_constraintStart_toStartOf="parent"
+            coverflow:layout_constraintBottom_toBottomOf="parent"
+            coverflow:layout_constraintVertical_bias="0.22"/>
+
+    <TextView
+            android:layout_width="0dp"
+            android:layout_height="46dp"
+            android:id="@+id/text_Title_c" coverflow:layout_constraintEnd_toEndOf="parent"
+            coverflow:layout_constraintStart_toStartOf="parent" coverflow:layout_constraintTop_toTopOf="parent"
+            android:textAppearance="@style/TextAppearance.AppCompat.Display1"
+            android:textAlignment="center" android:ellipsize="end" android:maxLines="1"
+            android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12dp" android:gravity="center_vertical"
+            android:paddingLeft="8dp" android:paddingRight="8dp" android:autoSizeMaxTextSize="34dp"
+            coverflow:layout_constraintBottom_toBottomOf="parent"
+            coverflow:layout_constraintVertical_bias="0.05"/>
+    <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/text_Artist" coverflow:layout_constraintStart_toStartOf="parent"
+            coverflow:layout_constraintEnd_toEndOf="parent"
+            coverflow:layout_constraintTop_toBottomOf="@+id/text_Title_c"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body2" android:textAlignment="center"
+            android:ellipsize="end" android:autoSizeTextType="uniform" android:maxLines="1" android:paddingLeft="8dp"
+            android:paddingRight="8dp" android:gravity="center_vertical"/>
+    <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/text_Length" coverflow:layout_constraintEnd_toEndOf="parent"
+            coverflow:layout_constraintStart_toStartOf="parent"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            coverflow:layout_constraintTop_toBottomOf="@+id/text_Artist" android:textAlignment="center"
+    />
+    <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/text_Tags" coverflow:layout_constraintStart_toStartOf="parent"
+            coverflow:layout_constraintEnd_toEndOf="parent" android:layout_marginTop="8dp"
+            coverflow:layout_constraintTop_toBottomOf="@+id/text_Length" android:textAlignment="center"
+            android:ellipsize="end" android:maxLines="3" android:textSize="10sp"
+            android:textColor="?attr/colorButtonNormal" android:paddingLeft="8dp" android:paddingRight="8dp"/>
+    <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/text_Speed" coverflow:layout_constraintEnd_toEndOf="parent"
+            coverflow:layout_constraintStart_toStartOf="parent"
+            coverflow:layout_constraintTop_toTopOf="@+id/text_Length"
+            coverflow:layout_constraintBottom_toBottomOf="@+id/text_Length" android:textAlignment="viewEnd"
+            android:layout_marginEnd="8dp" android:layout_marginStart="8dp"
+    />
+    <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/text_Num" coverflow:layout_constraintEnd_toEndOf="parent"
+            coverflow:layout_constraintStart_toStartOf="parent"
+            coverflow:layout_constraintBottom_toTopOf="@+id/text_Title_c" android:layout_marginEnd="8dp"
+            android:layout_marginStart="8dp" android:textAlignment="viewEnd" android:textSize="10sp"/>
+    <Button
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:id="@+id/button_menu"
+            coverflow:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginEnd="16dp"
+            coverflow:layout_constraintBottom_toBottomOf="parent" android:layout_marginBottom="32dp"
+            android:onClick="Button_Menu"
+            android:background="@drawable/menu" android:scaleX="0.5"
+            android:scaleY="0.5"/>
+    <Button
+            android:text="@string/_go_"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/button_Go"
+            coverflow:layout_constraintEnd_toEndOf="parent" coverflow:layout_constraintStart_toStartOf="parent"
+            android:textSize="30sp" style="@style/Widget.AppCompat.Button.Colored"
+            android:backgroundTint="@android:color/holo_blue_dark" android:paddingHorizontal="50dp"
+            coverflow:layout_constraintBottom_toBottomOf="parent" android:layout_marginBottom="32dp"
+            android:onClick="Button_Go"/>
+    <Button
+            android:text="@string/back"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/button_back"
+            app:layout_constraintBottom_toBottomOf="parent" android:layout_marginBottom="32dp"
+            app:layout_constraintStart_toStartOf="parent"
+            style="@style/Widget.AppCompat.Button.Borderless.Colored"
+            android:textColor="@android:color/holo_blue_dark" android:onClick="Button_Back"/>
+
+    <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            tools:layout_editor_absoluteX="198dp" coverflow:layout_constraintTop_toTopOf="parent"
+            coverflow:layout_constraintBottom_toBottomOf="parent" coverflow:layout_constraintVertical_bias="0.80"
+            android:id="@+id/frameLayout">
+
+        <com.mizushiki.nicoflick_a.CustomPicker
+                android:background="@android:color/transparent"
+                android:id="@+id/levelpicker"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:descendantFocusability="blocksDescendants"
+                android:alpha="0.5"
+        />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="240dp"
+                      android:layout_marginTop="-20dp" android:orientation="vertical"
+                      android:id="@+id/levelpickerContainer">
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="15dp"
+                    android:textColor="#999999"
+                    android:textSize="8dp"
+                    android:layout_marginLeft="10dp"
+                    android:gravity="bottom"
+                    android:id="@+id/score_m1"/>
+            <FrameLayout android:layout_width="match_parent" android:layout_height="50dp">
+                <TextView
+                        android:layout_width="80dp" android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:textSize="24sp"
+                        android:id="@+id/rank_m1"/>
+                <TextView
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:textSize="14sp"
+                        android:gravity="center"
+                        android:id="@+id/star_m1"/>
+                <TextView
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="30dp"
+                        android:textSize="8sp"
+                        android:textColor="#999999"
+                        android:gravity="center"
+                        android:id="@+id/creator_m1"/>
+
+            </FrameLayout>
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="15dp"
+                    android:textColor="#999999"
+                    android:textSize="8dp"
+                    android:gravity="right|top"
+                    android:id="@+id/date_m1"/>
+
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="15dp"
+                    android:textColor="#999999"
+                    android:textSize="8dp"
+                    android:layout_marginLeft="10dp"
+                    android:gravity="bottom"
+                    android:id="@+id/score"/>
+            <FrameLayout android:layout_width="match_parent" android:layout_height="50dp">
+                <TextView
+                        android:layout_width="80dp" android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:textSize="24sp"
+                        android:id="@+id/rank"/>
+                <TextView
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:textSize="14sp"
+                        android:gravity="center"
+                        android:id="@+id/star"/>
+                <TextView
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="30dp"
+                        android:textSize="8sp"
+                        android:textColor="#999999"
+                        android:gravity="center"
+                        android:id="@+id/creator"/>
+
+            </FrameLayout>
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="15dp"
+                    android:textColor="#999999"
+                    android:textSize="8dp"
+                    android:gravity="right|top"
+                    android:id="@+id/date"/>
+
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="15dp"
+                    android:textColor="#999999"
+                    android:textSize="8dp"
+                    android:layout_marginLeft="10dp"
+                    android:gravity="bottom"
+                    android:id="@+id/score_p1"/>
+            <FrameLayout android:layout_width="match_parent" android:layout_height="50dp">
+                <TextView
+                        android:layout_width="80dp" android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:textSize="24sp"
+                        android:id="@+id/rank_p1"/>
+                <TextView
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:textSize="14sp"
+                        android:gravity="center"
+                        android:id="@+id/star_p1"/>
+                <TextView
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="30dp"
+                        android:textSize="8sp"
+                        android:textColor="#999999"
+                        android:gravity="center"
+                        android:id="@+id/creator_p1"/>
+
+            </FrameLayout>
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="15dp"
+                    android:textColor="#999999"
+                    android:textSize="8dp"
+                    android:gravity="right|top"
+                    android:id="@+id/date_p1"/>
+        </LinearLayout>
+        <View
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:background="@drawable/gradation"
+                android:layout_gravity="top"/>
+        <View
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:background="@drawable/gradation_r"
+                android:layout_gravity="bottom"/>
+        <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="60dp"
+                android:background="#DDDDDD"
+                android:layout_gravity="top"/>
+        <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginBottom="60dp"
+                android:background="#DDDDDD"
+                android:layout_gravity="bottom"/>
+
+    </FrameLayout>
+    <Button
+            android:text="Ranking\nComment"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/button_RankingComment"
+            android:onClick="Button_RankingComment"
+            style="@android:style/Widget.Holo.Button.Borderless.Small"
+            android:textColor="@android:color/holo_blue_dark" android:textSize="8sp" android:lines="2"
+            android:singleLine="false" coverflow:layout_constraintTop_toTopOf="@+id/frameLayout"
+            coverflow:layout_constraintBottom_toBottomOf="@+id/frameLayout"
+            coverflow:layout_constraintEnd_toEndOf="@+id/frameLayout"/>
+    <TextView
+            android:text="◁"
+            android:layout_width="wrap_content"
+            android:layout_height="0dp"
+            android:id="@+id/textView14"
+            coverflow:layout_constraintTop_toTopOf="@+id/button_RankingComment"
+            coverflow:layout_constraintBottom_toBottomOf="@+id/button_RankingComment"
+            android:textSize="8sp"
+            android:textColor="@android:color/holo_blue_dark" android:gravity="center_vertical"
+            android:textStyle="bold" coverflow:layout_constraintStart_toStartOf="@+id/button_RankingComment"
+            android:layout_marginStart="2dp"/>
+    <ProgressBar
+            style="?android:attr/progressBarStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/progress_circular"
+            app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintHorizontal_bias="0.5"
+            app:layout_constraintEnd_toEndOf="parent" android:visibility="invisible"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

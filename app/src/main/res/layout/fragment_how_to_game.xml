@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+             xmlns:app="http://schemas.android.com/apk/res-auto" xmlns:tools="http://schemas.android.com/tools"
+             android:layout_width="match_parent"
+             android:layout_height="match_parent"
+             tools:context=".Fragment_HowToGame" android:background="@android:color/transparent">
+
+    <!-- TODO: Update blank fragment layout -->
+    <Button
+            android:text="@android:string/ok"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:id="@+id/button_HowToGame_OK" android:layout_gravity="center"
+            style="@style/Widget.AppCompat.Button.Borderless.Colored"
+            android:textColor="@android:color/holo_blue_light" android:textSize="36sp"/>
+    <ImageView
+            android:src="@drawable/howto1a"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:id="@+id/imageView_HowToGame" android:layout_margin="20dp"
+    />
+
+</FrameLayout>
