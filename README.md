@@ -120,5 +120,5 @@ kotlinが使える人は、GitHubにブランチを投稿してください。�
 
 ## どうでもいい言い訳
 >私のプログラム歴
->>・HSP(Windows) → Objective-C → Swift → kotlin (間にperlやphpも少しだけ齧ってますが)
+>>・HSP(Windows) → Objective-C → Swift → kotlin (間にperlやphpも少しだけ齧ってますが)  
 >>・GitHubの利用：2回目
