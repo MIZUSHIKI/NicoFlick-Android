@@ -2,6 +2,8 @@
 NicoFlickはフリック入力リズムゲーである 故「ミクフリック」の パクリ、オマージュ、リスペクト、難民先 作品・・・のAndroid版です。  
 誰も作ってくれないから作りました。
 
+- iOS版はコチラ：https://github.com/MIZUSHIKI/NicoFlick
+
 ## Google Play
 https://play.google.com/store/apps/details?id=com.mizushiki.nicoflick_a
 
