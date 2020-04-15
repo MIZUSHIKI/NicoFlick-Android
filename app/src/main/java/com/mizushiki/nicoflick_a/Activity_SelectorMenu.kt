@@ -1,9 +1,12 @@
 package com.mizushiki.nicoflick_a
 
+import android.content.DialogInterface
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
@@ -20,6 +23,11 @@ class Activity_SelectorMenu : AppCompatActivity() {
         textView_sortWords.setText(USERDATA.SelectedMusicCondition.sortItem)
 
         Button_goMovieSite.isVisible = (GLOBAL.SelectMUSIC != null)
+        Button_postReport.isVisible = (GLOBAL.SelectMUSIC != null)
+        if(USERDATA.RepotedMusicID.contains("${GLOBAL.SelectMUSIC!!.sqlID}")){
+            Button_postReport.isEnabled = false
+            Button_postReport.setBackgroundColor(Color.LTGRAY)
+        }
     }
 
     fun Button_HowTo(view: View) {
@@ -76,5 +84,29 @@ class Activity_SelectorMenu : AppCompatActivity() {
         if( requestCode == 1001 ){
             textView_tagWords.setText(USERDATA.SelectedMusicCondition.tags)
         }
+    }
+
+    fun Button_postReport(view: View) {
+        val editText = EditText(this);
+        editText.setHint("具体的な違反内容を記入");
+        AlertDialog.Builder(this)
+            .setTitle("違反報告")
+            .setMessage("この動画の利用が著作者の権利を侵害していることを報告します。\n\n・無断でアップロードされた楽曲\n・二次三次創作がある程度許容されうるジャンル（環境）ではない 等\n")
+            .setView(editText)
+            .setPositiveButton("OK", DialogInterface.OnClickListener() { dialogInterface: DialogInterface, i: Int ->
+                // TextViewにセットしてあげる
+                val musicID = GLOBAL.SelectMUSIC!!.sqlID
+                ServerDataHandler().postReport(musicID,editText.text.toString(),USERDATA.UserID){
+                    if(it){
+                        val rmid = USERDATA.RepotedMusicID
+                        rmid.add("$musicID")
+                        USERDATA.RepotedMusicID = rmid
+                        Button_postReport.isEnabled = false
+                        Button_postReport.setBackgroundColor(Color.LTGRAY)
+                    }
+                }
+            })
+            .setNegativeButton("キャンセル", null)
+            .show()
     }
 }

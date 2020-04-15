@@ -28,6 +28,10 @@ import java.util.*
 
 class CommentFragment : Fragment() {
 
+    var commentDatas:CommentDataLists = CommentDataLists
+
+    var loading:Boolean = false
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
          // Inflate the layout for this fragment
         return inflater.inflate(R.layout.fragment_comment, container, false)
@@ -64,19 +68,23 @@ class CommentFragment : Fragment() {
                     editText_comment.setTextColor(Color.DKGRAY)
                     editText_comment.setBackgroundColor(Color.LTGRAY)
                     progress_circular_c.isVisible = true
+                    loading = true
 
                     ServerDataHandler().postComment(editText_comment.text.toString().trim(),GLOBAL.SelectLEVEL!!.sqlID,USERDATA.UserID){
                         if(it){
                             progress_circular_c.isVisible = false
+                            loading = false
                             AlertDialog.Builder(activity)
                                 .setMessage("投稿しました。")
                                 .setPositiveButton("OK", { dialog, which ->
+
                                     progress_circular_c.isVisible = true
-                                    ServerDataHandler().GetCommentData(GLOBAL.SelectLEVEL!!.sqlID) {
-                                        if( it != null ){
-                                            listView_c.adapter = CommentAdapter(GLOBAL.APPLICATIONCONTEXT, it)
-                                            progress_circular_c.isVisible = false
-                                        }
+                                    loading = true
+                                    ServerDataHandler().DownloadCommentData(GLOBAL.SelectLEVEL!!.sqlID) {
+                                        val itto = commentDatas.getSortedComments(GLOBAL.SelectLEVEL!!.sqlID)
+                                        listView_c.adapter = CommentAdapter(GLOBAL.APPLICATIONCONTEXT, itto)
+                                        progress_circular_c.isVisible = false
+                                        loading = false
                                     }
                                 })
                                 .show()
@@ -104,27 +112,29 @@ class CommentFragment : Fragment() {
         }
 
         progress_circular_c.isVisible = true
-        ServerDataHandler().GetCommentData(GLOBAL.SelectLEVEL!!.sqlID) {
-            if( it != null ){
-                listView_c.adapter = CommentAdapter(GLOBAL.APPLICATIONCONTEXT, it)
-                progress_circular_c.isVisible = false
-            }
+        loading = true
+        ServerDataHandler().DownloadCommentData(GLOBAL.SelectLEVEL!!.sqlID) {
+            val itto = commentDatas.getSortedComments(GLOBAL.SelectLEVEL!!.sqlID)
+            println("itto=$itto")
+            listView_c.adapter = CommentAdapter(GLOBAL.APPLICATIONCONTEXT, itto)
+            progress_circular_c.isVisible = false
+            loading = false
         }
     }
 
 }
 
 private class CommentAdapter(val context: Context,
-                             val sortedList: JsonArray
+                             val sortedList: List<commentData>
 ) : BaseAdapter() {
     val layoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
 
     override fun getCount(): Int {
-        return sortedList.size() + ( if(GLOBAL.SelectLEVEL!!.description!="") 1 else 0 )
+        return sortedList.count() + ( if(GLOBAL.SelectLEVEL!!.description!="") 1 else 0 )
     }
 
-    override fun getItem(position: Int): JsonObject {
-        return sortedList.get(position).asObject()
+    override fun getItem(position: Int): commentData {
+        return sortedList[position]
     }
 
     override fun getItemId(position: Int): Long {
@@ -147,10 +157,9 @@ private class CommentAdapter(val context: Context,
             }
             position -= 1
         }
-        val jsonObject =  sortedList.get(position).asObject()
-        view.findViewById<TextView>(R.id.name).text =  UserNameDataLists.getUserName(jsonObject.get("userID").asString())
-        view.findViewById<TextView>(R.id.comment).text = jsonObject.get("comment").asString()
-        val a = jsonObject.get("updateTime").asString().toInt()
+        view.findViewById<TextView>(R.id.name).text =  UserNameDataLists.getUserName(sortedList[position].userID)
+        view.findViewById<TextView>(R.id.comment).text = sortedList[position].comment
+        val a = sortedList[position].sqlUpdateTime
         val date = Date(a*1000L)
         val f = SimpleDateFormat("yyyy.MM.dd")
         view.findViewById<TextView>(R.id.postedDay).text = f.format(date)

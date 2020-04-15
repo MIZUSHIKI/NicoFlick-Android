@@ -132,6 +132,8 @@ class Activity_Selector : AppCompatActivity() {
 
         text_Tags.setOnClickListener {
             if( currentMusics.size > 0 ){
+                if(segueing){ return@setOnClickListener }
+                segueing = true
                 maeTags = USERDATA.SelectedMusicCondition.tags
                 maeSort = USERDATA.SelectedMusicCondition.sortItem
                 GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
@@ -152,9 +154,6 @@ class Activity_Selector : AppCompatActivity() {
             currentMusics = it
             //println("tags="+USERDATA.SelectedMusicCondition.tags)
             //println("currentMusics.size="+currentMusics.size)
-            for( m in currentMusics ){
-                println(m.title)
-            }
 
             coverflow = findViewById<View>(R.id.coverflow) as FeatureCoverFlow
             if(indexCoverFlow == -1){
@@ -219,25 +218,39 @@ class Activity_Selector : AppCompatActivity() {
         LevelPickerContainerRedraw()
     }
 
-    fun ShowHowToExtendView(){
-        Handler().postDelayed(Runnable {
-            if(USERDATA.lookedExtend == false){
-                var musicIDSet:MutableSet<Int> = mutableSetOf()
-                for( (sKey,_) in USERDATA.Score.scores){
-                    for( ms in musicDatas.musics ){
-                        if( ms.levelIDs.contains(sKey) ){
-                            musicIDSet.add(ms.sqlID)
-                        }
+    fun ShowHowToExtendView():Boolean{
+
+        if(USERDATA.lookedExtend == false){
+            var musicIDSet:MutableSet<Int> = mutableSetOf()
+            for( (sKey,_) in USERDATA.Score.scores){
+                for( ms in musicDatas.musics ){
+                    if( ms.levelIDs.contains(sKey) ){
+                        musicIDSet.add(ms.sqlID)
                     }
                 }
-                println("$musicIDSet ; ${musicIDSet.size}")
-                if( musicIDSet.size >= 5 ){
-                    USERDATA.lookedExtend = true
+            }
+            println("$musicIDSet ; ${musicIDSet.size}")
+            if( musicIDSet.size >= 5 ){
+                USERDATA.lookedExtend = true
+                segueing = true
+                Handler().postDelayed(Runnable {
+                    segueing = false
                     val intent: Intent = Intent(applicationContext, Activity_HowToExtend::class.java)
                     startActivity(intent)
-                }
+                }, 750)
+                return true
             }
-        }, 750)
+            if( USERDATA.lookedOtherIme ){ return false }
+            USERDATA.lookedOtherIme = true
+            segueing = true
+            Handler().postDelayed(Runnable {
+                segueing = false
+                val intent: Intent = Intent(applicationContext, Activity_HowToGame2::class.java)
+                startActivity(intent)
+            }, 750)
+            return true
+        }
+        return false
     }
 
     fun Button_Go(view: View) {
@@ -273,6 +286,10 @@ class Activity_Selector : AppCompatActivity() {
         }
     }
     fun Button_Menu(view: View) {
+        if(segueing) {
+            return
+        }
+        segueing = true
         val intent: Intent = Intent(applicationContext, Activity_SelectorMenu::class.java)
         if( currentMusics.size > 0 ) {
             GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
@@ -290,30 +307,55 @@ class Activity_Selector : AppCompatActivity() {
         startActivityForResult(intent, 1002)
     }
     fun Button_Back(view: View) {
+        if(segueing) {
+            return
+        }
         finish()
     }
     fun Button_RankingComment(view: View) {
         if(indexPicker==-1){ return }
+        if(segueing) {
+            return
+        }
+        segueing = true
         val intent: Intent = Intent(applicationContext, Activity_RankingComment::class.java)
         GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
         println("selector title ="+ GLOBAL.SelectMUSIC!!.title)
         GLOBAL.SelectLEVEL = currentLevels[indexPicker]
-        startActivity(intent)
+        startActivityForResult(intent, 1003)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        segueing = false
         // startActivityForResult()の際に指定した識別コードとの比較
         when( requestCode ){
             1001 -> {
                 userScore = USERDATA.Score
                 setCurrentLevels(indexCoverFlow)
-                ShowHowToExtendView()
+                if(!ShowHowToExtendView()){
+                    //ユーザーネームデータをロードするため遷移させないようにする
+                    segueing = true
+                    progress_circular.isVisible = true
+                    ServerDataHandler().Chance_DownloadUserNameData_FirstData {
+                        segueing = false
+                        progress_circular.isVisible = false
+                    }
+                }
             }
             1002 -> {
                 if( maeTags != USERDATA.SelectedMusicCondition.tags || maeSort != USERDATA.SelectedMusicCondition.sortItem){
                     indexCoverFlow = -1
                     SetMusicToCoverFlow()
+                }
+            }
+            1003 -> {
+                //ユーザーネームデータをロードするため遷移させないようにする
+                segueing = true
+                progress_circular.isVisible = true
+                ServerDataHandler().Chance_DownloadUserNameData_FirstData {
+                    segueing = false
+                    progress_circular.isVisible = false
                 }
             }
         }

@@ -152,6 +152,13 @@ object USERDATA {
             dataStore.edit().putBoolean("LookedExtend",value).commit()
             field = value
         }
+    //ヘルプを見たかどうか
+    var lookedOtherIme:Boolean = false
+        get() = dataStore.getBoolean("LookedOtherIme",false)
+        set(value) {
+            dataStore.edit().putBoolean("LookedOtherIme",value).commit()
+            field = value
+        }
 
     //
     var PlayerHeightPer:Int = 10000
@@ -179,6 +186,38 @@ object USERDATA {
         get() = dataStore.getString("UserNamesJson","")!!
         set(value) {
             dataStore.edit().putString("UserNamesJson",value).commit()
+            field = value
+        }
+    var UserNamesServerJsonNumCount:Int = 0
+        get() = dataStore.getInt("UserNamesServerJsonNumCount",0)
+        set(value) {
+            dataStore.edit().putInt("UserNamesServerJsonNumCount",value).commit()
+            field = value
+        }
+    var UserNamesServerJsonCreateTime:Int = 0
+        get() = dataStore.getInt("UserNamesServerJsonCreateTime",0)
+        set(value) {
+            dataStore.edit().putInt("UserNamesServerJsonCreateTime",value).commit()
+            field = value
+        }
+    var ScoresJson:String = ""
+        get() = dataStore.getString("ScoresJson","")!!
+        set(value) {
+            dataStore.edit().putString("ScoresJson",value).commit()
+            field = value
+        }
+    var CommentsJson:String = ""
+        get() = dataStore.getString("CommentsJson","")!!
+        set(value) {
+            dataStore.edit().putString("CommentsJson",value).commit()
+            field = value
+        }
+
+    var RepotedMusicID:MutableList<String> = mutableListOf()
+        get() = dataStore.getString("RepotedMusicID","")!!.split(",").toMutableList()
+        set(value) {
+            println("report set")
+            dataStore.edit().putString("RepotedMusicID",value.joinToString(",")).commit()
             field = value
         }
 }

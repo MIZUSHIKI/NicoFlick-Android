@@ -12,9 +12,15 @@
             android:roundIcon="@mipmap/ic_launcher_round"
             android:supportsRtl="true"
             android:theme="@style/AppTheme">
-        <activity android:name=".Activity_HowToExtend"
-                  android:screenOrientation="portrait"
-                  android:theme="@style/Theme.TranslucentBackground">
+        <activity
+                android:name=".Activity_HowToGame2"
+                android:screenOrientation="portrait"
+                android:theme="@style/Theme.TranslucentBackground">
+        </activity>
+        <activity
+                android:name=".Activity_HowToExtend"
+                android:screenOrientation="portrait"
+                android:theme="@style/Theme.TranslucentBackground">
         </activity>
         <activity
                 android:name=".Activity_HowToGame"

@@ -10,5 +10,26 @@
         <domain includeSubdomains="true">tn.smilevideo.jp</domain>
         <domain includeSubdomains="true">timetag.main.jp</domain>
         <domain includeSubdomains="true">192.168.100.101</domain>
+        <domain includeSubdomains="true">nicoflick-ladder.sakura.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflick-zenith.sakura.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflick-maiden.sakura.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflick-yellow.sakura.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflick-sacred.sakura.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflick-baffle.sakura.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflick-namely.sakura.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflick-galaxy.sakura.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflick-quench.sakura.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflick-object.sakura.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflicklad.stars.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflickzen.stars.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflickmai.stars.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflickyel.stars.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflicksac.stars.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflickbaf.stars.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflicknam.stars.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflickgal.stars.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflickque.stars.ne.jp</domain>
+        <domain includeSubdomains="true">nicoflickobj.stars.ne.jp</domain>
+        <domain includeSubdomains="true">suwa.pupu.jp</domain>
     </domain-config>
 </network-security-config>

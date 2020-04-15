@@ -61,6 +61,12 @@ object MusicDataLists {
     var levels: MutableMap<String,ArrayList<levelData>> = mutableMapOf()
     var taglist: MutableMap<String,Int> = mutableMapOf()
 
+    fun reset(){
+        musics = arrayListOf()
+        levels = mutableMapOf()
+        taglist = mutableMapOf()
+    }
+
     fun setMusic(sqlID:Int, movieURL:String, thumbnailURL:String, title:String, artist:String, movieLength:String, tags:String, updateTime:Int, createTime:Int){
         if(movieURL=="delete"){
             //削除
@@ -268,7 +274,7 @@ object MusicDataLists {
                 continue
             }
             outputMusics.add(musicdata)
-            println(musicdata.title)
+            //println(musicdata.title)
         }
         getSortedMusics(outputMusics, callback)
         return
@@ -329,6 +335,7 @@ object MusicDataLists {
                 sortedMusics = ArrayList(musics.filter{ levelp.keys.contains(it.movieURL)})
                 sortedMusics.sortBy { levelp[it.movieURL]!! }
             }
+            /*
             "最近ハイスコアが更新された曲順" -> {
                 //スコアデータ更新取得
                 ServerDataHandler().DownloadScoreData {
@@ -417,6 +424,7 @@ object MusicDataLists {
                 }
             }
 
+             */
             else -> sortedMusics = musics
         }
         //《編集中》 levels[$0.movieURL] のすべてのdescriptionを調べて【非表示】が含まれるものを排除したとき、lelvelの数が0ならmusicもフィルタリングで除外される

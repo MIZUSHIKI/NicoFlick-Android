@@ -6,8 +6,11 @@
 
     <TextView android:layout_width="50dp" android:layout_height="50dp"
               android:id="@+id/rank"
-              android:gravity="center"
               android:textSize="20sp"
+              android:autoSizeMaxTextSize="20sp"
+              android:textAlignment="center" android:ellipsize="end" android:maxLines="1"
+              android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12dp" android:gravity="center_vertical"
+              android:paddingLeft="2dp" android:paddingRight="2dp"
               />
     <LinearLayout
             android:layout_width="0dp"

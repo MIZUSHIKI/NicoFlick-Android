@@ -28,12 +28,17 @@ import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.SimpleExoPlayer
 import com.google.android.exoplayer2.database.ExoDatabaseProvider
+import com.google.android.exoplayer2.source.MediaSource
 import com.google.android.exoplayer2.source.MediaSourceEventListener
 import com.google.android.exoplayer2.source.ProgressiveMediaSource
+import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
 import com.google.android.exoplayer2.ui.PlayerView
+import com.google.android.exoplayer2.upstream.BandwidthMeter
+import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
 import com.google.android.exoplayer2.upstream.cache.NoOpCacheEvictor
 import com.google.android.exoplayer2.upstream.cache.SimpleCache
+import com.google.android.exoplayer2.util.Clock
 import com.google.android.exoplayer2.util.Util
 import kotlinx.android.synthetic.main.activity_game_view.*
 import kotlin.collections.ArrayList
@@ -63,7 +68,7 @@ class Activity_GameView : AppCompatActivity() {
 
 
     //ゲーム　表示、判定　定数データ
-    var gameviewWidth = 375.0 // あとで実際の画面サイズに変更
+    var gameviewWidth = 1.0 // あとで実際の画面サイズに変更
     var flickPointX = 50.0 // あとで比率で計算して変更
     var drawRange = arrayOf(-100, -50, 400)
     val greatLine = listOf(-0.080, 0.080)
@@ -101,7 +106,8 @@ class Activity_GameView : AppCompatActivity() {
         selectMusic = GLOBAL.SelectMUSIC!!
         selectLevel = GLOBAL.SelectLEVEL!!
 
-        simpleExoPlayer = SimpleExoPlayer.Builder(applicationContext).build()
+        simpleExoPlayer = SimpleExoPlayer.Builder(applicationContext)
+            .build()
         playerView = findViewById(R.id.playerView)
 
         if(USERDATA.lookedHelp == false){
@@ -558,6 +564,11 @@ class Activity_GameView : AppCompatActivity() {
                 }
                 return
             }
+
+            //進捗状況
+            progressBar_Loaded.progress = simpleExoPlayer.bufferedPercentage
+            progressBar_Played.progress = (100000 * simpleExoPlayer.currentPosition / simpleExoPlayer.duration).toInt()
+
             val time = simpleExoPlayer.currentPosition.toDouble() / 1000
             //xps = (gameviewWidth-flickPointX)*Double(selectLevel.speed)/300 //ノートが一秒間に進む距離（View作成時に計算済み）
             // speed=300が出現してから打つまでの時間が１秒。つまりspeed=100は出現してから打つまでの時間が３秒。

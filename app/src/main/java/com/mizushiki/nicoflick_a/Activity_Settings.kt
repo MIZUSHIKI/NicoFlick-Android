@@ -55,9 +55,17 @@ class Activity_Settings : AppCompatActivity() {
             .setTitle("データベースからロードしたデータを全て削除")
             .setMessage("・何か不具合があった場合の初期化用です。")
             .setPositiveButton("Yes", { dialog, which ->
+                MusicDataLists.reset()
                 USERDATA.MusicsJson = ""
                 USERDATA.LevelsJson = ""
+                UserNameDataLists.reset()
                 USERDATA.UserNamesJson = ""
+                USERDATA.UserNamesServerJsonNumCount = 0
+                USERDATA.UserNamesServerJsonCreateTime = 0
+                ScoreDataLists.reset()
+                USERDATA.ScoresJson = ""
+                CommentDataLists.reset()
+                USERDATA.CommentsJson = ""
             })
             .setNegativeButton("No", { dialog, which ->
             })

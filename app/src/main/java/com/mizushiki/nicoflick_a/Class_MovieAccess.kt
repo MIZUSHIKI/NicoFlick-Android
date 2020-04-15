@@ -25,7 +25,6 @@ class MovieAccess {
 
     fun StreamingUrlNicoAccess(smNum:String, callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
 
-        println("sutori")
         var smNum = smNum
         if( !isWiFiConnected(GLOBAL.APPLICATIONCONTEXT) ){
             if(!smNum.endsWith("?eco=1")){

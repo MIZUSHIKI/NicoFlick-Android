@@ -7,6 +7,16 @@
         android:layout_height="match_parent"
         tools:context=".Activity_SelectorMenu">
 
+    <Button
+            android:text="通報"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/Button_postReport"
+            app:layout_constraintBottom_toTopOf="@+id/view" android:layout_marginBottom="24dp"
+            style="@style/Widget.AppCompat.Button.Small"
+            android:onClick="Button_postReport"
+            app:layout_constraintEnd_toEndOf="parent" android:layout_marginEnd="16dp"
+            android:background="@color/design_default_color_error" android:textColor="@android:color/darker_gray"/>
     <View
             android:layout_width="wrap_content"
             android:layout_height="0dp"
@@ -112,5 +122,6 @@
             android:id="@+id/Button_goMovieSite" app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintBottom_toTopOf="@+id/view" android:layout_marginBottom="24dp"
             android:layout_marginStart="16dp" style="@style/Widget.AppCompat.Button.Small"
-            android:textColor="@android:color/holo_blue_dark" android:onClick="Button_GoMovieSite"/>
+            android:onClick="Button_GoMovieSite" android:background="@android:color/holo_blue_bright"
+    />
 </androidx.constraintlayout.widget.ConstraintLayout>

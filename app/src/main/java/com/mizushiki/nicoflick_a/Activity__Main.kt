@@ -55,9 +55,6 @@ class MainActivity : AppCompatActivity() {
             CookieHandler.setDefault(GLOBAL.COOKIE_MANAGER)
         }
         //
-        println(USERDATA.MusicsJson)
-        println(USERDATA.LevelsJson)
-        println(USERDATA.UserNamesJson)
     }
 
     fun Button_Start(view: View) {
@@ -87,7 +84,7 @@ class MainActivity : AppCompatActivity() {
 
     fun Button_Info(view: View) {
 
-        val strList = arrayOf(/*">アプリレビューを見る",*/"☞ デザイン協力募集中(GitHub)","ライブラリ クレジット")
+        val strList = arrayOf("🔗 Google Playで見る","🔗 デザイン協力募集中(GitHub)","ライブラリ クレジット")
 
         val textView = TextView(applicationContext)
         textView.setTextSize(14.0f)
@@ -110,17 +107,17 @@ iOS11リリース(32bitアプリなので両方起動できなくなる)"""
             .setView(textView)
             .setItems(strList, { dialog, which ->
                 when(which){
-                    10 -> {
-                        val url = "http://timetag.main.jp/nicoflick/index.php"
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                        startActivity(Intent.createChooser(intent, "Browse with"))
-                    }
                     0 -> {
-                        val url = "https://github.com/MIZUSHIKI/NicoFlick/blob/master/README.md"
+                        val url = "https://play.google.com/store/apps/details?id=com.mizushiki.nicoflick_a"
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                         startActivity(Intent.createChooser(intent, "Browse with"))
                     }
                     1 -> {
+                        val url = "https://github.com/MIZUSHIKI/NicoFlick-Android/blob/master/README.md"
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        startActivity(Intent.createChooser(intent, "Browse with"))
+                    }
+                    2 -> {
                         ShowLicensesDialog()
                     }
                 }

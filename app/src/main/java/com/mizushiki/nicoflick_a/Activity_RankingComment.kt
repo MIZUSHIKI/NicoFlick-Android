@@ -11,6 +11,7 @@ class Activity_RankingComment : AppCompatActivity(),BottomNavigationView.OnNavig
 
     val rankingFragment = RankingFragment()
     val commentFragment = CommentFragment()
+    var added:Boolean = false //・・・
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,6 +27,11 @@ class Activity_RankingComment : AppCompatActivity(),BottomNavigationView.OnNavig
     }
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
+        println("rankingFragment.loading= ${rankingFragment.loading}")
+        println("commentFragment.loading= ${commentFragment.loading}")
+        if( rankingFragment.loading == true || commentFragment.loading == true ){
+            return false
+        }
         when (item.itemId) {
             R.id.item1 -> {
                 val sfmbt = supportFragmentManager.beginTransaction()
@@ -36,7 +42,8 @@ class Activity_RankingComment : AppCompatActivity(),BottomNavigationView.OnNavig
             }
             R.id.item2 -> {
                 val sfmbt = supportFragmentManager.beginTransaction()
-                if(!commentFragment.isAdded){
+                if(!commentFragment.isAdded && !added){
+                    added = true
                     sfmbt.add(R.id.frameLayout, commentFragment)
                 }
                 sfmbt.hide(rankingFragment)
