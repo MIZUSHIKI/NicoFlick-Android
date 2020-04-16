@@ -117,14 +117,12 @@ object ScoreDataLists {
     }
 
     fun setScore(sqlID:Int, levelID:Int, score:Int, userID:String, updateTime:Int) {
-        if(false) {
-            SqlIDtoIndex[sqlID]?.let {
-                scores[it].levelID = levelID
-                scores[it].score = score
-                scores[it].userID = userID
-                scores[it].sqlUpdateTime = updateTime
-                return
-            }
+        SqlIDtoIndex[sqlID]?.let {
+            scores[it].levelID = levelID
+            scores[it].score = score
+            scores[it].userID = userID
+            scores[it].sqlUpdateTime = updateTime
+            return
         }
         SqlIDtoIndex[sqlID] = scores.count()
         val scoredata = scoreData()

@@ -24,7 +24,7 @@ class Activity_SelectorMenu : AppCompatActivity() {
 
         Button_goMovieSite.isVisible = (GLOBAL.SelectMUSIC != null)
         Button_postReport.isVisible = (GLOBAL.SelectMUSIC != null)
-        if(USERDATA.RepotedMusicID.contains("${GLOBAL.SelectMUSIC!!.sqlID}")){
+        if(USERDATA.RepotedMusicID.contains("${GLOBAL.SelectMUSIC?.sqlID}")){
             Button_postReport.isEnabled = false
             Button_postReport.setBackgroundColor(Color.LTGRAY)
         }
