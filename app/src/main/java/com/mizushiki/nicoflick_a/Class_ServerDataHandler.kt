@@ -64,6 +64,7 @@ class ServerDataHandler {
                 //callback(it)
                 //return@DownloadMusicData
             }
+            println("music-load")
             //データベース接続２ : 次にlevelデータロード
             ServerDataHandler().DownloadLevelData {
                 if (it != null) {
@@ -71,7 +72,7 @@ class ServerDataHandler {
                     //callback(it)
                     //return@DownloadMusicData
                 }
-
+                println("level-load")
                 //データベース接続 おまけ : プレイ回数をデータベースに送信する（送信済みでないもの）。リザルトまで行かずに溜まったものがあれば出す。
                 val playcountset = USERDATA.PlayCount.getSendPlayCountStr() //送信するデータ
                 if( playcountset != "" ){
@@ -81,6 +82,7 @@ class ServerDataHandler {
                             //プレイ回数データを保存する(初期化データになる)
                             USERDATA.PlayCount.setSended()
                         }
+                        println("post-PlayCount")
                     }
                 }
                 println("ServerData Download")
@@ -104,6 +106,7 @@ class ServerDataHandler {
             }else if(it.startsWith("server-url:")){
                 val url = it.removePrefix("server-url:")
                 DownloadMusicData_FirstData( serverURL = url, callback = callback)
+                return@let
             }
             try {
                 val jsonArray = Json.parse(it).asArray()
@@ -126,10 +129,12 @@ class ServerDataHandler {
                 //保存データも更新
                 USERDATA.MusicsJson = musicDatas.toMusicsJsonString()
                 callback(null)
+                return@let
 
             } catch (e: Exception) {
                 println(e)
                 callback(e.message)
+                return@let
             }
         }
     }
@@ -200,10 +205,12 @@ class ServerDataHandler {
                         //保存データも更新
                         USERDATA.MusicsJson = musicDatas.toMusicsJsonString()
                         callback(null)
+                        return@let
 
                     } catch (e: Exception) {
                         println(e)
                         callback(e.message)
+                        return@let
                     }
                 }
                 // ↑
@@ -211,6 +218,7 @@ class ServerDataHandler {
             } catch (e: Exception) {
                 println(e)
                 callback(e.message)
+                return@let
             }
         }
     }
@@ -229,6 +237,7 @@ class ServerDataHandler {
             }else if(it.startsWith("server-url:")){
                 val url = it.removePrefix("server-url:")
                 DownloadLevelData_FirstData( serverURL = url, callback = callback)
+                return@let
             }
             try {
                 val jsonArray = Json.parse(it).asArray()
@@ -251,10 +260,12 @@ class ServerDataHandler {
                 //保存データも更新
                 USERDATA.LevelsJson = musicDatas.toLevelsJsonString()
                 callback(null)
+                return@let
 
             } catch (e: Exception) {
                 println(e)
                 callback(e.message)
+                return@let
             }
         }
     }
@@ -324,10 +335,12 @@ class ServerDataHandler {
                         //保存データも更新
                         USERDATA.LevelsJson = musicDatas.toLevelsJsonString()
                         callback(null)
+                        return@let
 
                     } catch (e: Exception) {
                         println(e)
                         callback(e.message)
+                        return@let
                     }
                 }
                 // ↑
@@ -335,6 +348,7 @@ class ServerDataHandler {
             } catch (e: Exception) {
                 println(e)
                 callback(e.message)
+                return@let
             }
         }
     }
@@ -355,10 +369,12 @@ class ServerDataHandler {
                 //保存データも更新
                 USERDATA.LevelsJson = musicDatas.toLevelsJsonString()
                 callback(null)
+                return@let
 
             } catch (e: Exception) {
                 println(e)
                 callback(e.message)
+                return@let
             }
         }
     }
@@ -393,10 +409,12 @@ class ServerDataHandler {
                 //保存データも更新
                 USERDATA.ScoresJson = scoreDatas.toScoresJsonString()
                 callback(null)
+                return@let
 
             } catch (e: Exception) {
                 println(e)
                 callback(e.message)
+                return@let
             }
         }
     }
@@ -430,10 +448,12 @@ class ServerDataHandler {
                 //保存データも更新
                 USERDATA.CommentsJson = commentDatas.toCommentsJsonString()
                 callback(null)
+                return@let
 
             } catch (e: Exception) {
                 println(e)
                 callback(e.message)
+                return@let
             }
         }
     }
@@ -473,10 +493,12 @@ class ServerDataHandler {
                     }
                     //
                     DownloadUserNameData_FirstData( serverURL = serverURL, callback = callback)
+                    return@let
 
                 } catch (e: Exception) {
                     println(e)
                     callback(e.message)
+                    return@let
                 }
                 return@let
             }
@@ -498,10 +520,12 @@ class ServerDataHandler {
                 USERDATA.UserNamesServerJsonNumCount = userNameDatas.usernameJsonNumCount
                 USERDATA.UserNamesServerJsonCreateTime = userNameDatas.usernameJsonCreateTime
                 callback(null)
+                return@let
 
             } catch (e: Exception) {
                 println(e)
                 callback(e.message)
+                return@let
             }
         }
     }
@@ -548,6 +572,7 @@ class ServerDataHandler {
                 USERDATA.UserNamesServerJsonCreateTime = userNameDatas.usernameJsonCreateTime
                 if(nextFlg){
                     callback(null)
+                    return@let
                 }else {
                     //分割Jsonの最後まで来た。もう一度通常取得を試みてFirstデータにない残りを取得。（Swiftみたいに上手くできない？ので そのまま全部コピペ）
                     //DownloadUserNameData(callback)
@@ -585,10 +610,12 @@ class ServerDataHandler {
                             USERDATA.UserNamesServerJsonNumCount = userNameDatas.usernameJsonNumCount
                             USERDATA.UserNamesServerJsonCreateTime = userNameDatas.usernameJsonCreateTime
                             callback(null)
+                            return@let
 
                         } catch (e: Exception) {
                             println(e)
                             callback(e.message)
+                            return@let
                         }
                     }
                     // ↑
@@ -597,6 +624,7 @@ class ServerDataHandler {
             } catch (e: Exception) {
                 println(e)
                 callback(e.message)
+                return@let
             }
         }
     }

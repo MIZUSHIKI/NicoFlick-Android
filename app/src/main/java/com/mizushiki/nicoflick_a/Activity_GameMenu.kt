@@ -22,13 +22,14 @@ class Activity_GameMenu : AppCompatActivity() {
 
         val _levelID = GLOBAL.SelectLEVEL!!.sqlID//intent.getIntExtra("SelectLevelID", -1)
         textView_judgeOffset.setText("0.0")
+        seekBar.setProgress( 20,false)
         USERDATA.JudgeOffset[_levelID]?.let {
-            seekBar.setProgress((it * 100).toInt(),false)
+            seekBar.setProgress((it * 100 + 20).toInt(),false)
             textView_judgeOffset.setText("$it")
         }
         seekBar.setOnSeekBarChangeListener(object :SeekBar.OnSeekBarChangeListener{
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val jo = progress.toFloat() / 100
+                val jo = (progress.toFloat() - 20.0F) / 100
                 textView_judgeOffset.setText("$jo")
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -36,7 +37,7 @@ class Activity_GameMenu : AppCompatActivity() {
                 if(seekBar == null){ return }
                 println("stop")
                 val judges = USERDATA.JudgeOffset
-                judges[_levelID] = seekBar.progress.toFloat() / 100
+                judges[_levelID] = (seekBar.progress.toFloat() - 20.0F) / 100
                 USERDATA.JudgeOffset = judges
                 //USERDATA.JudgeOffset[_levelID] = seekBar.progress.toFloat() / 100
             }

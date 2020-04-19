@@ -1,15 +1,22 @@
 package com.mizushiki.nicoflick_a
 
 import android.animation.ValueAnimator
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
+import android.os.VibrationEffect
+import android.os.VibrationEffect.DEFAULT_AMPLITUDE
+import android.os.Vibrator
 import android.text.Html
+import android.view.KeyEvent.ACTION_UP
 import android.view.View
+import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.NumberPicker
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow
 import it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow.OnScrollPositionListener
@@ -34,13 +41,16 @@ class Activity_Selector : AppCompatActivity() {
     var indexCoverFlow = -1
     var indexPicker = 0
     var levelpicker_scrollY = 0
+    var levelScroller_index = 0
+    var levelScroller_scrollY = 0
+    var levelScroller_maeScrollY = -100
     var maeTags = ""
     var maeSort = ""
     var scrollingTimer: Timer? = null
 
     lateinit var coverflow: FeatureCoverFlow
-    lateinit var levelpickerContainer: LinearLayout
     var containerFirstPos = 0
+    var scrollerOneHeight = 100
 
     var segueing = false
 
@@ -82,52 +92,76 @@ class Activity_Selector : AppCompatActivity() {
             }
 
         })
-        //レベルピッカー
-        levelpicker.wrapSelectorWheel = false
-        levelpicker.setOnScrollListener(object :NumberPicker.OnScrollListener {
-            override fun onScrollStateChange(view: NumberPicker?, scrollState: Int) {
-                //println("\nscrolling = "+scrollState)
-                //println("view.scrollY = ${view!!.scrollY}")
-                if(scrollState==0 && levelpicker_scrollY != 0 && (indexPicker==0 || indexPicker==currentLevels.size-1)){
-                    ValueAnimator.ofInt(levelpicker_scrollY, 0).apply {
-                        duration = 500
-                        levelpicker_scrollY = 0
-                        addUpdateListener {
-                            LevelPickerContainerSetScrollY(it.getAnimatedValue() as Int)
-                        }
-                        start()
+        //レベルピッカー(スクロールビューVer)
+        scrollerOneHeight = levelScrollerView.layoutParams.height / 2
+
+        scrollview_levelScroller.setOnScrollChangeListener { v, scrollX, scrollY, oldScrollX, oldScrollY ->
+            //println("scID = ${ (scrollY.toFloat() / scrollerOneHeight + 0.5).toInt()}, scrollY = $scrollY")
+            levelScroller_scrollY = scrollY
+            // IndexPicker
+            if( indexPicker != (scrollY.toFloat() / scrollerOneHeight + 0.5).toInt() ){
+                indexPicker = (scrollY.toFloat() / scrollerOneHeight + 0.5).toInt()
+                if(indexPicker > currentLevels.count()-1){
+                    indexPicker = currentLevels.count()-1
+                }else {
+                    val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        val vibrationEffect = VibrationEffect.createOneShot(30, DEFAULT_AMPLITUDE)
+                        vibrator.vibrate(vibrationEffect)
+                    } else {
+                        vibrator.vibrate(30)
                     }
                 }
             }
-        })
-        levelpicker.setOnScrollChangeListener(object : View.OnScrollChangeListener {
-            override fun onScrollChange(v: View?, scrollX: Int, scrollY: Int, oldScrollX: Int, oldScrollY: Int) {
-                //println("scrollY=$scrollY")
-                if( indexPicker != (v as NumberPicker).value ){
-                    indexPicker = (v as NumberPicker).value
-                    //LevelPickerコンテナの中身を更新
-                    LevelPickerContainerRedraw()
+            // 表示用のindex
+            if( levelScroller_index != (scrollY / scrollerOneHeight) ){
+                levelScroller_index = scrollY / scrollerOneHeight
+                if(levelScroller_index > currentLevels.count()-1){
+                    levelScroller_index = currentLevels.count()-1
                 }
-                if( levelpicker.oneScrollOffset != null ){
-                    levelpicker_scrollY = scrollY-levelpicker.oneScrollOffset!!
-                    //LevelPickerコンテナの位置を移動
-                    LevelPickerContainerSetScrollY(levelpicker_scrollY)
+                //LevelPickerコンテナの中身を更新
+                LevelPickerContainerRedraw()
+            }
+            LevelPickerContainerSetScrollY(scrollY % scrollerOneHeight)
+        }
+        scrollview_levelScroller.setOnTouchListener { v, event ->
+            if(event.action == ACTION_UP){
+                //指を離したとき据わりの良い位置にスクロールする。ための確認ループ
+                val timerRun = object : Runnable {
+                    override fun run() {
+                        if(levelScroller_maeScrollY == -100){
+                            //確認ループ最初はmae数値の保存だけする
+                            levelScroller_maeScrollY = levelScroller_scrollY
+                            //繰り返し
+                            mHandler.postDelayed(this, 20)
+                            return
+                        }
+                        if(levelScroller_maeScrollY != levelScroller_scrollY){
+                            levelScroller_maeScrollY = levelScroller_scrollY
+                            //前回とスクロール値が異なるならまだスクロール中と判断して繰り返し
+                            mHandler.postDelayed(this, 20)
+                            return
+                        }else {
+                            //指離した後、スクロールも止まった。
+                            levelScroller_maeScrollY = -100
+                            scrollview_levelScroller.smoothScrollTo(0,indexPicker * scrollerOneHeight)
+                       }
+                    }
+                }
+                if(levelScroller_maeScrollY == -100){
+                    //指離し後、まだスクロール中か確認するループ起動
+                    mHandler.post(timerRun)
                 }
             }
-        })
-        levelpickerContainer = findViewById<View>(R.id.levelpickerContainer) as LinearLayout
+            return@setOnTouchListener false
+        }
 
         SetMusicToCoverFlow()
 
-        //オブジェクトが生成されてから実行（各種値を取得する）
+        //オブジェクトが生成されてから実行（値を取得する）
         Handler().postDelayed(Runnable {
-            //LevelPickerの１項目のスクロール量を調べる。
-            levelpicker.checkContainerHeight()
             //コンテナの初期値を保存
             containerFirstPos = levelpickerContainer.y.toInt()
-
-            //ここで一応コンテナの位置を修正しておく
-            LevelPickerContainerSetScrollY(0)
         }, 100)
 
         text_Tags.setOnClickListener {
@@ -214,7 +248,10 @@ class Activity_Selector : AppCompatActivity() {
         if(indexPicker >= currentLevels.size - 1){
             indexPicker = currentLevels.size - 1
         }
-        levelpicker.maxValue = currentLevels.size - 1
+        // LinearLayout(levelScrollerContainer)内の Viewを新しく作り直してAddする（height変更がうまくできなかった）
+        levelScrollerContainer.removeAllViews()
+        levelScrollerContainer.addView(View(applicationContext), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,scrollerOneHeight * (currentLevels.size + 1 )))
+
         LevelPickerContainerRedraw()
     }
 
@@ -364,20 +401,20 @@ class Activity_Selector : AppCompatActivity() {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // LevelPicker処理 //
     fun LevelPickerContainerRedraw() {
-        if( indexPicker-1 >= 0 ) {
-            setLevelPickerContainer( currentLevels[indexPicker-1], star_m1, creator_m1, score_m1, rank_m1, date_m1 )
+        if( (levelScroller_index-1) >= 0 &&  (levelScroller_index-1) < currentLevels.count()) {
+            setLevelPickerContainer( currentLevels[levelScroller_index-1], star_m1, creator_m1, score_m1, rank_m1, date_m1 )
         }else {
             setLevelPickerContainer( null, star_m1, creator_m1, score_m1, rank_m1, date_m1 )
         }
-        if( indexPicker != -1 ){
-            setLevelPickerContainer( currentLevels[indexPicker], star, creator, score, rank, date )
-            text_Speed.setText( "speed: "+currentLevels[indexPicker].speed )
+        if( levelScroller_index != -1 &&  (levelScroller_index) < currentLevels.count() ){
+            setLevelPickerContainer( currentLevels[levelScroller_index], star, creator, score, rank, date )
+            text_Speed.setText( "speed: "+currentLevels[levelScroller_index].speed )
         }else {
             setLevelPickerContainer( null, star, creator, score, rank, date )
             text_Speed.setText("")
         }
-        if( indexPicker+1 <= currentLevels.size-1 ){
-            setLevelPickerContainer( currentLevels[indexPicker+1], star_p1, creator_p1, score_p1, rank_p1, date_p1 )
+        if( levelScroller_index+1 <= currentLevels.size-1  &&  (levelScroller_index+1) < currentLevels.count()){
+            setLevelPickerContainer( currentLevels[levelScroller_index+1], star_p1, creator_p1, score_p1, rank_p1, date_p1 )
         }else {
             setLevelPickerContainer( null, star_p1, creator_p1, score_p1, rank_p1, date_p1 )
         }
@@ -413,8 +450,8 @@ class Activity_Selector : AppCompatActivity() {
 
     }
     fun LevelPickerContainerSetScrollY(scrollY:Int) {
-        val realScrollY = levelpickerContainer.height * (scrollY) / (levelpicker.oneScrollLength!!) / 3
-        levelpickerContainer.layout(0, containerFirstPos+realScrollY, levelpickerContainer.width, containerFirstPos+realScrollY + levelpickerContainer.height)
+        val realScrollY = levelpickerContainer.height * (scrollY) / (scrollerOneHeight) / 3
+        levelpickerContainer.layout(0, containerFirstPos-realScrollY, levelpickerContainer.width, containerFirstPos-realScrollY + levelpickerContainer.height)
     }
 
 

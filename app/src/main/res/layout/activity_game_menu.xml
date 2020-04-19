@@ -40,7 +40,7 @@
             android:id="@+id/seekBar" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintBottom_toTopOf="@+id/continu"
             android:layout_marginBottom="64dp" android:layout_marginEnd="32dp" android:layout_marginStart="32dp"
-            android:min="-20" android:max="20"
+            android:min="0" android:max="40"
             android:progressBackgroundTint="@android:color/white"
     />
     <TextView

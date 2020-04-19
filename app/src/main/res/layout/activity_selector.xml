@@ -111,14 +111,19 @@
             coverflow:layout_constraintBottom_toBottomOf="parent" coverflow:layout_constraintVertical_bias="0.80"
             android:id="@+id/frameLayout">
 
-        <com.mizushiki.nicoflick_a.CustomPicker
-                android:background="@android:color/transparent"
-                android:id="@+id/levelpicker"
+        <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:descendantFocusability="blocksDescendants"
-                android:alpha="0.5"
-        />
+                android:id="@+id/scrollview_levelScroller">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                          android:orientation="vertical"
+                          android:id="@+id/levelScrollerContainer">
+                <View
+                        android:layout_width="match_parent"
+                        android:layout_height="200dp"
+                        android:id="@+id/levelScrollerView"/>
+            </LinearLayout>
+        </ScrollView>
         <LinearLayout android:layout_width="match_parent" android:layout_height="240dp"
                       android:layout_marginTop="-20dp" android:orientation="vertical"
                       android:id="@+id/levelpickerContainer">

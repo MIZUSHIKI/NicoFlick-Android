@@ -3,7 +3,7 @@
           package="com.mizushiki.nicoflick_a">
 
     <uses-permission android:name="android.permission.INTERNET"/>
-
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <application
             android:allowBackup="true"
             android:icon="@mipmap/ic_launcher"
