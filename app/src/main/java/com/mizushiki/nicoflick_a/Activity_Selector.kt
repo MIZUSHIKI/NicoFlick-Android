@@ -560,6 +560,7 @@ class Activity_Selector : AppCompatActivity() {
                     retTag = retTag.trim()
                     retTag = retTag.pregReplace("\\s*/(and|AND)/\\s","/and/")
                     retTag = retTag.pregReplace("\\s+"," or ")
+                    retTag = retTag.pregReplace("/and/"," ")
 
                     USERDATA.SelectedMusicCondition.tags = retTag
                     if( retSort != "" ){
