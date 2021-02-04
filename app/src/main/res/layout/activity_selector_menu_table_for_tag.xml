@@ -41,15 +41,38 @@
     <ListView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            app:layout_constraintTop_toBottomOf="@+id/editText_tags" app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/button7" app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" app:layout_constraintBottom_toBottomOf="parent"
             android:id="@+id/listView"/>
     <Button
             android:text="@string/SyokiGakkyoku"
             android:layout_width="wrap_content"
+            android:layout_height="25dp"
+            android:textSize="10sp"
+            android:id="@+id/button7"
+            app:layout_constraintEnd_toEndOf="@+id/editText_tags"
+            app:layout_constraintTop_toBottomOf="@+id/editText_tags"
+            style="@android:style/Widget.Material.Light.Button.Borderless.Small"
+            android:textColor="@android:color/holo_blue_dark" android:onClick="Button_SyokiGakkyoku"
+            android:textAlignment="center" android:background="@drawable/transparameterClear"/>
+
+    <Button
+            android:text="@string/hensyu"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:id="@+id/button7" app:layout_constraintEnd_toEndOf="parent"
+            android:id="@+id/button8" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="@+id/toolbar2" app:layout_constraintBottom_toBottomOf="@+id/toolbar2"
             style="@style/Widget.AppCompat.Button.Borderless.Colored"
-            android:textColor="@color/design_default_color_surface" android:onClick="Button_SyokiGakkyoku"/>
+            android:textColor="#FF0000"
+            android:onClick="Button_Hensyu"/>
+    <ProgressBar
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:layout_margin="30dp"
+            android:id="@+id/progress_circular"
+            style="@android:style/Widget.Material.ProgressBar.Large" tools:ignore="MissingConstraints"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintHorizontal_bias="0.5" app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
+            android:visibility="invisible"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

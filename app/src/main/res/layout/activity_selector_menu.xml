@@ -124,4 +124,16 @@
             android:layout_marginStart="16dp" style="@style/Widget.AppCompat.Button.Small"
             android:onClick="Button_GoMovieSite" android:background="@android:color/holo_blue_bright"
     />
+    <TextView
+            android:text=""
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/text_music_level_id"
+            android:textSize="8sp"
+            android:textColor="#000000"
+            app:layout_constraintTop_toTopOf="parent"
+            android:layout_marginTop="10dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:textAlignment="center"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

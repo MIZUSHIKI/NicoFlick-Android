@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import java.util.*
 import kotlin.collections.ArrayList
+import kotlin.properties.Delegates
 
 
 // object Userdata
@@ -40,6 +41,12 @@ object USERDATA {
             dataStore.edit().putString("UserName",value).commit()
             field = value
         }
+    var UserNameID:Int = 0
+        get() = dataStore.getInt("UserNameID",0)
+        set(value) {
+            dataStore.edit().putInt("UserNameID",value).commit()
+            field = value
+        }
     //ニコニコ動画： mail
     var NicoMail:String = ""
         get() = dataStore.getString("NicoMail","")!!
@@ -74,6 +81,23 @@ object USERDATA {
             }
             dataStore.edit().putString("UserScore",usString).commit()
         }
+
+    //MyFavorite
+    var MyFavorite:MutableSet<Int>
+        get() {
+            val ids = dataStore.getString("MyFavorite","")!!
+            if( ids == "" ){
+                return mutableSetOf()
+            }
+            val s = mutableSetOf<Int>()
+            s.addAll( ids.split(",").map{ Int(it) } )
+            return s
+        }
+        set(value) {
+            val s = value.map { String(it) }.joinToString(separator = ",")
+            println("MyFavo保存 $s")
+            dataStore.edit().putString("MyFavorite",s).commit()
+        }
     //PlayCounter
     var PlayCount:PlayCounter
         get() {
@@ -94,7 +118,26 @@ object USERDATA {
             }
             dataStore.edit().putString("PlayCount",usString).commit()
         }
-
+    //FavoriteCounter
+    var FavoriteCount:FavoriteCounter
+        get() {
+            val usString = dataStore.getString("FavoriteCount","")!!
+            val favoriteCounter = FavoriteCounter()
+            for( data in usString.split("|") ){
+                val sp = data.split(",")
+                if( sp.size != 2 ){ break }
+                favoriteCounter.counter[sp[0].toInt()] = sp[1].toInt()
+                // playCounter.counter[levelID] = playCount
+            }
+            return favoriteCounter
+        }
+        set(value) {
+            var usString=""
+            for( (id,favoriteCount) in value.counter ){
+                usString += "$id,$favoriteCount|"
+            }
+            dataStore.edit().putString("FavoriteCount",usString).commit()
+        }
 
     //tagやソートの設定
     var SelectedMusicCondition:SelectConditions = SelectConditions("","")
@@ -116,6 +159,20 @@ object USERDATA {
             editor.commit()
             println("SMC field保存")
         }
+    //
+    var LevelSortCondition:Int = 0
+        get() = dataStore.getInt("LevelSortCondition",0)
+        set(value) {
+            dataStore.edit().putInt("LevelSortCondition",value).commit()
+            field = value
+        }
+    var MusicSortCondition:Int = 0
+        get() = dataStore.getInt("MusicSortCondition",0)
+        set(value) {
+            dataStore.edit().putInt("MusicSortCondition",value).commit()
+            field = value
+        }
+
     //ジャッジオフセット
     var JudgeOffset:MutableMap<Int,Float>
         get() {
@@ -136,6 +193,13 @@ object USERDATA {
                 usString += "$id,$offset|"
             }
             dataStore.edit().putString("JudgeOffset",usString).commit()
+        }
+    //cachedMoviesNum
+    var cachedMovieNum:Int = 20
+        get() = dataStore.getInt("cachedMovieNum",20)
+        set(value) {
+            dataStore.edit().putInt("cachedMovieNum",value).commit()
+            field = value
         }
 
     //プレイ方法、本体キーボード設定のヘルプを見たかどうか
@@ -267,7 +331,8 @@ class UserScore {
         var scoreset = ""
         for( (levelID,us) in scores ){
             if( us[Companion.FLG] == 0 ){
-                scoreset += "<$levelID,${us[Companion.SCORE]}>"
+                val musicID = MusicDataLists.getLevelIDtoMusicID(levelID)
+                scoreset += "<$levelID,$musicID,${us[Companion.SCORE]}>"
             }
         }
         return scoreset
@@ -322,6 +387,79 @@ class PlayCounter {
     }
 }
 
+class FavoriteCounter {
+    var counter:MutableMap<Int,Int> = mutableMapOf()
+
+    fun addFavoriteCount(levelID:Int){
+        if( counter[levelID] != null ){
+            //あった
+            if( counter[levelID] == -1 ){
+                //けど引こうとしていた
+                counter.remove(levelID)
+            }else {
+                return
+            }
+        }else {
+            //なかった
+            counter[levelID] = 1
+        }
+        //保存
+        USERDATA.FavoriteCount = this
+    }
+    fun subFavoriteCount(levelID:Int){
+        if( counter[levelID] != null ){
+            //あった
+            if( counter[levelID] == 1 ){
+                //足そうとしていた
+                counter.remove(levelID)
+            }else {
+                return
+            }
+        }else {
+            //なかった
+            counter[levelID] = -1
+        }
+        //保存
+        USERDATA.FavoriteCount = this
+    }
+    //データベースに送るプレイ回数セット文字列
+    fun getSendFavoriteCountStr() : String {
+        var favoritecountset = ""
+        for( (levelID,pc) in counter ){
+            favoritecountset += "<$levelID,$pc>"
+        }
+        return favoritecountset
+    }
+    //スコア送信後、FLGを送信済みにする
+    fun setSended() {
+        counter = mutableMapOf() //初期化
+        //保存
+        USERDATA.FavoriteCount = this
+    }
+}
+class PFCounter {
+    var playCounter:MutableMap<Int,Int>  by Delegates.notNull()
+    var favoriteCounter:MutableMap<Int,Int>  by Delegates.notNull()
+    init {
+        playCounter = USERDATA.PlayCount.counter
+        favoriteCounter = USERDATA.FavoriteCount.counter
+    }
+    fun getSendPlayFavoriteCountStr() : String {
+        val sets =  playCounter.keys.toMutableSet()
+        sets.addAll(favoriteCounter.keys)
+        if( sets.size == (playCounter.size + favoriteCounter.size)){
+            return ""
+        }
+        var pfcountset = ""
+        for( levelID in sets ){
+            val pc = playCounter[levelID] ?: 0
+            val fc = favoriteCounter[levelID] ?: 0
+            pfcountset += "<${levelID},${pc},${fc}>"
+        }
+        return pfcountset
+    }
+}
+
 class SelectConditions(_tags:String, _sortItem:String) {
 
     val SortItem = arrayOf(
@@ -331,6 +469,8 @@ class SelectConditions(_tags:String, _sortItem:String) {
         "ゲームの投稿が古い曲順",
         "ゲームプレイ回数が多い曲順",
         "ゲームプレイ回数が少ない曲順",
+        "お気に入り数が多い曲順",
+        "お気に入り数が少ない曲順",
         "最近ハイスコアが更新された曲順",
         "最近コメントされた曲順")
 
@@ -365,12 +505,18 @@ class SelectConditions(_tags:String, _sortItem:String) {
         }
         val array = tags.trim().split(" ")
         var type = "or" //1つ目のデフォルトは orで以降のデフォルトは and
-        for( value in array ){
+        loop@ for( value in array ){
             var v = value
             when(value) {
-                "and" -> type = "and"
-                "or" -> type = "of"
-                "" -> {}
+                "and" -> {
+                    type = "and"
+                    continue@loop
+                }
+                "or" -> {
+                    type = "or"
+                    continue@loop
+                }
+                "" -> { continue@loop }
                 else -> {
                     if(value.substring(0,1)=="-"){
                         v = ""
@@ -383,11 +529,12 @@ class SelectConditions(_tags:String, _sortItem:String) {
         }
     }
     data class tagp(val word:String, val type:String)
-
+    /*
     var sortItemNum: Int
         get() = SortItem.indexOf(sortItem)
         set(value) {
             sortItem = SortItem[value]
             USERDATA.SelectedMusicCondition = this
         }
+     */
 }

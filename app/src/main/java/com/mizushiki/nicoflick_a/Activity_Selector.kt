@@ -2,7 +2,10 @@ package com.mizushiki.nicoflick_a
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
+import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.VibrationEffect
@@ -15,13 +18,18 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.NumberPicker
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isGone
+import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow
 import it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow.OnScrollPositionListener
 import kotlinx.android.synthetic.main.activity_selector.*
+import kotlinx.android.synthetic.main.activity_selector_menu.*
 import kotlinx.android.synthetic.main.activity_settings.progress_circular
+import java.net.URLDecoder
+import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.concurrent.schedule
 
@@ -46,7 +54,10 @@ class Activity_Selector : AppCompatActivity() {
     var levelScroller_maeScrollY = -100
     var maeTags = ""
     var maeSort = ""
+    var maeMusicTags = ""
     var scrollingTimer: Timer? = null
+    var maeMusic:musicData? = null
+    var numberRoll_index = -1
 
     lateinit var coverflow: FeatureCoverFlow
     var containerFirstPos = 0
@@ -58,6 +69,9 @@ class Activity_Selector : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_selector)
 
+        //お気に入りソート関係
+        button_levelSort.alpha = if (USERDATA.LevelSortCondition != 0) 0.6F else 0.2F
+        button_musicSort.alpha = if (USERDATA.MusicSortCondition != 0) 0.6F else 0.2F
         //カバーフロー
         val mHandler = Handler()
         coverflow = findViewById<View>(R.id.coverflow) as FeatureCoverFlow
@@ -88,6 +102,11 @@ class Activity_Selector : AppCompatActivity() {
                     indexCoverFlow = position
                     scrollingTimer?.cancel()
                     scrollingTimer = null
+
+                    if( currentMusics.indices.contains(indexCoverFlow) ){
+                        maeMusic = currentMusics[indexCoverFlow]
+                        println("maeMusic=$maeMusic")
+                    }
                 }
             }
 
@@ -170,21 +189,59 @@ class Activity_Selector : AppCompatActivity() {
                 segueing = true
                 maeTags = USERDATA.SelectedMusicCondition.tags
                 maeSort = USERDATA.SelectedMusicCondition.sortItem
+                maeMusicTags = currentMusics[indexCoverFlow].tags
                 GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
                 val intent: Intent = Intent(applicationContext, Activity_SelectorMenuTableForTag::class.java)
                 intent.putExtra("fromSelector", true)
                 startActivityForResult(intent, 1002)
             }
         }
+        text_Title_c.setOnClickListener {
+           gotoSelectorMenuTableForSort()
+        }
+        text_Artist.setOnClickListener {
+            gotoSelectorMenuTableForSort()
+        }
+        text_Length.setOnClickListener {
+            gotoSelectorMenuTableForSort()
+        }
+        text_Speed.setOnClickListener {
+            gotoSelectorMenuTableForSort()
+        }
+        text_Num.setOnClickListener {
+
+            val a = currentMusics.indices.map { (it + 1).toString() }.toTypedArray()
+            AlertDialog.Builder(this)
+                .setTitle("曲の選択")
+                .setItems(a){ dialog, which ->
+                    numberRoll_index = which
+                    indexCoverFlow = -1 //CoverFlowリロード
+                    SetMusicToCoverFlow()
+                }
+                .setNegativeButton("Cancel",null)
+                .show()
+        }
+    }
+    fun gotoSelectorMenuTableForSort() {
+        if( currentMusics.size <= 0 ){
+            return
+        }
+        if(segueing){ return }
+        segueing = true
+        maeTags = USERDATA.SelectedMusicCondition.tags
+        maeSort = USERDATA.SelectedMusicCondition.sortItem
+        maeMusicTags = currentMusics[indexCoverFlow].tags
+        GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
+        val intent: Intent = Intent(applicationContext, Activity_SelectorMenuTableForSort::class.java)
+        intent.putExtra("fromSelector", true)
+        startActivityForResult(intent, 1004)
     }
 
     fun SetMusicToCoverFlow() {
         progress_circular.isVisible = true
 
         musicDatas.getSelectMusics {
-            //for(m in it){
-            //    println(m.title)
-            //}
+
             currentMusics = it
             //println("tags="+USERDATA.SelectedMusicCondition.tags)
             //println("currentMusics.size="+currentMusics.size)
@@ -196,8 +253,22 @@ class Activity_Selector : AppCompatActivity() {
                     val coverFlowAdapter = CoverFlowAdapter(this, it)
                     coverflow.adapter = coverFlowAdapter
                     coverflow.setShouldRepeat(false)
-                    coverflow.scrollToPosition(0)
-                    indexCoverFlow = 0
+                    //前回選択していた曲に飛べれば飛ぶ
+                    var scrollPos = 0
+                    if( numberRoll_index == -1 ){
+                        maeMusic?.let {
+                            val selectMusic = it
+                            val firstIndex = currentMusics.indexOfFirst { it.movieURL == selectMusic.movieURL }
+                            if( firstIndex>=0 ){
+                                scrollPos = firstIndex
+                            }
+                        }
+                    }else {
+                        scrollPos = numberRoll_index
+                        numberRoll_index = -1
+                    }
+                    coverflow.scrollToPosition(scrollPos)
+                    indexCoverFlow = scrollPos
                 }else{
                     coverflow.isVisible = false
                 }
@@ -230,8 +301,7 @@ class Activity_Selector : AppCompatActivity() {
         var htmlText = currentMusics[index].tags
         for( tagp in USERDATA.SelectedMusicCondition.tag ){
             val tag = tagp.word
-            //println(tag)
-            htmlText = htmlText.pregReplace("(^|\\s)($tag)(\\s|$)","$1<font color='#000000'>$2</font>$3")
+            htmlText = htmlText.pregReplace("(^|\\s)(${Regex.escape(tag)})(\\s|$)","$1<font color='#000000'>$2</font>$3")
 
         }
         text_Tags.setText( Html.fromHtml( htmlText, Html.FROM_HTML_MODE_COMPACT ) )
@@ -361,6 +431,84 @@ class Activity_Selector : AppCompatActivity() {
         GLOBAL.SelectLEVEL = currentLevels[indexPicker]
         startActivityForResult(intent, 1003)
     }
+    fun Button_StartPage(view: View) {
+        println("gotoStartPage")
+        val intent: Intent = Intent(applicationContext, Activity_WikiPageWeb::class.java)
+        startActivityForResult(intent, 1005)
+    }
+    fun Button_favorite(view: View) {
+        println("favorite")
+        if( currentMusics.indices.contains(indexCoverFlow) == false ){
+            return
+        }
+        val selectMovieURL:String = currentMusics[indexCoverFlow].movieURL
+        if( musicDatas.levels.size > 0 && musicDatas.levels[selectMovieURL] == null ){
+            println()
+            return
+        }
+        val currentLevel = currentLevels[indexPicker]
+        if( USERDATA.MyFavorite.contains(currentLevel.sqlID) ){
+            val myFavorite = USERDATA.MyFavorite
+            myFavorite.remove(currentLevel.sqlID)
+            USERDATA.MyFavorite = myFavorite //ここでDataStoreに保存される
+            USERDATA.FavoriteCount.subFavoriteCount(levelID= currentLevel.sqlID)
+        }else{
+            val myFavorite = USERDATA.MyFavorite
+            myFavorite.add(currentLevel.sqlID)
+            USERDATA.MyFavorite = myFavorite //ここでDataStoreに保存される
+            USERDATA.FavoriteCount.addFavoriteCount(levelID= currentLevel.sqlID)
+        }
+        star_color.isVisible = USERDATA.MyFavorite.contains(currentLevel.sqlID)
+
+    }
+    fun Button_LevelSort(view: View) {
+        println("levelSort")
+
+        val strList = arrayOf("なし","お気に入りを上に集める")
+        AlertDialog.Builder(this) // FragmentではActivityを取得して生成
+            .setTitle("お気に入りソート")
+            .setItems(strList, { dialog, which ->
+                when(which){
+                    0 -> {
+                        USERDATA.LevelSortCondition = 0
+                        SetMusicToCoverFlow()
+                        button_levelSort.alpha = if (USERDATA.LevelSortCondition != 0) 0.6F else 0.2F
+                    }
+                    1 -> {
+                        USERDATA.LevelSortCondition = 1
+                        SetMusicToCoverFlow()
+                        button_levelSort.alpha = if (USERDATA.LevelSortCondition != 0) 0.6F else 0.2F
+                    }
+                }
+            })
+            .setPositiveButton("キャンセル", null)
+            .show()
+    }
+    fun Button_MusicSort(view: View) {
+
+        val strList = arrayOf("なし","お気に入りを含む曲を先頭に集める")
+        AlertDialog.Builder(this) // FragmentではActivityを取得して生成
+            .setTitle("お気に入りソート")
+            .setItems(strList, { dialog, which ->
+                when(which){
+                    0 -> {
+                        USERDATA.MusicSortCondition = 0
+                        indexCoverFlow = -1 //CoverFlowリロード
+                        SetMusicToCoverFlow()
+                        button_musicSort.alpha = if (USERDATA.MusicSortCondition != 0) 0.6F else 0.2F
+                    }
+                    1 -> {
+                        USERDATA.MusicSortCondition = 1
+                        indexCoverFlow = -1 //CoverFlowリロード
+                        SetMusicToCoverFlow()
+                        button_musicSort.alpha = if (USERDATA.MusicSortCondition != 0) 0.6F else 0.2F
+                    }
+                }
+            })
+            .setPositiveButton("キャンセル", null)
+            .show()
+    }
+
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -381,8 +529,14 @@ class Activity_Selector : AppCompatActivity() {
                 }
             }
             1002 -> {
-                if( maeTags != USERDATA.SelectedMusicCondition.tags || maeSort != USERDATA.SelectedMusicCondition.sortItem){
-                    indexCoverFlow = -1
+                if( maeTags != USERDATA.SelectedMusicCondition.tags || maeMusicTags != currentMusics[indexCoverFlow].tags){
+                    indexCoverFlow = -1 //CoverFlowリロード
+                    SetMusicToCoverFlow()
+                }
+            }
+            1004 -> {
+                if( maeSort != USERDATA.SelectedMusicCondition.sortItem){
+                    indexCoverFlow = -1 //CoverFlowリロード
                     SetMusicToCoverFlow()
                 }
             }
@@ -395,6 +549,29 @@ class Activity_Selector : AppCompatActivity() {
                     progress_circular.isVisible = false
                 }
             }
+            1005 -> {
+                val modoriStr = data?.getStringExtra("modori") ?: ""
+                println("url = $modoriStr")
+                if( modoriStr != "" ){
+                    val retStr = URLDecoder.decode(modoriStr,"UTF-8")
+                    println(retStr)
+                    var retTag = retStr.pregMatche_firstString("tag=(.*?)(&sort=|$)")
+                    val retSort = retStr.pregMatche_firstString("sort=(.*?)(&tag=|$)")
+                    retTag = retTag.trim()
+                    retTag = retTag.pregReplace("\\s*/(and|AND)/\\s","/and/")
+                    retTag = retTag.pregReplace("\\s+"," or ")
+
+                    USERDATA.SelectedMusicCondition.tags = retTag
+                    if( retSort != "" ){
+                        USERDATA.SelectedMusicCondition.sortItem = retSort
+                    }
+
+                    indexCoverFlow = -1 //CoverFlowリロード
+                    maeMusic = null
+                    SetMusicToCoverFlow()
+                }
+            }
+
         }
     }
 
@@ -408,15 +585,52 @@ class Activity_Selector : AppCompatActivity() {
         }
         if( levelScroller_index != -1 &&  (levelScroller_index) < currentLevels.count() ){
             setLevelPickerContainer( currentLevels[levelScroller_index], star, creator, score, rank, date )
-            text_Speed.setText( "speed: "+currentLevels[levelScroller_index].speed )
+            UpdateObject_Level( currentLevels[levelScroller_index] )
         }else {
             setLevelPickerContainer( null, star, creator, score, rank, date )
-            text_Speed.setText("")
+            UpdateObject_Level( null )
         }
         if( levelScroller_index+1 <= currentLevels.size-1  &&  (levelScroller_index+1) < currentLevels.count()){
             setLevelPickerContainer( currentLevels[levelScroller_index+1], star_p1, creator_p1, score_p1, rank_p1, date_p1 )
         }else {
             setLevelPickerContainer( null, star_p1, creator_p1, score_p1, rank_p1, date_p1 )
+        }
+    }
+    fun UpdateObject_Level( currentLevel:levelData? ){
+        if( currentLevel == null ){
+            text_Speed.setText("")
+            star_color.isVisible = false
+            return
+        }
+        currentLevel?.let {
+            val currentLevel = it
+            //スピード反映
+            text_Speed.setText( "speed: "+currentLevel.speed )
+            //favorite反映
+            star_color.isVisible = USERDATA.MyFavorite.contains(currentLevel.sqlID)
+            println(USERDATA.MyFavorite)
+            println(USERDATA.MyFavorite.contains(currentLevel.sqlID))
+            val fc = Int(currentLevel.favoriteCount / 10) * 10
+            text_FavoriteNum.text = String(fc)
+            text_FavoriteNum2.text = String(fc)
+            text_FavoriteNum3.text = String(fc)
+            text_FavoriteNum.isVisible = ( fc > 0)
+            text_FavoriteNum2.isVisible = ( fc > 0)
+            text_FavoriteNum3.isVisible = ( fc > 0)
+            val sDateFormat = SimpleDateFormat("yyy.MM.dd")
+            if( USERDATA.SelectedMusicCondition.sortItem == "最近ハイスコアが更新された曲順" && currentLevel.scoreTime > 0 ){
+                text_RankingTime.text = sDateFormat.format( Date( currentLevel.scoreTime * 1000L ))
+                text_RankingTime.isVisible = true
+            }else{
+                text_RankingTime.isVisible = false
+            }
+            if( USERDATA.SelectedMusicCondition.sortItem == "最近コメントされた曲順" && currentLevel.commentTime > 0 ){
+                text_CommentTime.text = sDateFormat.format( Date( currentLevel.commentTime * 1000L ))
+                text_CommentTime.isVisible = true
+            }else{
+                text_CommentTime.isVisible = false
+            }
+
         }
     }
     fun setLevelPickerContainer( leveldata:levelData?, _star:TextView, _creator:TextView, _score:TextView, _rank:TextView, _date:TextView ){

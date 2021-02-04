@@ -38,6 +38,18 @@
                 android:screenOrientation="portrait">
         </activity>
         <activity
+                android:name=".Activity_SelectorMenuTagEditor"
+                android:screenOrientation="portrait">
+        </activity>
+        <activity
+                android:name=".Activity_SelectorMenuTableForSort"
+                android:screenOrientation="portrait">
+        </activity>
+        <activity
+                android:name=".Activity_WikiPageWeb"
+                android:screenOrientation="portrait">
+        </activity>
+        <activity
                 android:name=".Activity_SelectorMenu"
                 android:screenOrientation="portrait"
                 android:theme="@style/Theme.TranslucentBackgroundClear">

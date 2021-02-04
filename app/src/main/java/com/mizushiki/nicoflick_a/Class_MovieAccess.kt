@@ -4,7 +4,11 @@ import android.R
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import androidx.core.text.HtmlCompat
+import com.google.android.exoplayer2.DefaultLoadControl
+import com.google.android.exoplayer2.SimpleExoPlayer
+import com.google.android.exoplayer2.source.ProgressiveMediaSource
 import com.google.android.exoplayer2.upstream.*
 import com.google.android.exoplayer2.upstream.cache.CacheDataSink
 import com.google.android.exoplayer2.upstream.cache.CacheDataSource
@@ -93,6 +97,50 @@ class MovieAccess {
 
 object CachedMovies {
     //いずれ．．．
+    data class CachedMovie(var url:String, var simpleExoPlayer: SimpleExoPlayer )
+
+    var cachedMovies:MutableList<CachedMovie> = mutableListOf()
+    fun access(url:String) : SimpleExoPlayer {
+        //読み込み済みのものがあればそれを返す
+        for ( i in 0 until cachedMovies.count()){
+            if( cachedMovies[i].url == url ){
+                cachedMovies.add(cachedMovies[i])
+                cachedMovies.removeAt(i)
+                while (cachedMovies.count() > USERDATA.cachedMovieNum){
+                    cachedMovies.removeAt(0)
+                }
+                return cachedMovies.last().simpleExoPlayer
+            }
+        }
+        for( bi in 0 until cachedMovies.count() ){
+            val i = cachedMovies.count() - bi - 1
+            if( cachedMovies[i].simpleExoPlayer.bufferedPercentage < 99 ){
+                cachedMovies.removeAt(i)
+                break
+            }
+        }
+        val loadControl = DefaultLoadControl.Builder().setBackBuffer(10*60*1000, true).createDefaultLoadControl()
+        val simpleExoPlayer = SimpleExoPlayer.Builder(GLOBAL.APPLICATIONCONTEXT).setLoadControl(loadControl)
+            .build()
+        val dataSourceFactory = DefaultDataSourceFactory(
+            GLOBAL.APPLICATIONCONTEXT,
+            Util.getUserAgent(GLOBAL.APPLICATIONCONTEXT, GLOBAL.APPLICATIONCONTEXT.packageName)
+        )
+        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(url))
+        simpleExoPlayer.prepare(mediaSource)
+
+        simpleExoPlayer.playWhenReady = true
+        simpleExoPlayer.volume = 0.2f
+
+        val cachedMovie = CachedMovie(url,simpleExoPlayer)
+        cachedMovies.add(cachedMovie)
+
+        while (cachedMovies.count() > USERDATA.cachedMovieNum){
+            cachedMovies.removeAt(0)
+        }
+
+        return simpleExoPlayer
+    }
 }
 internal class CacheDataSourceFactory(
     private val context: Context,

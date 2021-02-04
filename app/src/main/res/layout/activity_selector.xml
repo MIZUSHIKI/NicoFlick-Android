@@ -68,12 +68,24 @@
             android:layout_marginEnd="8dp" android:layout_marginStart="8dp"
     />
     <TextView
-            android:layout_width="0dp"
+            android:layout_width="100dp"
             android:layout_height="wrap_content"
-            android:id="@+id/text_Num" coverflow:layout_constraintEnd_toEndOf="parent"
-            coverflow:layout_constraintStart_toStartOf="parent"
+            android:id="@+id/text_Num"
+            coverflow:layout_constraintEnd_toEndOf="@+id/text_Title_c"
             coverflow:layout_constraintBottom_toTopOf="@+id/text_Title_c" android:layout_marginEnd="8dp"
             android:layout_marginStart="8dp" android:textAlignment="viewEnd" android:textSize="10sp"/>
+    <Button
+            android:layout_width="35dp"
+            android:layout_height="20dp"
+            android:id="@+id/button_musicSort"
+            android:onClick="Button_MusicSort"
+            android:background="@drawable/cursor_lr"
+            android:layout_marginStart="8dp"
+            android:scaleX="0.8"
+            android:scaleY="0.8"
+            android:alpha="0.3"
+            coverflow:layout_constraintStart_toStartOf="@+id/text_Title_c"
+            coverflow:layout_constraintBottom_toTopOf="@+id/text_Title_c"/>
     <Button
             android:layout_width="50dp"
             android:layout_height="50dp"
@@ -284,6 +296,127 @@
             android:textColor="@android:color/holo_blue_dark" android:gravity="center_vertical"
             android:textStyle="bold" coverflow:layout_constraintStart_toStartOf="@+id/button_RankingComment"
             android:layout_marginStart="2dp"/>
+    <TextView
+            android:text="2021.01.29"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/text_RankingTime"
+            coverflow:layout_constraintStart_toStartOf="@+id/button_RankingComment"
+            coverflow:layout_constraintEnd_toEndOf="@+id/button_RankingComment"
+            coverflow:layout_constraintTop_toTopOf="@+id/button_RankingComment" android:textAlignment="center"
+            android:textSize="7sp"
+            android:textColor="#999999"/>
+    <TextView
+            android:text="2021.01.29"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/text_CommentTime"
+            coverflow:layout_constraintStart_toStartOf="@+id/button_RankingComment"
+            coverflow:layout_constraintEnd_toEndOf="@+id/button_RankingComment"
+            coverflow:layout_constraintBottom_toBottomOf="@+id/button_RankingComment" android:textAlignment="center"
+            android:textSize="7sp"
+            android:textColor="#999999"/>
+    <Button
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:id="@+id/button_favoriteWaku"
+            android:onClick="Button_favorite"
+            android:background="@drawable/hukidasi"
+            android:layout_marginEnd="16dp"
+            android:scaleX="1.0"
+            android:scaleY="1.0"
+            android:alpha="0.2"
+            coverflow:layout_constraintTop_toTopOf="@+id/frameLayout"
+            coverflow:layout_constraintBottom_toTopOf="@+id/button_RankingComment"
+            coverflow:layout_constraintEnd_toEndOf="@+id/frameLayout"/>
+    <Button
+            android:layout_width="20dp"
+            android:layout_height="35dp"
+            android:id="@+id/button_levelSort"
+            android:onClick="Button_LevelSort"
+            android:background="@drawable/cursor_ud"
+            android:scaleX="0.8"
+            android:scaleY="0.8"
+            android:alpha="0.3"
+            coverflow:layout_constraintTop_toTopOf="@+id/button_favoriteWaku"
+            coverflow:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku"
+            coverflow:layout_constraintEnd_toStartOf="@+id/button_favoriteWaku"/>
+    <ImageView
+            android:src="@drawable/star"
+            android:layout_width="19dp"
+            android:layout_height="19dp" android:id="@+id/star_mono"
+            app:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku"
+            app:layout_constraintTop_toTopOf="@+id/button_favoriteWaku"
+            app:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
+            app:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku"
+            android:scaleX="0.9"
+            android:scaleY="0.9"
+            android:alpha="0.5"
+            android:visibility="visible"/>
+    <ImageView
+            android:src="@drawable/star_color"
+            android:layout_width="19dp"
+            android:layout_height="19dp" android:id="@+id/star_color"
+            app:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku"
+            app:layout_constraintTop_toTopOf="@+id/button_favoriteWaku"
+            app:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
+            app:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku"
+            android:visibility="invisible"/>
+    <TextView
+            android:text=""
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/text_FavoriteNum3"
+            coverflow:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
+            coverflow:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku" android:layout_marginBottom="3px"
+             android:layout_marginEnd="1px"
+            coverflow:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku" android:textAlignment="center"
+            android:ellipsize="end" android:maxLines="1" android:textSize="8sp"
+            android:textColor="#FFFFFF"/>
+    <TextView
+            android:text=""
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/text_FavoriteNum2"
+            coverflow:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
+            coverflow:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku" android:layout_marginBottom="1px"
+            android:layout_marginStart="1px"
+            coverflow:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku" android:textAlignment="center"
+            android:ellipsize="end" android:maxLines="1" android:textSize="8sp"
+            android:textColor="#FFFFFF"/>
+    <TextView
+            android:text="100"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/text_FavoriteNum"
+            coverflow:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
+            coverflow:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku" android:layout_marginBottom="2px"
+            coverflow:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku" android:textAlignment="center"
+            android:ellipsize="end" android:maxLines="1" android:textSize="8sp"
+            android:textColor="#111111"/>
+    <Button
+            android:text="Start\nPage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/button_gotoWiki"
+            android:onClick="Button_StartPage"
+            style="@android:style/Widget.Holo.Button.Borderless.Small"
+            android:textColor="@android:color/holo_blue_dark" android:textSize="8sp" android:lines="2"
+            android:singleLine="false"
+            coverflow:layout_constraintTop_toBottomOf="@+id/button_RankingComment"
+            coverflow:layout_constraintBottom_toBottomOf="@+id/frameLayout"
+            coverflow:layout_constraintEnd_toEndOf="@+id/frameLayout"/>
+    <TextView
+            android:text="▷"
+            android:layout_width="wrap_content"
+            android:layout_height="0dp"
+            android:id="@+id/textView15"
+            coverflow:layout_constraintTop_toTopOf="@+id/button_gotoWiki"
+            coverflow:layout_constraintBottom_toBottomOf="@+id/button_gotoWiki"
+            android:textSize="8sp"
+            android:layout_marginRight="10dp"
+            android:textColor="@android:color/holo_blue_dark" android:gravity="center_vertical"
+            android:textStyle="bold" coverflow:layout_constraintEnd_toEndOf="@+id/button_gotoWiki"/>
     <ProgressBar
             style="?android:attr/progressBarStyle"
             android:layout_width="wrap_content"

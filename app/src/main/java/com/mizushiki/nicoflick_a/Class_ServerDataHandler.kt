@@ -73,21 +73,66 @@ class ServerDataHandler {
                     //return@DownloadMusicData
                 }
                 println("level-load")
-                //データベース接続 おまけ : プレイ回数をデータベースに送信する（送信済みでないもの）。リザルトまで行かずに溜まったものがあれば出す。
-                val playcountset = USERDATA.PlayCount.getSendPlayCountStr() //送信するデータ
-                if( playcountset != "" ){
-                    // プレイ回数 送信
-                    ServerDataHandler().postPlayCountData(playcountset= playcountset) {
-                        if( it ){
-                            //プレイ回数データを保存する(初期化データになる)
-                            USERDATA.PlayCount.setSended()
-                        }
-                        println("post-PlayCount")
+                //データベース接続３ : 次にplayCount,favoriteデータロード
+                ServerDataHandler().DownloadPlayFavoriteCountData {
+                    if (it != null) {
+                        println("PlayFavorite-load error")
+                        //callback(it)
+                        //return@DownloadMusicData
                     }
-                }
-                println("ServerData Download")
-                callback(null)
-                //
+                    println("UserNameID-get")
+                    //データベース接続4 : もしUserNameを登録していてまだIDを取得していない場合（Ver.1.4未満ケア）
+                    ServerDataHandler().GetUserNameSqlID(USERDATA.UserID) {
+                        if (!it) {
+                            println("UserNameID-get error")
+                            //callback(it)
+                            //return@DownloadMusicData
+                        }
+
+
+                        //データベース接続 おまけ : プレイ回数をデータベースに送信する（送信済みでないもの）。リザルトまで行かずに溜まったものがあれば出す。
+                        // 3.でのロード後に送信してるけど気にしない
+                        val pfcountset = PFCounter().getSendPlayFavoriteCountStr()
+                        println("pfcountset=${pfcountset}")
+                        if( pfcountset != "" ){
+                            // データ送信
+                            ServerDataHandler().postPlayFavoriteCountData(pfcountset = pfcountset){
+                                if( it ){
+                                    // データを保存する(初期化データになる)
+                                    USERDATA.PlayCount.setSended()
+                                    USERDATA.FavoriteCount.setSended()
+                                }
+                            }
+                        }else {
+                            val playcountset = USERDATA.PlayCount.getSendPlayCountStr() //送信するデータ
+                            if( playcountset != "" ){
+                                // プレイ回数 送信
+                                ServerDataHandler().postPlayCountData(playcountset= playcountset) {
+                                    if( it ){
+                                        //プレイ回数データを保存する(初期化データになる)
+                                        USERDATA.PlayCount.setSended()
+                                    }
+                                    println("post-PlayCount")
+                                }
+                            }
+                            val favoritecountset = USERDATA.FavoriteCount.getSendFavoriteCountStr() //送信するデータ
+                            if( favoritecountset != "" ){
+                                // お気に入り回数 送信
+                                ServerDataHandler().postFavoriteCountData(favoritecountset= favoritecountset) {
+                                    if( it ){
+                                        //プレイ回数データを保存する(初期化データになる)
+                                        USERDATA.FavoriteCount.setSended()
+                                    }
+                                    println("post-FavoriteCount")
+                                }
+                            }
+                        }
+                        println("ServerData Download")
+                        callback(null)
+
+
+                    }// 4.UserNameID取得
+                }// 3.playCount,favoriteデータロード
             }// 2.levelデータロード
         }// 1.musicデータロード
     }
@@ -224,7 +269,7 @@ class ServerDataHandler {
     }
 
     fun DownloadLevelData(callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
-        val url = GLOBAL.PHP_URL + "?req=levelz-noTimetag&time="+musicDatas.getLastUpdateTimeLevel()
+        val url = GLOBAL.PHP_URL + "?req=levelm-noTimetag&userID="+USERDATA.UserID.take(8)+"&time="+musicDatas.getLastUpdateTimeLevel()
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
         async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
             if (it == null) {
@@ -244,6 +289,12 @@ class ServerDataHandler {
                 // ロードした levelデータを処理
                 for (i in 0 until jsonArray.size()) {
                     val json = jsonArray.get(i).asObject()
+                    //下位互換
+                    val playCountTime = json.get("playCountTime")?.asString()?.toInt() ?: 0
+                    val favoriteCount =  json.get("favorite")?.asString()?.toInt() ?: 0
+                    val favoriteCountTime = json.get("favoriteTime")?.asString()?.toInt() ?: 0
+                    val commentTime = json.get("commentTime")?.asString()?.toInt() ?: 0
+                    val scoreTime = json.get("scoreTime")?.asString()?.toInt() ?: 0
                     musicDatas.setLevel(
                         sqlID = json.get("id").asString().toInt(),
                         movieURL = json.get("movieURL").asString(),
@@ -254,7 +305,12 @@ class ServerDataHandler {
                         noteData = "",
                         updateTime = json.get("updateTime").asString().toInt(),
                         createTime = json.get("createTime").asString().toInt(),
-                        playCount = json.get("playCount").asString().toInt()
+                        playCount = json.get("playCount").asString().toInt(),
+                        playCountTime = playCountTime,
+                        favoriteCount = favoriteCount,
+                        favoriteCountTime = favoriteCountTime,
+                        commentTime = commentTime,
+                        scoreTime = scoreTime
                     )
                 }
                 //保存データも更新
@@ -282,6 +338,12 @@ class ServerDataHandler {
                 // ロードした levelデータを処理
                 for (i in 0 until jsonArray.size()) {
                     val json = jsonArray.get(i).asObject()
+                    //下位互換
+                    val playCountTime = json.get("playCountTime")?.asString()?.toInt() ?: 0
+                    val favoriteCount =  json.get("favorite")?.asString()?.toInt() ?: 0
+                    val favoriteCountTime = json.get("favoriteTime")?.asString()?.toInt() ?: 0
+                    val commentTime = json.get("commentTime")?.asString()?.toInt() ?: 0
+                    val scoreTime = json.get("scoreTime")?.asString()?.toInt() ?: 0
                     musicDatas.setLevel(
                         sqlID = json.get("id").asString().toInt(),
                         movieURL = json.get("movieURL").asString(),
@@ -292,7 +354,12 @@ class ServerDataHandler {
                         noteData = "",
                         updateTime = json.get("updateTime").asString().toInt(),
                         createTime = json.get("createTime").asString().toInt(),
-                        playCount = json.get("playCount").asString().toInt()
+                        playCount = json.get("playCount").asString().toInt(),
+                        playCountTime = playCountTime,
+                        favoriteCount = favoriteCount,
+                        favoriteCountTime = favoriteCountTime,
+                        commentTime = commentTime,
+                        scoreTime = scoreTime
                     )
                 }
                 //保存データも更新
@@ -300,7 +367,7 @@ class ServerDataHandler {
                 //もう一度通常取得を試みる（Swiftみたいに上手くできない？ので そのまま全部コピペ）
                 //DownloadLevelData(callback)
                 // ↓
-                val url = GLOBAL.PHP_URL + "?req=levelz-noTimetag&time="+musicDatas.getLastUpdateTimeLevel()
+                val url = GLOBAL.PHP_URL + "?req=levelm-noTimetag&userID="+USERDATA.UserID.take(8)+"&time="+musicDatas.getLastUpdateTimeLevel()
                 //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
                 async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
                     if (it == null) {
@@ -319,6 +386,12 @@ class ServerDataHandler {
                         // ロードした levelデータを処理
                         for (i in 0 until jsonArray.size()) {
                             val json = jsonArray.get(i).asObject()
+                            //下位互換
+                            val playCountTime = json.get("playCountTime")?.asString()?.toInt() ?: 0
+                            val favoriteCount =  json.get("favorite")?.asString()?.toInt() ?: 0
+                            val favoriteCountTime = json.get("favoriteTime")?.asString()?.toInt() ?: 0
+                            val commentTime = json.get("commentTime")?.asString()?.toInt() ?: 0
+                            val scoreTime = json.get("scoreTime")?.asString()?.toInt() ?: 0
                             musicDatas.setLevel(
                                 sqlID = json.get("id").asString().toInt(),
                                 movieURL = json.get("movieURL").asString(),
@@ -329,7 +402,12 @@ class ServerDataHandler {
                                 noteData = "",
                                 updateTime = json.get("updateTime").asString().toInt(),
                                 createTime = json.get("createTime").asString().toInt(),
-                                playCount = json.get("playCount").asString().toInt()
+                                playCount = json.get("playCount").asString().toInt(),
+                                playCountTime = playCountTime,
+                                favoriteCount = favoriteCount,
+                                favoriteCountTime = favoriteCountTime,
+                                commentTime = commentTime,
+                                scoreTime = scoreTime
                             )
                         }
                         //保存データも更新
@@ -344,6 +422,53 @@ class ServerDataHandler {
                     }
                 }
                 // ↑
+
+            } catch (e: Exception) {
+                println(e)
+                callback(e.message)
+                return@let
+            }
+        }
+    }
+
+    fun DownloadPlayFavoriteCountData(callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
+        val url = GLOBAL.PHP_URL + "?req=PcFcCtSt&playcountTime="+musicDatas.getLastUpdateTimeLevel() + "&playcountTime="+musicDatas.getLastPlayCountTimeLevel() + "&favoriteTime="+musicDatas.getLastFavoriteCountTimeLevel() + "&commentTime="+musicDatas.getLastCommentTimeLevel() + "&scoreTime="+musicDatas.getLastScoreTimeLevel()
+        //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
+        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+            if (it == null) {
+                callback("error")
+                return@let
+            }
+            if (it == "latest") {
+                callback(null)
+                return@let
+            }
+            try {
+                val jsonArray = Json.parse(it).asArray()
+                // ロードした levelデータを処理
+                for (i in 0 until jsonArray.size()) {
+                    val json = jsonArray.get(i).asObject()
+                    //下位互換
+                    val playCount = json.get("playCount")?.asString()?.toInt() ?: -1
+                    val playCountTime = json.get("playCountTime")?.asString()?.toInt() ?: -1
+                    val favoriteCount =  json.get("favorite")?.asString()?.toInt() ?: -1
+                    val favoriteCountTime = json.get("favoriteTime")?.asString()?.toInt() ?: -1
+                    val commentTime = json.get("commentTime")?.asString()?.toInt() ?: -1
+                    val scoreTime = json.get("scoreTime")?.asString()?.toInt() ?: -1
+                    musicDatas.setLevel_PlaycountFavorite(
+                        sqlID = json.get("id").asString().toInt(),
+                        playCount = playCount,
+                        playCountTime = playCountTime,
+                        favoriteCount = favoriteCount,
+                        favoriteCountTime = favoriteCountTime,
+                        commentTime = commentTime,
+                        scoreTime = scoreTime
+                    )
+                }
+                //保存データも更新
+                USERDATA.LevelsJson = musicDatas.toLevelsJsonString()
+                callback(null)
+                return@let
 
             } catch (e: Exception) {
                 println(e)
@@ -680,7 +805,7 @@ class ServerDataHandler {
     fun postUserName(name:String, userID:String, callback: (Boolean) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         //  登録
         val url = GLOBAL.PHP_URL
-        val body = "req=userName-add&id=${userID}&name=${name}"
+        val body = "req=userName-add&id=${userID}&name=${URLEncoder.encode(name,"utf-8")}"
         println("postbody="+body)
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
         async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
@@ -688,13 +813,38 @@ class ServerDataHandler {
                 callback(false)
                 return@let
             }
+            println("postRet="+it)
+            if (it.startsWith("success userName-add UserNameSqlID=")) {
+                USERDATA.UserNameID = it.pregMatche_firstString("UserNameSqlID=(\\d+)").toInt()
+            }
+            callback(true)
+        }
+    }
+    //Ver.1.4未満のケア
+    fun GetUserNameSqlID(userID:String, callback: (Boolean) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
+        if( USERDATA.UserName == "" || USERDATA.UserNameID != 0 ){
+            println("usernameid=${USERDATA.UserNameID}")
+            callback(true)
+            return@launch
+        }
+        val url = GLOBAL.PHP_URL + "?req=userNameID&id=$userID"
+        //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
+        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+            if (it == null) {
+                callback(false)
+                return@let
+            }
+            println("postRet="+it)
+            if (it.startsWith("success UserNameSqlID=")) {
+                USERDATA.UserNameID = it.pregMatche_firstString("UserNameSqlID=(\\d+)").toInt()
+            }
             callback(true)
         }
     }
     fun postScoreData(scoreset:String, userID:String, callback: (Boolean) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         //  登録
         val url = GLOBAL.PHP_URL
-        val body = "req=score-add&userID=${userID}&scoreset=${scoreset}&pass=${Crypt.encryptx_urlsafe("ニコFlick", userID)}"
+        val body = "req=scorez-add&userID=${userID}&userNameID=${USERDATA.UserNameID}&scoreset=${scoreset}&pass=${Crypt.encryptx_urlsafe("ニコFlick", userID)}"
         println("postbody="+body)
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
         async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
@@ -728,6 +878,40 @@ class ServerDataHandler {
             }
         }
     }
+    fun postFavoriteCountData(favoritecountset:String, callback: (Boolean) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
+        //  登録
+        val url = GLOBAL.PHP_URL
+        val body = "req=favorite-add&favoritecountset=${favoritecountset}"
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+            if (it == null) {
+                callback(false)
+                return@let
+            }
+            if (it == "success favorite-add") {
+                callback(true)
+            } else {
+                println("favorite送信失敗")
+                callback(false)
+            }
+        }
+    }
+    fun postPlayFavoriteCountData(pfcountset:String, callback: (Boolean) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
+        //  登録
+        val url = GLOBAL.PHP_URL
+        val body = "req=PlaycountFavorite-add&PFcountset=${pfcountset}"
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+            if (it == null) {
+                callback(false)
+                return@let
+            }
+            if (it == "success PFcount-add") {
+                callback(true)
+            } else {
+                println("PFcount送信失敗")
+                callback(false)
+            }
+        }
+    }
     fun postComment(comment:String, levelID: Int, userID:String, callback: (Boolean) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         //  登録
         val url = GLOBAL.PHP_URL
@@ -741,6 +925,26 @@ class ServerDataHandler {
             }
             println("postRet="+it)
             callback(true)
+        }
+    }
+    fun postMusicTagUpdate(id:Int, tags:String, userID:String, callback: (Boolean) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
+        //  登録
+        val url = GLOBAL.PHP_URL
+        val body = "req=musicTag-update&id=${id}&tags=${URLEncoder.encode(tags,"utf-8")}&userID=${userID}&pass=${Crypt.encryptx_urlsafe("ニコFlick", userID)}"
+        println("postbody="+body)
+        //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+            if (it == null) {
+                callback(false)
+                return@let
+            }
+            println("postRet="+it)
+            if (it == "success musictag-update") {
+                callback(true)
+            } else {
+                println("musicタグ送信失敗")
+                callback(false)
+            }
         }
     }
 
@@ -762,5 +966,20 @@ class ServerDataHandler {
             }
             callback(false)
        }
+    }
+    fun postTagsToMusics(tags:String, musicsStr:String, callback: (Boolean) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
+        //  登録
+        val url = GLOBAL.PHP_URL
+        val body = "req=tagsToMusics&tags=${URLEncoder.encode(tags,"UTF-8")}&musics=${URLEncoder.encode(musicsStr, "UTF-8")}"
+        println("postbody="+body)
+        //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+            if (it == null) {
+                callback(false)
+                return@let
+            }
+            println("postRet="+it)
+            callback(true)
+        }
     }
 }

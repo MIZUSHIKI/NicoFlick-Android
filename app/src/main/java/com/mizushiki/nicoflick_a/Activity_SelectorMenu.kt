@@ -28,6 +28,13 @@ class Activity_SelectorMenu : AppCompatActivity() {
             Button_postReport.isEnabled = false
             Button_postReport.setBackgroundColor(Color.LTGRAY)
         }
+        GLOBAL.SelectMUSIC?.let {
+            val music = it
+            GLOBAL.SelectLEVEL?.let {
+                val level = it
+                text_music_level_id.text = "musicID=${music.sqlID}, gameID=${level.sqlID}"
+            }
+        }
     }
 
     fun Button_HowTo(view: View) {
@@ -62,6 +69,9 @@ class Activity_SelectorMenu : AppCompatActivity() {
         startActivityForResult(intent, 1001)
     }
     fun TextVIew_sortOnClick(view: View) {
+        val intent: Intent = Intent(applicationContext, Activity_SelectorMenuTableForSort::class.java)
+        startActivityForResult(intent, 1002)
+        /*
         AlertDialog.Builder(this) // FragmentではActivityを取得して生成
             .setTitle("Sort")
             .setSingleChoiceItems(USERDATA.SelectedMusicCondition.SortItem, USERDATA.SelectedMusicCondition.sortItemNum, { dialog, which ->
@@ -70,6 +80,8 @@ class Activity_SelectorMenu : AppCompatActivity() {
             })
             .setPositiveButton("OK",null)
             .show()
+
+         */
     }
 
     fun Button_GoMovieSite(view: View) {
@@ -83,6 +95,8 @@ class Activity_SelectorMenu : AppCompatActivity() {
         // startActivityForResult()の際に指定した識別コードとの比較
         if( requestCode == 1001 ){
             textView_tagWords.setText(USERDATA.SelectedMusicCondition.tags)
+        }else if( requestCode == 1002 ){
+            textView_sortWords.setText(USERDATA.SelectedMusicCondition.sortItem)
         }
     }
 

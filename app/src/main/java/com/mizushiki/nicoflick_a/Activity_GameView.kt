@@ -24,9 +24,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.os.postDelayed
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.SimpleExoPlayer
+import com.google.android.exoplayer2.*
 import com.google.android.exoplayer2.database.ExoDatabaseProvider
 import com.google.android.exoplayer2.source.MediaSource
 import com.google.android.exoplayer2.source.MediaSourceEventListener
@@ -85,7 +83,8 @@ class Activity_GameView : AppCompatActivity() {
     //ゲームデータ
     val noteData = Notes()
 
-    private lateinit var simpleExoPlayer: SimpleExoPlayer
+    //private lateinit var simpleExoPlayer: SimpleExoPlayer
+    private var cacheExoPlayer: SimpleExoPlayer? = null
     private lateinit var playerView: PlayerView
 
     var maeSource = ""
@@ -106,8 +105,8 @@ class Activity_GameView : AppCompatActivity() {
         selectMusic = GLOBAL.SelectMUSIC!!
         selectLevel = GLOBAL.SelectLEVEL!!
 
-        simpleExoPlayer = SimpleExoPlayer.Builder(applicationContext)
-            .build()
+        //simpleExoPlayer = SimpleExoPlayer.Builder(applicationContext)
+        //    .build()
         playerView = findViewById(R.id.playerView)
 
         if(USERDATA.lookedHelp == false){
@@ -125,62 +124,26 @@ class Activity_GameView : AppCompatActivity() {
         val smNum = Regex("watch/(.+)$").find(selectMusic.movieURL)!!.groupValues.get(1)
 
         //Movie呼び込み
-        simpleExoPlayer.playWhenReady = true
-        simpleExoPlayer.volume = 0.2f
-        simpleExoPlayer.apply {
-            MovieAccess().StreamingUrlNicoAccess(smNum) {
-                if( it!! != "re-eco" ){
+        var nicodougaURL = ""
+        MovieAccess().StreamingUrlNicoAccess(smNum) {
+            if( it!! != "re-eco" ){
+                // 動画
+                nicodougaURL = it!!
+                println(nicodougaURL)
+                //println(applicationContext.packageName)
+                setExo(nicodougaURL)
+
+            }else{
+                //なんか再帰がよくわからなかったので無理やりもう一回実行する(Swiftみたく出来ない？)
+                MovieAccess().StreamingUrlNicoAccess(smNum+"?eco=1") {
                     // 動画
-                    val url = it!!
-                    println(url)
+                    nicodougaURL = it!!
+                    println(nicodougaURL)
                     //println(applicationContext.packageName)
-                    val dataSourceFactory = DefaultDataSourceFactory(
-                        applicationContext,
-                        Util.getUserAgent(applicationContext, applicationContext.packageName)
-                    )
-                    val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(url))
-                    prepare(mediaSource)
-
-                }else{
-                    //なんか再帰がよくわからなかったので無理やりもう一回実行する(Swiftみたく出来ない？)
-                    MovieAccess().StreamingUrlNicoAccess(smNum+"?eco=1") {
-                        // 動画
-                        val url = it!!
-                        println(url)
-                        //println(applicationContext.packageName)
-                        val dataSourceFactory = DefaultDataSourceFactory(
-                            applicationContext,
-                            Util.getUserAgent(applicationContext, applicationContext.packageName)
-                        )
-                        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(url))
-                        prepare(mediaSource)
-                    }
+                    setExo(nicodougaURL)
                 }
             }
         }
-        playerView.apply {
-            player = simpleExoPlayer
-        }
-        simpleExoPlayer.addListener(object : Player.EventListener {
-            override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
-                println("playbackState=" + playbackState)
-                when (playbackState) {
-                    ExoPlayer.STATE_ENDED -> {
-                        println("終了 -> リザルト画面へ")
-
-                        if(resultSegued==false){
-                            resultSegued = true
-                            val intent: Intent = Intent(applicationContext, Activity_Result::class.java)
-                            //intent.putExtra("SelectMusicID", selectMusic.sqlID)
-                            //intent.putExtra("SelectLevelID", selectLevel.sqlID)
-                            GLOBAL.CurrentNOTES = noteData
-                            GLOBAL.ResultFirst = true
-                            startActivityForResult(intent, 1002)
-                        }
-                    }
-                }
-            }
-        })
 
         editText.filters = arrayOf(object : InputFilter {
             override fun filter(
@@ -388,13 +351,49 @@ class Activity_GameView : AppCompatActivity() {
         view.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE
     }
 
+    fun setExo(nicodougaURL:String) {
+
+        //val loadControl = DefaultLoadControl.Builder().setBufferDurationsMs(DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,10*60*1000,10*60*1000,0)
+        //val simpleExoPlayer = SimpleExoPlayer.Builder(applicationContext).setLoadControl()
+        //    .build()
+        cacheExoPlayer = CachedMovies.access(nicodougaURL)
+
+        playerView.apply {
+            player = cacheExoPlayer
+        }
+        cacheExoPlayer!!.setSeekParameters(SeekParameters.CLOSEST_SYNC)
+        cacheExoPlayer!!.seekTo(0)
+        cacheExoPlayer!!.playWhenReady = true
+        cacheExoPlayer!!.addListener(object : Player.EventListener {
+            override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
+                println("playbackState=" + playbackState)
+                when (playbackState) {
+                    ExoPlayer.STATE_ENDED -> {
+                        println("終了 -> リザルト画面へ")
+
+                        if(resultSegued==false){
+                            resultSegued = true
+                            val intent: Intent = Intent(applicationContext, Activity_Result::class.java)
+                            //intent.putExtra("SelectMusicID", selectMusic.sqlID)
+                            //intent.putExtra("SelectLevelID", selectLevel.sqlID)
+                            GLOBAL.CurrentNOTES = noteData
+                            GLOBAL.ResultFirst = true
+                            startActivityForResult(intent, 1002)
+                        }
+                    }
+                }
+            }
+        })
+    }
+
     //フリック判定
     fun FlickInput(string: String) {
 
         //フリックアクション
         FlickAction()
 
-        var flickTime = simpleExoPlayer.currentPosition.toDouble() / 1000 - 0.05 + judgeOffset//キー打ち定量ズレ
+        if( cacheExoPlayer == null ){ return }
+        var flickTime = cacheExoPlayer!!.currentPosition.toDouble() / 1000 - 0.05 + judgeOffset//キー打ち定量ズレ
         //着目ノートを決定 _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
         var flickedNote: Note? = null
         var minDiffTime = 1.0 //フリックとノートのズレ時間
@@ -565,11 +564,12 @@ class Activity_GameView : AppCompatActivity() {
                 return
             }
 
+            if( cacheExoPlayer == null ){ return }
             //進捗状況
-            progressBar_Loaded.progress = simpleExoPlayer.bufferedPercentage
-            progressBar_Played.progress = (100000 * simpleExoPlayer.currentPosition / simpleExoPlayer.duration).toInt()
+            progressBar_Loaded.progress = cacheExoPlayer!!.bufferedPercentage
+            progressBar_Played.progress = (100000 * cacheExoPlayer!!.currentPosition / cacheExoPlayer!!.duration).toInt()
 
-            val time = simpleExoPlayer.currentPosition.toDouble() / 1000
+            val time = cacheExoPlayer!!.currentPosition.toDouble() / 1000
             //xps = (gameviewWidth-flickPointX)*Double(selectLevel.speed)/300 //ノートが一秒間に進む距離（View作成時に計算済み）
             // speed=300が出現してから打つまでの時間が１秒。つまりspeed=100は出現してから打つまでの時間が３秒。
             val offsetX: Double = time * xps
@@ -851,7 +851,8 @@ class Activity_GameView : AppCompatActivity() {
         super.onPause()
         paused = true
         timerKill = true
-        simpleExoPlayer.playWhenReady = false
+        if( cacheExoPlayer == null ){ return }
+        cacheExoPlayer!!.playWhenReady = false
     }
 
     override fun onResume() {
@@ -860,12 +861,13 @@ class Activity_GameView : AppCompatActivity() {
         if (paused) {
             timerKill = false
             mHandler.post(timerRun)
-            simpleExoPlayer.playWhenReady = true
             //ゲージ
             progressBar.setProgress((noteData.score.borderScore * 10).toInt())
             val view = window.decorView
             //最下のボタン非表示
             view.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE
+            if( cacheExoPlayer == null ){ return }
+            cacheExoPlayer!!.playWhenReady = true
         }
     }
 
@@ -886,7 +888,9 @@ class Activity_GameView : AppCompatActivity() {
                         noteData.noteReset()
                         textView_combo.isInvisible = true
                         textView_Score.setText("Score: 0 ")
-                        simpleExoPlayer.seekTo(0)
+                        if(cacheExoPlayer != null){
+                            cacheExoPlayer!!.seekTo(0)
+                        }
                     }
                 }
                 // ジャッジオフセットの取得
