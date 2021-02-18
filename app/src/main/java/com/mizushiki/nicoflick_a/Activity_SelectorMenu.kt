@@ -59,6 +59,34 @@ class Activity_SelectorMenu : AppCompatActivity() {
             .setPositiveButton("キャンセル", null)
             .show()
     }
+    fun Button_Help(view: View) {
+
+        val strList = arrayOf("ああ かか 等がSafe判定になる","フリックの反応が悪いとき","すべての楽曲をプレイしたい")
+
+        AlertDialog.Builder(this) // FragmentではActivityを取得して生成
+            .setTitle("ヘルプ")
+            .setItems(strList, { dialog, which ->
+                when(which){
+                    0 -> {
+                        val intent: Intent = Intent(applicationContext, Activity_HowToGame::class.java)
+                        startActivity(intent)
+                        USERDATA.lookedHelp = true
+                    }
+                    1 -> {
+                        val intent: Intent = Intent(applicationContext, Activity_HowToGame2::class.java)
+                        startActivity(intent)
+                        USERDATA.lookedOtherIme = true
+                    }
+                    2 -> {
+                        val intent: Intent = Intent(applicationContext, Activity_HowToExtend::class.java)
+                        startActivity(intent)
+                        USERDATA.lookedExtend = true
+                    }
+                }
+            })
+            .setPositiveButton("キャンセル", null)
+            .show()
+    }
     fun Button_Back(view: View) {
         setResult( 10, null )
         finish()

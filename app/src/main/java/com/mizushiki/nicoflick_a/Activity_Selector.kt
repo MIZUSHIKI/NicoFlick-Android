@@ -267,7 +267,11 @@ class Activity_Selector : AppCompatActivity() {
                         scrollPos = numberRoll_index
                         numberRoll_index = -1
                     }
-                    coverflow.scrollToPosition(scrollPos)
+                    println("scrollPos=${scrollPos}")
+                    Handler().postDelayed(Runnable {
+                        //コンテナの初期値を保存
+                        coverflow.scrollToPosition(scrollPos)
+                    }, 20)
                     indexCoverFlow = scrollPos
                 }else{
                     coverflow.isVisible = false
@@ -367,7 +371,8 @@ class Activity_Selector : AppCompatActivity() {
             return
         }
         segueing = true
-
+        println(currentLevels[indexPicker].noteData)
+        println("c == ${currentLevels[indexPicker].noteData}")
         //すでにゲームデータを持っている場合
         if(currentLevels[indexPicker].noteData != ""){
             val intent: Intent = Intent(applicationContext, Activity_GameView::class.java)

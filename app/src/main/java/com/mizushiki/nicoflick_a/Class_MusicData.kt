@@ -349,17 +349,17 @@ object MusicDataLists {
             var remainMusics = musics.clone() as ArrayList<musicData>
 
             loop@ for( tagp in tagps ){
-                println(""+tagp.type+", "+tagp.word)
+                //println(""+tagp.type+", "+tagp.word)
                 when( tagp.type ){
                     "or" -> {
                         val rmCount = remainMusics.size
-                        println("rmCount="+rmCount)
+                        //println("rmCount="+rmCount)
                         if( rmCount == 0 ){
                             continue@loop
                         }
                         for( bindex in 1 .. rmCount ){
                             val index = rmCount - bindex
-                            println(remainMusics[index].title+" - remainMusics[$index].tag.contains(${tagp.word})="+remainMusics[index].tag.contains(tagp.word))
+                            //println(remainMusics[index].title+" - remainMusics[$index].tag.contains(${tagp.word})="+remainMusics[index].tag.contains(tagp.word))
                             if( tagp.word == "@初期楽曲" ) {
 
                                 if (remainMusics[index].sqlID > 14) {
@@ -372,7 +372,7 @@ object MusicDataLists {
                             }else if( !remainMusics[index].tag.contains(tagp.word) ){
                                 continue
                             }
-                            println("たす")
+                            //println("たす")
                             val r = remainMusics[index]
                             extractMusics.add(r)
                             //remainMusics.filterIndexed { i, musicData -> i != index }

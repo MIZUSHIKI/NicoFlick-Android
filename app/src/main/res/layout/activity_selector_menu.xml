@@ -116,6 +116,18 @@
             app:layout_constraintTop_toTopOf="@+id/view" app:layout_constraintVertical_bias="0.7"
             android:onClick="Button_HowTo"/>
     <Button
+            android:text="　 ヘルプ"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/buttonHelp" app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.0"
+            android:layout_marginStart="24dp" style="@style/Widget.AppCompat.Button.Borderless.Colored"
+            android:textColor="@android:color/holo_blue_light"
+            android:onClick="Button_Help"
+            app:layout_constraintBottom_toTopOf="@+id/button6"
+            android:layout_marginBottom="10dp"/>
+    <Button
             android:text="🔗"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

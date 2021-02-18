@@ -547,7 +547,6 @@ class Activity_GameView : AppCompatActivity() {
             }
         }
     }
-
     //タイマー
     val timerRun = object : Runnable {
         override fun run() {
@@ -564,78 +563,79 @@ class Activity_GameView : AppCompatActivity() {
                 return
             }
 
-            if( cacheExoPlayer == null ){ return }
-            //進捗状況
-            progressBar_Loaded.progress = cacheExoPlayer!!.bufferedPercentage
-            progressBar_Played.progress = (100000 * cacheExoPlayer!!.currentPosition / cacheExoPlayer!!.duration).toInt()
+            if( cacheExoPlayer != null ){
+                //進捗状況
+                progressBar_Loaded.progress = cacheExoPlayer!!.bufferedPercentage
+                progressBar_Played.progress = (100000 * cacheExoPlayer!!.currentPosition / cacheExoPlayer!!.duration).toInt()
 
-            val time = cacheExoPlayer!!.currentPosition.toDouble() / 1000
-            //xps = (gameviewWidth-flickPointX)*Double(selectLevel.speed)/300 //ノートが一秒間に進む距離（View作成時に計算済み）
-            // speed=300が出現してから打つまでの時間が１秒。つまりspeed=100は出現してから打つまでの時間が３秒。
-            val offsetX: Double = time * xps
-            //ノートをゾロ動かす
-            for ((index, note) in noteData.notes.withIndex()) {
-                val x = note.posX - offsetX + flickPointX
-                //もしオフセット後の表示位置が400(375+25)以内なら動かす
-                if (drawRange[0] < x && x < drawRange[2]) {
-                    note.label.x = x.toFloat()
-                    note.label.y = textView_BarWord.y
-                    note.label.isInvisible = false
+                val time = cacheExoPlayer!!.currentPosition.toDouble() / 1000
+                //xps = (gameviewWidth-flickPointX)*Double(selectLevel.speed)/300 //ノートが一秒間に進む距離（View作成時に計算済み）
+                // speed=300が出現してから打つまでの時間が１秒。つまりspeed=100は出現してから打つまでの時間が３秒。
+                val offsetX: Double = time * xps
+                //ノートをゾロ動かす
+                for ((index, note) in noteData.notes.withIndex()) {
+                    val x = note.posX - offsetX + flickPointX
+                    //もしオフセット後の表示位置が400(375+25)以内なら動かす
+                    if (drawRange[0] < x && x < drawRange[2]) {
+                        note.label.x = x.toFloat()
+                        note.label.y = textView_BarWord.y
+                        note.label.isInvisible = false
 
-                    //過ぎ去りBad判定
-                    if (note.isFlickable && note.flicked == false) {
-                        val diffTime = note.time - (time + judgeOffset)
-                        if (diffTime < safeLine[0]) {
-                            //Miss
-                            note.flickedTime = -1.0
-                            note.flicked = true
-                            note.judge = Note.MISS
-                            noteData.score.addScore(judge = Note.MISS)
-                            //println("Miss")
-                            //ゲージ
-                            progressBar.setProgress((noteData.score.borderScore * 10).toInt())
-                            if (selectLevel.level <= 10) {
-                                //フリック済みフォントに設定
-                                note.setUnFlickableFont()
-                                note.label.y = textView_BarWord.y
-                                //エフェクト
-                                MissAction()
-                            }//Fullバージョンのときはエフェクトしない（MISSとしてカウント。但しリザルトも表示は0にする。）
+                        //過ぎ去りBad判定
+                        if (note.isFlickable && note.flicked == false) {
+                            val diffTime = note.time - (time + judgeOffset)
+                            if (diffTime < safeLine[0]) {
+                                //Miss
+                                note.flickedTime = -1.0
+                                note.flicked = true
+                                note.judge = Note.MISS
+                                noteData.score.addScore(judge = Note.MISS)
+                                //println("Miss")
+                                //ゲージ
+                                progressBar.setProgress((noteData.score.borderScore * 10).toInt())
+                                if (selectLevel.level <= 10) {
+                                    //フリック済みフォントに設定
+                                    note.setUnFlickableFont()
+                                    note.label.y = textView_BarWord.y
+                                    //エフェクト
+                                    MissAction()
+                                }//Fullバージョンのときはエフェクトしない（MISSとしてカウント。但しリザルトも表示は0にする。）
 
-                            //次のフリックまでの時間がSafeLine+1秒以上あって、TextViewになんか入ってたら消す
-                            if (index + 1 >= noteData.notes.size) {
-                                editText.setText("");
-                                maeSourceClear = true
-                            } else {
-                                val flickTime = note.time
-                                for (i in (index + 1 until noteData.notes.size)) {
-                                    val note = noteData.notes[i]
-                                    if (note.isFlickable && note.flicked == false) {
-                                        val diffTime = note.time - flickTime
-                                        if (diffTime > (1.0 - safeLine[0])) {
+                                //次のフリックまでの時間がSafeLine+1秒以上あって、TextViewになんか入ってたら消す
+                                if (index + 1 >= noteData.notes.size) {
+                                    editText.setText("");
+                                    maeSourceClear = true
+                                } else {
+                                    val flickTime = note.time
+                                    for (i in (index + 1 until noteData.notes.size)) {
+                                        val note = noteData.notes[i]
+                                        if (note.isFlickable && note.flicked == false) {
+                                            val diffTime = note.time - flickTime
+                                            if (diffTime > (1.0 - safeLine[0])) {
+                                                editText.setText("");
+                                                maeSourceClear = true
+                                            }
+                                            break
+                                        }
+                                        if (i >= noteData.notes.size) {
                                             editText.setText("");
                                             maeSourceClear = true
                                         }
-                                        break
-                                    }
-                                    if (i >= noteData.notes.size) {
-                                        editText.setText("");
-                                        maeSourceClear = true
                                     }
                                 }
+                                ComboAction()
                             }
-                            ComboAction()
                         }
-                    }
-                    //左に消えたらビューも消す
-                    if (x <= drawRange[1]) {
-                        note.label.isInvisible = true
-                    }
-                }/*else {
-                if note.label.isHidden == false {
-                    note.label.isHidden = true
+                        //左に消えたらビューも消す
+                        if (x <= drawRange[1]) {
+                            note.label.isInvisible = true
+                        }
+                    }/*else {
+                        if note.label.isHidden == false {
+                            note.label.isHidden = true
+                        }
+                    }*/
                 }
-            }*/
             }
 
             //繰り返し
@@ -849,6 +849,7 @@ class Activity_GameView : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        println("onPause!!")
         paused = true
         timerKill = true
         if( cacheExoPlayer == null ){ return }
