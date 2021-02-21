@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.service.autofill.UserData
 import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
@@ -27,6 +28,7 @@ object GLOBAL {
     lateinit var COOKIE_MANAGER: CookieManager
     val PHP_URL = "http://timetag.main.jp/nicoflick/nicoflick.php"
     //val PHP_URL = "http://192.168.11.6/nicoflick_20201103/nicoflick.php" //windows xampp
+    val Version = 1430
     //Activity間 オブジェクト受け渡し用
     var SelectMUSIC:musicData? = null
     var SelectLEVEL:levelData? = null
@@ -55,7 +57,9 @@ class MainActivity : AppCompatActivity() {
         if (CookieHandler.getDefault() != GLOBAL.COOKIE_MANAGER) {
             CookieHandler.setDefault(GLOBAL.COOKIE_MANAGER)
         }
-        //
+        //バージョンアップ時に必要な処理があれば実行
+        migration()
+        USERDATA.MyVersion = GLOBAL.Version
     }
 
     fun Button_Start(view: View) {
@@ -361,5 +365,17 @@ iOS11リリース(32bitアプリなので両方起動できなくなる)"""
                 ApacheSoftwareLicense20()
             ))
         LicensesDialog.Builder(this).setNotices(notices).build().show()
+    }
+
+    //マイグレーション
+    fun migration(){
+        println("migration")
+        if( USERDATA.MyVersion < 1430 ){
+            //データベースの初期データが上手く記録できていない時期があったため music, level を初期化して再取得
+            MusicDataLists.reset()
+            USERDATA.MusicsJson = ""
+            USERDATA.LevelsJson = ""
+            println("music,level Reset")
+        }
     }
 }

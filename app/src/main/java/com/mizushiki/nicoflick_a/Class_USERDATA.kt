@@ -15,6 +15,14 @@ object USERDATA {
     // 必ず GLOBAL.APPLICATIONCONTEXTが入力されてからシングルトンを作る
     val dataStore: SharedPreferences = GLOBAL.APPLICATIONCONTEXT.getSharedPreferences("DataStore", Context.MODE_PRIVATE)
 
+    //MyVersion
+    //  バージョンアップ時に必要な処理があれば実行するため
+    var MyVersion:Int = 0
+        get() = dataStore.getInt("MyVersion",0)
+        set(value) {
+            dataStore.edit().putInt("MyVersion",value).commit()
+            field = value
+        }
     //ユニークユーザーID
     val UserID: String
         get() {

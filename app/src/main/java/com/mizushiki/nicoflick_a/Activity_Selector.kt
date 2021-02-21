@@ -248,13 +248,13 @@ class Activity_Selector : AppCompatActivity() {
 
             coverflow = findViewById<View>(R.id.coverflow) as FeatureCoverFlow
             if(indexCoverFlow == -1){
+                var scrollPos = 0
                 if( currentMusics.size > 0 ){
                     coverflow.clearCache()
                     val coverFlowAdapter = CoverFlowAdapter(this, it)
                     coverflow.adapter = coverFlowAdapter
                     coverflow.setShouldRepeat(false)
                     //前回選択していた曲に飛べれば飛ぶ
-                    var scrollPos = 0
                     if( numberRoll_index == -1 ){
                         maeMusic?.let {
                             val selectMusic = it
@@ -268,14 +268,14 @@ class Activity_Selector : AppCompatActivity() {
                         numberRoll_index = -1
                     }
                     println("scrollPos=${scrollPos}")
-                    Handler().postDelayed(Runnable {
-                        //コンテナの初期値を保存
-                        coverflow.scrollToPosition(scrollPos)
-                    }, 20)
                     indexCoverFlow = scrollPos
                 }else{
                     coverflow.isVisible = false
                 }
+                Handler().postDelayed(Runnable {
+                    //coverflowセット後、遅延させて選択
+                    coverflow.scrollToPosition(scrollPos)
+                }, 50)
             }
             progress_circular.isVisible = false
 
