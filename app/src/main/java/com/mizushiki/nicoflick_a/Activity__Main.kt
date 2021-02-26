@@ -28,7 +28,7 @@ object GLOBAL {
     lateinit var COOKIE_MANAGER: CookieManager
     val PHP_URL = "http://timetag.main.jp/nicoflick/nicoflick.php"
     //val PHP_URL = "http://192.168.11.6/nicoflick_20201103/nicoflick.php" //windows xampp
-    val Version = 1430
+    val Version = 1500
     //Activity間 オブジェクト受け渡し用
     var SelectMUSIC:musicData? = null
     var SelectLEVEL:levelData? = null
@@ -376,6 +376,12 @@ iOS11リリース(32bitアプリなので両方起動できなくなる)"""
             USERDATA.MusicsJson = ""
             USERDATA.LevelsJson = ""
             println("music,level Reset")
+        }
+        if( USERDATA.MyVersion < 1500 ){
+            if( USERDATA.MyFavorite.size > 0 ){
+                println("お気に入り仕様変更を見せる")
+                USERDATA.lookedChangeFavoSpec_v1500 = false
+            }
         }
     }
 }

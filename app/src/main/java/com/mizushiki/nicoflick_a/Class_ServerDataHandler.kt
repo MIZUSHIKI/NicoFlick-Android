@@ -881,7 +881,7 @@ class ServerDataHandler {
     fun postFavoriteCountData(favoritecountset:String, callback: (Boolean) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         //  登録
         val url = GLOBAL.PHP_URL
-        val body = "req=favorite-add&favoritecountset=${favoritecountset}"
+        val body = "req=favoritez-add&favoritecountset=${favoritecountset}"
         async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
             if (it == null) {
                 callback(false)
@@ -898,7 +898,7 @@ class ServerDataHandler {
     fun postPlayFavoriteCountData(pfcountset:String, callback: (Boolean) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         //  登録
         val url = GLOBAL.PHP_URL
-        val body = "req=PlaycountFavorite-add&PFcountset=${pfcountset}"
+        val body = "req=PlaycountFavoritez-add&PFcountset=${pfcountset}"
         async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
             if (it == null) {
                 callback(false)

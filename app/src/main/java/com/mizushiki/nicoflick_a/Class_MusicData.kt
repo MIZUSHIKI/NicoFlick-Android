@@ -539,7 +539,7 @@ object MusicDataLists {
             for( (key,lvInURL) in levels ){
                 levelp[key] = false
                 for( level in lvInURL ){
-                    if( USERDATA.MyFavorite.contains(level.sqlID) ){
+                    if( USERDATA.MyFavoriteAll.contains(level.sqlID) ){
                         levelp[key] = true
                         break
                     }
@@ -561,7 +561,7 @@ object MusicDataLists {
             var a:MutableList<levelData> = mutableListOf()
             var b:MutableList<levelData> = mutableListOf()
             for( level in getSelectMusicLevels_noSort(selectMovieURL) ){
-                if( USERDATA.MyFavorite.contains(level.sqlID) ){
+                if( USERDATA.MyFavoriteAll.contains(level.sqlID) ){
                     a.add(level)
                 }else {
                     b.add(level)

@@ -13,6 +13,11 @@
             android:supportsRtl="true"
             android:theme="@style/AppTheme">
         <activity
+                android:name=".Activity_AboutVerUp1500"
+                android:screenOrientation="portrait"
+                android:theme="@style/Theme.TranslucentBackground">
+        </activity>
+        <activity
                 android:name=".Activity_HowToGame2"
                 android:screenOrientation="portrait"
                 android:theme="@style/Theme.TranslucentBackground">

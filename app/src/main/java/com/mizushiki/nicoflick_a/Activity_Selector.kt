@@ -221,6 +221,8 @@ class Activity_Selector : AppCompatActivity() {
                 .setNegativeButton("Cancel",null)
                 .show()
         }
+        //
+        showChangeFavoSpecView()
     }
     fun gotoSelectorMenuTableForSort() {
         if( currentMusics.size <= 0 ){
@@ -275,7 +277,7 @@ class Activity_Selector : AppCompatActivity() {
                 Handler().postDelayed(Runnable {
                     //coverflowセット後、遅延させて選択
                     coverflow.scrollToPosition(scrollPos)
-                }, 50)
+                }, 200)
             }
             progress_circular.isVisible = false
 
@@ -362,6 +364,18 @@ class Activity_Selector : AppCompatActivity() {
             return true
         }
         return false
+    }
+    fun showChangeFavoSpecView() {
+        if(USERDATA.lookedChangeFavoSpec_v1500){
+            return
+        }
+        USERDATA.lookedChangeFavoSpec_v1500 = true
+
+        Handler().postDelayed(Runnable {
+            segueing = false
+            val intent: Intent = Intent(applicationContext, Activity_AboutVerUp1500::class.java)
+            startActivity(intent)
+        }, 750)
     }
 
     fun Button_Go(view: View) {
@@ -452,18 +466,44 @@ class Activity_Selector : AppCompatActivity() {
             return
         }
         val currentLevel = currentLevels[indexPicker]
-        if( USERDATA.MyFavorite.contains(currentLevel.sqlID) ){
-            val myFavorite = USERDATA.MyFavorite
+        if( USERDATA.MyFavorite2.contains(currentLevel.sqlID) ) {
+            val myFavorite = USERDATA.MyFavorite2
             myFavorite.remove(currentLevel.sqlID)
-            USERDATA.MyFavorite = myFavorite //ここでDataStoreに保存される
+            USERDATA.MyFavorite2 = myFavorite //ここでDataStoreに保存される
             USERDATA.FavoriteCount.subFavoriteCount(levelID= currentLevel.sqlID)
-        }else{
-            val myFavorite = USERDATA.MyFavorite
-            myFavorite.add(currentLevel.sqlID)
-            USERDATA.MyFavorite = myFavorite //ここでDataStoreに保存される
-            USERDATA.FavoriteCount.addFavoriteCount(levelID= currentLevel.sqlID)
+        }else {
+            if( USERDATA.MyFavorite.contains(currentLevel.sqlID) ){
+                //Ver.1.5未満の互換
+                val myFavorite = USERDATA.MyFavorite
+                myFavorite.remove(currentLevel.sqlID)
+                USERDATA.MyFavorite = myFavorite //ここでDataStoreに保存される
+                //プレイしたことのあるレベルだけお気に入りできるようにする
+                if( USERDATA.Score.scores.keys.contains(currentLevel.sqlID) ){
+                    val myFavo = USERDATA.MyFavorite2
+                    myFavo.add(currentLevel.sqlID)
+                    USERDATA.MyFavorite2 = myFavo //ここでDataStoreに保存される
+                    USERDATA.FavoriteCount.addFavoriteCount(levelID = currentLevel.sqlID)
+                }
+            }else {
+                //プレイしたことのあるレベルだけお気に入りできるようにする
+                if( USERDATA.Score.scores.keys.contains(currentLevel.sqlID) ){
+                    val myFavo = USERDATA.MyFavorite2
+                    myFavo.add(currentLevel.sqlID)
+                    USERDATA.MyFavorite2 = myFavo //ここでDataStoreに保存される
+                    USERDATA.FavoriteCount.addFavoriteCount(levelID = currentLevel.sqlID)
+                }else {
+
+                    val strList = arrayOf("譜面が良かったらお気に入りしよう！")
+                    AlertDialog.Builder(this) // FragmentではActivityを取得して生成
+                        .setTitle("ゲームをプレイしたらお気に入りできるようになります。")
+                        .setItems(strList, null)
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
         }
-        star_color.isVisible = USERDATA.MyFavorite.contains(currentLevel.sqlID)
+        star_black.isVisible = USERDATA.MyFavorite.contains(currentLevel.sqlID)
+        star_color.isVisible = USERDATA.MyFavorite2.contains(currentLevel.sqlID)
 
     }
     fun Button_LevelSort(view: View) {
@@ -613,10 +653,11 @@ class Activity_Selector : AppCompatActivity() {
             //スピード反映
             text_Speed.setText( "speed: "+currentLevel.speed )
             //favorite反映
-            star_color.isVisible = USERDATA.MyFavorite.contains(currentLevel.sqlID)
+            star_color.isVisible = USERDATA.MyFavorite2.contains(currentLevel.sqlID)
+            star_black.isVisible = USERDATA.MyFavorite.contains(currentLevel.sqlID)
             println(USERDATA.MyFavorite)
             println(USERDATA.MyFavorite.contains(currentLevel.sqlID))
-            val fc = Int(currentLevel.favoriteCount / 10) * 10
+            val fc = Int(currentLevel.favoriteCount / 5) * 5
             text_FavoriteNum.text = String(fc)
             text_FavoriteNum2.text = String(fc)
             text_FavoriteNum3.text = String(fc)

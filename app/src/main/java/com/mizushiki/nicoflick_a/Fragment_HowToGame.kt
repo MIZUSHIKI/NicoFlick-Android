@@ -41,6 +41,7 @@ class Fragment_HowToGame : Fragment() {
             imageView_HowToGame.isVisible = false
             return
         }
+        button_HowToGame_OK.isVisible = false
         imageView_HowToGame.setImageResource(Rdrawable)
     }
 }

@@ -362,6 +362,15 @@
             app:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
             app:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku"
             android:visibility="invisible"/>
+    <ImageView
+            android:src="@drawable/star_bk"
+            android:layout_width="19dp"
+            android:layout_height="19dp" android:id="@+id/star_black"
+            app:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku"
+            app:layout_constraintTop_toTopOf="@+id/button_favoriteWaku"
+            app:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
+            app:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku"
+            android:visibility="invisible"/>
     <TextView
             android:text=""
             android:layout_width="0dp"

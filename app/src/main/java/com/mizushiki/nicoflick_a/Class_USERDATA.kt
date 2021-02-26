@@ -106,6 +106,25 @@ object USERDATA {
             println("MyFavo保存 $s")
             dataStore.edit().putString("MyFavorite",s).commit()
         }
+    //MyFavorite2
+    var MyFavorite2:MutableSet<Int>
+        get() {
+            val ids = dataStore.getString("MyFavorite2","")!!
+            if( ids == "" ){
+                return mutableSetOf()
+            }
+            val s = mutableSetOf<Int>()
+            s.addAll( ids.split(",").map{ Int(it) } )
+            return s
+        }
+        set(value) {
+            val s = value.map { String(it) }.joinToString(separator = ",")
+            println("MyFavo2保存 $s")
+            dataStore.edit().putString("MyFavorite2",s).commit()
+        }
+    val MyFavoriteAll:Set<Int>
+        get() = MyFavorite.union(MyFavorite2)
+
     //PlayCounter
     var PlayCount:PlayCounter
         get() {
@@ -229,6 +248,13 @@ object USERDATA {
         get() = dataStore.getBoolean("LookedOtherIme",false)
         set(value) {
             dataStore.edit().putBoolean("LookedOtherIme",value).commit()
+            field = value
+        }
+    //ver1.5でのお気に入り仕様変更について見たかどうか
+    var lookedChangeFavoSpec_v1500:Boolean = false
+        get() = dataStore.getBoolean("lookedChangeFavoSpec_v1500",true)
+        set(value) {
+            dataStore.edit().putBoolean("lookedChangeFavoSpec_v1500",value).commit()
             field = value
         }
 

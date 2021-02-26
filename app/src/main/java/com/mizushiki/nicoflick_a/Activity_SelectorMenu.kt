@@ -61,7 +61,7 @@ class Activity_SelectorMenu : AppCompatActivity() {
     }
     fun Button_Help(view: View) {
 
-        val strList = arrayOf("ああ かか 等がSafe判定になる","フリックの反応が悪いとき","すべての楽曲をプレイしたい")
+        val strList = arrayOf("ああ 等の連続がSafe判定になる","フリックの反応が悪いとき","すべての楽曲をプレイしたい")
 
         AlertDialog.Builder(this) // FragmentではActivityを取得して生成
             .setTitle("ヘルプ")
