@@ -87,6 +87,7 @@ object MusicDataLists {
             }
             return
         }
+        val movieURL = movieURL.pregReplace("\\?.*$","")
         for(index in 0 until musics.size){
             if(musics[index].sqlID == sqlID){
                 musics[index].movieURL = movieURL
@@ -426,6 +427,23 @@ object MusicDataLists {
             if( getSelectMusicLevels_noSort(musicdata.movieURL, isMe).size == 0 ){
                 continue
             }
+            var flg = false
+            levels[musicdata.movieURL]?.let {
+                if(it.filter {
+                    if( it.level > 10 ){
+                        return@filter selectCondition.sortStars[10]
+                    }
+                    if( it.level <= 0 ){
+                        return@filter false
+                    }
+                        return@filter selectCondition.sortStars[it.level-1]
+                }.size == 0){
+                    flg = true
+                }
+            }
+            if(flg){
+                continue
+            }
             outputMusics.add(musicdata)
             //println(musicdata.title)
         }
@@ -436,7 +454,7 @@ object MusicDataLists {
         val selectCondition = USERDATA.SelectedMusicCondition //userData読み出し
 
         var sortedMusics:ArrayList<musicData> = musics//arrayListOf()
-        when( selectCondition.sortItem ){
+        when( selectCondition.sortItem.pregReplace(" [★☆]{10}[■□]$","") ){
             "曲の投稿が新しい順" -> musics.sortBy{ it.sqlCreateTime * -1 }
             "曲の投稿が古い順" -> musics.sortBy { it.sqlCreateTime }
             "ゲームの投稿が新しい曲順" -> {
@@ -525,6 +543,8 @@ object MusicDataLists {
                 sortedMusics = ArrayList(musics.filter{ levelp.keys.contains(it.movieURL)})
                 sortedMusics.sortBy { levelp[it.movieURL]!! }
             }
+            "動画IDが大きい順" -> musics.sortBy{ it.movieURL.pregReplace("[^0-9]","").toInt() * -1 }
+            "動画IDが小さい順" -> musics.sortBy { it.movieURL.pregReplace("[^0-9]","").toInt() }
             "タグで選んだ順" -> {
                 sortedMusics = musics
             }
@@ -554,13 +574,29 @@ object MusicDataLists {
     //とりあえずレベル取り出しを作った。現状level順ソートだけしか必要無い。
     fun getSelectMusicLevels(selectMovieURL:String) : ArrayList<levelData>{
         if( USERDATA.LevelSortCondition == 0 ){
-            val sortedLevels = getSelectMusicLevels_noSort(selectMovieURL)
+            val sortedLevels = ArrayList(getSelectMusicLevels_noSort(selectMovieURL).filter {
+                if( it.level > 10 ){
+                    return@filter USERDATA.SelectedMusicCondition.sortStars[10]
+                }
+                if( it.level <= 0 ){
+                    return@filter false
+                }
+                return@filter USERDATA.SelectedMusicCondition.sortStars[it.level-1]
+            })
             sortedLevels.sortBy { it.level }
             return sortedLevels
         }else {
             var a:MutableList<levelData> = mutableListOf()
             var b:MutableList<levelData> = mutableListOf()
-            for( level in getSelectMusicLevels_noSort(selectMovieURL) ){
+            for( level in getSelectMusicLevels_noSort(selectMovieURL).filter {
+                if( it.level > 10 ){
+                    return@filter USERDATA.SelectedMusicCondition.sortStars[10]
+                }
+                if( it.level <= 0 ){
+                    return@filter false
+                }
+                return@filter USERDATA.SelectedMusicCondition.sortStars[it.level-1]
+            } ){
                 if( USERDATA.MyFavoriteAll.contains(level.sqlID) ){
                     a.add(level)
                 }else {

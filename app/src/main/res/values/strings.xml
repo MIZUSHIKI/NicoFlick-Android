@@ -3,7 +3,7 @@
     <string name="nicoflick">NicoFlick</string>
     <string name="settings">Settings</string>
     <string name="start">Start</string>
-    <string name="versionNum">Ver.1.5.a0</string>
+    <string name="versionNum">Ver.1.6.a0</string>
     <string name="nicoM_account">ニコニコ動画 アカウント</string>
     <string name="usedMyAccount">自分のアカウントを使いたいときに入力</string>
     <string name="mail">Mail</string>
@@ -28,4 +28,5 @@
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="SyokiGakkyoku">\@初期楽曲</string>
     <string name="hensyu">編集</string>
+    <string name="starfilter">★フィルタ</string>
 </resources>

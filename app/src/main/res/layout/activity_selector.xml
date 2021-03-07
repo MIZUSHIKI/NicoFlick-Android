@@ -303,7 +303,8 @@
             android:id="@+id/text_RankingTime"
             coverflow:layout_constraintStart_toStartOf="@+id/button_RankingComment"
             coverflow:layout_constraintEnd_toEndOf="@+id/button_RankingComment"
-            coverflow:layout_constraintTop_toTopOf="@+id/button_RankingComment" android:textAlignment="center"
+            coverflow:layout_constraintTop_toTopOf="@+id/button_RankingComment" android:textAlignment="viewEnd"
+            android:layout_marginRight="10dp"
             android:textSize="7sp"
             android:textColor="#999999"/>
     <TextView
@@ -313,7 +314,8 @@
             android:id="@+id/text_CommentTime"
             coverflow:layout_constraintStart_toStartOf="@+id/button_RankingComment"
             coverflow:layout_constraintEnd_toEndOf="@+id/button_RankingComment"
-            coverflow:layout_constraintBottom_toBottomOf="@+id/button_RankingComment" android:textAlignment="center"
+            coverflow:layout_constraintBottom_toBottomOf="@+id/button_RankingComment" android:textAlignment="viewEnd"
+            android:layout_marginRight="10dp"
             android:textSize="7sp"
             android:textColor="#999999"/>
     <Button

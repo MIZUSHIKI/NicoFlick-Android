@@ -28,7 +28,7 @@ object GLOBAL {
     lateinit var COOKIE_MANAGER: CookieManager
     val PHP_URL = "http://timetag.main.jp/nicoflick/nicoflick.php"
     //val PHP_URL = "http://192.168.11.6/nicoflick_20201103/nicoflick.php" //windows xampp
-    val Version = 1500
+    val Version = 1600
     //Activity間 オブジェクト受け渡し用
     var SelectMUSIC:musicData? = null
     var SelectLEVEL:levelData? = null

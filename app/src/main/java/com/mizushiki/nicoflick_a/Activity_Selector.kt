@@ -30,6 +30,7 @@ import kotlinx.android.synthetic.main.activity_selector_menu.*
 import kotlinx.android.synthetic.main.activity_settings.progress_circular
 import java.net.URLDecoder
 import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.util.*
 import kotlin.concurrent.schedule
 
@@ -574,7 +575,7 @@ class Activity_Selector : AppCompatActivity() {
                 }
             }
             1002 -> {
-                if( maeTags != USERDATA.SelectedMusicCondition.tags || maeMusicTags != currentMusics[indexCoverFlow].tags){
+                if( maeTags != USERDATA.SelectedMusicCondition.tags || maeMusicTags != currentMusics[indexCoverFlow].tags || maeSort != USERDATA.SelectedMusicCondition.sortItem){
                     indexCoverFlow = -1 //CoverFlowリロード
                     SetMusicToCoverFlow()
                 }
@@ -664,14 +665,15 @@ class Activity_Selector : AppCompatActivity() {
             text_FavoriteNum.isVisible = ( fc > 0)
             text_FavoriteNum2.isVisible = ( fc > 0)
             text_FavoriteNum3.isVisible = ( fc > 0)
+            val nowTime = (Date().time / 1000).toInt()
             val sDateFormat = SimpleDateFormat("yyy.MM.dd")
-            if( USERDATA.SelectedMusicCondition.sortItem == "最近ハイスコアが更新された曲順" && currentLevel.scoreTime > 0 ){
+            if( (USERDATA.SelectedMusicCondition.sortItem == "最近ハイスコアが更新された曲順" || (nowTime - currentLevel.scoreTime)<2592000 ) && currentLevel.scoreTime > 0 ){
                 text_RankingTime.text = sDateFormat.format( Date( currentLevel.scoreTime * 1000L ))
                 text_RankingTime.isVisible = true
             }else{
                 text_RankingTime.isVisible = false
             }
-            if( USERDATA.SelectedMusicCondition.sortItem == "最近コメントされた曲順" && currentLevel.commentTime > 0 ){
+            if( (USERDATA.SelectedMusicCondition.sortItem == "最近コメントされた曲順" || (nowTime - currentLevel.commentTime)<2592000 ) && currentLevel.commentTime > 0 ){
                 text_CommentTime.text = sDateFormat.format( Date( currentLevel.commentTime * 1000L ))
                 text_CommentTime.isVisible = true
             }else{

@@ -18,6 +18,15 @@ tools:context=".Activity_SelectorMenuTableForSort">
         android:id="@+id/toolbar2" app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
 />
+    <Button
+            android:text="@string/starfilter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/button8" app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/toolbar2" app:layout_constraintBottom_toBottomOf="@+id/toolbar2"
+            style="@style/Widget.AppCompat.Button.Borderless.Colored"
+            android:textColor="#FFF"
+            android:onClick="Button_StarFilter"/>
     <EditText
             android:layout_width="0dp"
             android:layout_height="wrap_content"

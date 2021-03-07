@@ -494,7 +494,7 @@ class PFCounter {
     }
 }
 
-class SelectConditions(_tags:String, _sortItem:String) {
+class SelectConditions(_tags:String="", _sortItem:String="") {
 
     val SortItem = arrayOf(
         "曲の投稿が新しい順",
@@ -505,6 +505,8 @@ class SelectConditions(_tags:String, _sortItem:String) {
         "ゲームプレイ回数が少ない曲順",
         "お気に入り数が多い曲順",
         "お気に入り数が少ない曲順",
+        "動画IDが大きい順",
+        "動画IDが小さい順",
         "最近ハイスコアが更新された曲順",
         "最近コメントされた曲順")
 
@@ -518,14 +520,17 @@ class SelectConditions(_tags:String, _sortItem:String) {
     var sortItem:String = ""
         set(value) {
             field = value
+            sortStars = getSortStars(value)
             if(!inited){return}
             USERDATA.SelectedMusicCondition = this
         }
     var tag:ArrayList<tagp> = arrayListOf()
+    var sortStars: MutableList<Boolean> = mutableListOf(true,true,true,true,true,true,true,true,true,true,true)
     var inited = false
     init {
         tags = _tags
         sortItem = _sortItem
+        sortStars = getSortStars(sortItem)
         inited = true //どうすれば．．．
         //setTag()
         println("tag.size="+tag.size)
@@ -571,4 +576,32 @@ class SelectConditions(_tags:String, _sortItem:String) {
             USERDATA.SelectedMusicCondition = this
         }
      */
+    fun getSortStarsString(containingStars:String? = null) : String {
+        containingStars?.let {
+            return it.pregMatche_firstString("( [★☆]{10}[■□])$")
+        }
+        return sortItem.pregMatche_firstString("( [★☆]{10}[■□])$")
+    }
+    fun getSortStars(containingStars: String? = null) : MutableList<Boolean> {
+        var containingStars = containingStars
+        if( containingStars == null ){
+            containingStars = sortItem
+        }
+        val hosi = getSortStarsString(containingStars)
+        if( hosi == "" ){
+            return mutableListOf(true,true,true,true,true,true,true,true,true,true,true)
+        }
+        sortStars[0] = hosi.pregMatche("★[★☆][★☆][★☆][★☆][★☆][★☆][★☆][★☆][★☆][■□]$")
+        sortStars[1] = hosi.pregMatche("[★☆]★[★☆][★☆][★☆][★☆][★☆][★☆][★☆][★☆][■□]$")
+        sortStars[2] = hosi.pregMatche("[★☆][★☆]★[★☆][★☆][★☆][★☆][★☆][★☆][★☆][■□]$")
+        sortStars[3] = hosi.pregMatche("[★☆][★☆][★☆]★[★☆][★☆][★☆][★☆][★☆][★☆][■□]$")
+        sortStars[4] = hosi.pregMatche("[★☆][★☆][★☆][★☆]★[★☆][★☆][★☆][★☆][★☆][■□]$")
+        sortStars[5] = hosi.pregMatche("[★☆][★☆][★☆][★☆][★☆]★[★☆][★☆][★☆][★☆][■□]$")
+        sortStars[6] = hosi.pregMatche("[★☆][★☆][★☆][★☆][★☆][★☆]★[★☆][★☆][★☆][■□]$")
+        sortStars[7] = hosi.pregMatche("[★☆][★☆][★☆][★☆][★☆][★☆][★☆]★[★☆][★☆][■□]$")
+        sortStars[8] = hosi.pregMatche("[★☆][★☆][★☆][★☆][★☆][★☆][★☆][★☆]★[★☆][■□]$")
+        sortStars[9] = hosi.pregMatche("[★☆][★☆][★☆][★☆][★☆][★☆][★☆][★☆][★☆]★[■□]$")
+        sortStars[10] = hosi.pregMatche("[★☆][★☆][★☆][★☆][★☆][★☆][★☆][★☆][★☆][★☆]■$")
+        return sortStars
+    }
 }
