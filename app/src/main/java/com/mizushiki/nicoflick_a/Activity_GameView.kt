@@ -126,23 +126,11 @@ class Activity_GameView : AppCompatActivity() {
         //Movie呼び込み
         var nicodougaURL = ""
         MovieAccess().StreamingUrlNicoAccess(smNum) {
-            if( it!! != "re-eco" ){
-                // 動画
-                nicodougaURL = it!!
-                println(nicodougaURL)
-                //println(applicationContext.packageName)
-                setExo(nicodougaURL)
-
-            }else{
-                //なんか再帰がよくわからなかったので無理やりもう一回実行する(Swiftみたく出来ない？)
-                MovieAccess().StreamingUrlNicoAccess(smNum+"?eco=1") {
-                    // 動画
-                    nicodougaURL = it!!
-                    println(nicodougaURL)
-                    //println(applicationContext.packageName)
-                    setExo(nicodougaURL)
-                }
-            }
+            // 動画
+            nicodougaURL = it!!
+            println(nicodougaURL)
+            //println(applicationContext.packageName)
+            setExo(nicodougaURL,smNum)
         }
 
         editText.filters = arrayOf(object : InputFilter {
@@ -351,19 +339,21 @@ class Activity_GameView : AppCompatActivity() {
         view.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE
     }
 
-    fun setExo(nicodougaURL:String) {
+    fun setExo(nicodougaURL:String,smNum:String) {
 
         //val loadControl = DefaultLoadControl.Builder().setBufferDurationsMs(DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,10*60*1000,10*60*1000,0)
         //val simpleExoPlayer = SimpleExoPlayer.Builder(applicationContext).setLoadControl()
         //    .build()
-        cacheExoPlayer = CachedMovies.access(nicodougaURL)
+        cacheExoPlayer = CachedMovies.access(nicodougaURL,smNum)
 
         playerView.apply {
             player = cacheExoPlayer
         }
         cacheExoPlayer!!.setSeekParameters(SeekParameters.CLOSEST_SYNC)
         cacheExoPlayer!!.seekTo(0)
-        cacheExoPlayer!!.playWhenReady = true
+        Handler().postDelayed(Runnable {
+            cacheExoPlayer!!.playWhenReady = true
+        }, 500)
         cacheExoPlayer!!.addListener(object : Player.EventListener {
             override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
                 println("playbackState=" + playbackState)

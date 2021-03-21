@@ -10,17 +10,14 @@ import com.google.android.exoplayer2.DefaultLoadControl
 import com.google.android.exoplayer2.SimpleExoPlayer
 import com.google.android.exoplayer2.source.ProgressiveMediaSource
 import com.google.android.exoplayer2.upstream.*
-import com.google.android.exoplayer2.upstream.cache.CacheDataSink
-import com.google.android.exoplayer2.upstream.cache.CacheDataSource
-import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor
-import com.google.android.exoplayer2.upstream.cache.SimpleCache
+import com.google.android.exoplayer2.upstream.cache.*
 import com.google.android.exoplayer2.util.Util
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import java.io.File
 import java.net.URLDecoder
+import java.util.*
+import kotlin.collections.ArrayList
+import kotlin.concurrent.schedule
 
 
 class MovieAccess {
@@ -29,58 +26,48 @@ class MovieAccess {
 
     fun StreamingUrlNicoAccess(smNum:String, callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
 
-        var smNum = smNum
-        if( !isWiFiConnected(GLOBAL.APPLICATIONCONTEXT) ){
-            if(!smNum.endsWith("?eco=1")){
-                smNum += "?eco=1"
-            }
+        //先にキャッシュ内にあるか確認。あればもうニコニコの動画ページにすらアクセスしないことにする
+        if( CachedMovies.cachedMovies.any{ it.smNum == smNum }){
+            callback("cached")
+            return@launch
         }
         println("smNum="+smNum)
-        //if(Userdata.NicoMail=="" || Userdata.NicoPass==""){
-            //アカウントなしの場合　
-            val strURL = "http://www.nicovideo.jp/watch/"+smNum
-            println(strURL)
 
-            //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-            async(Dispatchers.Default) { HttpUtil.httpGET(strURL) }.await().let {
-                println("net")
-                if (it == null) {
-                    callback("error")
+        val strURL = "https://www.nicovideo.jp/watch/"+smNum
+        //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
+        async(Dispatchers.Default) { HttpUtil.httpGET(strURL) }.await().let {
+            println("net")
+            if (it == null) {
+                callback("error")
+                return@let
+            }
+            var st = it.pregMatche_firstString("<div id=\"js-initial-watch-data\" data-api-data=\"(.*?)\" hidden></div>")
+            if( st=="" ){ return@let }
+            st = HtmlCompat.fromHtml(st,HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
+            //st = st.pregReplace("\\\\u([0-9a-f]{2})([0-9a-f]{2})","%$1%$2")
+            //st = st.pregReplace("\\\\","")
+            //st = URLDecoder.decode(st,"UTF16")
+
+            println(st)
+            val nicoDmc = NicoDmc(smNum,st)
+            if( nicoDmc.token == "" ){
+                return@let
+            }
+
+            val url = "https://api.dmc.nico/api/sessions?_format=json"
+            val body = nicoDmc.sessionFormatJson
+            async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+                println("it")
+                if (it != null) {
+                    print(it)
+                    nicoDmc.Set_session_metadata(it)
+                    nicoDmc.Start_HeartBeat()
+                    callback(nicoDmc.content_uri)
                     return@let
                 }
-                var st = it.pregMatche_firstString("<div id=\"js-initial-watch-data\" data-api-data=\"(.*?)</div>")
-                if( st=="" ){ return@let }
-                st = st.pregMatche_firstString("(&quot;smileInfo.*?)isSlowLine")
-                if( st=="" ){ return@let }
-                st = HtmlCompat.fromHtml(st,HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
-                st = st.pregReplace("\\\\u([0-9a-f]{2})([0-9a-f]{2})","%$1%$2")
-                st = st.pregReplace("\\\\","")
-                st = URLDecoder.decode(st,"UTF16")
-                val nicoDougaURL = st.pregMatche_firstString(""""smileInfo":\{"url":"(.*?)"""")
-                if(nicoDougaURL==""){ return@let }
-
-                println(nicoDougaURL)
-
-                //動画の拡張子確認
-                var m = nicoDougaURL.pregMatche_firstString("(.)=")
-
-                when( m ){
-                    "v" -> {
-                        println("FLV!!")
-                        //もしFLVならエコノミーを試してみる
-                        if( smNum.endsWith("?eco=1") == false ){
-                            //StreamingUrlNicoAccess(smNum+"?eco=1", callback) //再帰の仕方がよくわからない...
-                            callback("re-eco")
-                        }
-                    }
-                    "s" -> return@let
-                    else -> callback(nicoDougaURL)
-                }
+                callback("error")
             }
-        //}else {
-            //アカウントありの場合
-        //}
-
+        }
     }
 
     fun isWiFiConnected(context: Context): Boolean {
@@ -94,16 +81,164 @@ class MovieAccess {
         }
     }
 }
+class NicoDmc(smNum: String, js_initial_watch_data:String) {
+    val smNum : String
+    var recipeId = ""
+        private set
+    var playerId = ""
+        private set
+    var videos = ""
+        private set
+    var audios = ""
+        private set
+    var signature = ""
+        private set
+    var contentId = ""
+        private set
+    var heartbeatLifetime = ""
+        private set
+    var contentKeyTimeout = ""
+        private set
+    var transferPresets = ""
+        private set
+    var service_id = ""
+        private set
+    var player_id = ""
+        private set
+    var service_user_id = ""
+        private set
+    var auth_type = ""
+        private set
+    var token = ""
+        private set
+    var session_metadata = ""
+        private set
+    var session_id = ""
+        private set
+    var content_uri = ""
+        private set
+    private var timer = Timer()
+    init{
+        this.smNum = smNum
+        println("DMC")
+        var ans:ArrayList<String> = arrayListOf()
+        if( js_initial_watch_data.pregMatche("\"session\":\\{\"recipeId\":\"(.*?)\",\"playerId\":\"(.*?)\",\"videos\":\\[(.*?)\\],\"audios\":\\[(.*?)\\],", matche = ans)){
+            recipeId = ans[1]
+            playerId = ans[2]
+            videos = ans[3]
+            audios = ans[4]
+        }
+        ans = arrayListOf()
+        if( js_initial_watch_data.pregMatche("\"signature\":\"(.*?)\",\"contentId\":\"(.*?)\",\"heartbeatLifetime\":(.*?),\"contentKeyTimeout\":(.*?),\"priority\":.*?,\"transferPresets\":\\[(.*?)\\],", matche= ans) ){
+            signature = ans[1]
+            contentId = ans[2]
+            heartbeatLifetime = ans[3]
+            contentKeyTimeout = ans[4]
+            transferPresets = ans[5]
+        }
+        ans = arrayListOf()
+        if( js_initial_watch_data.pregMatche("\\\\\"service_id\\\\\":\\\\\"(.*?)\\\\\",\\\\\"player_id\\\\\":\\\\\"(.*?)\\\\\",\\\\\"recipe_id\\\\\":\\\\\".*?\\\\\",\\\\\"service_user_id\\\\\":\\\\\"(.*?)\\\\\",\\\\\"protocols\\\\\":\\[\\{\\\\\"name\\\\\":\\\\\"http\\\\\",\\\\\"auth_type\\\\\":\\\\\"(.*?)\\\\\"\\}", matche= ans) ){
+            service_id = ans[1]
+            player_id = ans[2]
+            service_user_id = ans[3]
+            auth_type = ans[4]
+        }
+        ans = arrayListOf()
+        if( js_initial_watch_data.pregMatche("\"token\":\"(.*?\\\\\"transfer_presets\\\\\":.*?\\})\",", matche= ans) ){
+            token = ans[1]
+        }
+        println("recipeId= ${recipeId}")
+        println("playerId= ${playerId}")
+        println("videos= ${videos}")
+        println("audios= ${audios}")
+        println("signature= ${signature}")
+        println("contentId= ${contentId}")
+        println("heartbeatLifetime= ${heartbeatLifetime}")
+        println("contentKeyTimeout= ${contentKeyTimeout}")
+        println("transferPresets= ${transferPresets}")
+        println("service_id= ${service_id}")
+        println("player_id= ${player_id}")
+        println("service_user_id= ${service_user_id}")
+        println("auth_type= ${auth_type}")
+        println("token= ${token}")
+    }
+    var sessionFormatJson : String = ""
+        get() {
+            var video_src = videos
+            val audio_src = audios
+            println("video_src=${video_src}")
+            if( !MovieAccess().isWiFiConnected(GLOBAL.APPLICATIONCONTEXT) ){
+                //Wifi接続なし
+                video_src = video_src.pregReplace("^.*,","")
+                println("video_src=${video_src}")
+            }
+            return """{"session":{"recipe_id":"${recipeId}","content_id":"${contentId}","content_type":"movie","content_src_id_sets":[{"content_src_ids":[{"src_id_to_mux":{"video_src_ids":[${video_src}],"audio_src_ids":[${audio_src}]}}]}],"timing_constraint":"unlimited","keep_method":{"heartbeat":{"lifetime":${heartbeatLifetime}}},"protocol":{"name":"http","parameters":{"http_parameters":{"parameters":{"http_output_download_parameters":{"use_well_known_port":"yes","use_ssl":"yes","transfer_preset":"${transferPresets}"}}}}},"content_uri":"","session_operation_auth":{"session_operation_auth_by_signature":{"token":"${token}","signature":"${signature}"}},"content_auth":{"auth_type":"${auth_type}","content_key_timeout":${contentKeyTimeout},"service_id":"${service_id}","service_user_id":"${service_user_id}"},"client_info":{"player_id":"${playerId}"},"priority":0}}"""
+        }
+    fun Set_session_metadata(ResponseMetadata:String){
+        session_metadata = ResponseMetadata.pregMatche_firstString("\"data\":(.*)\\}$")
+        session_id = session_metadata.pregMatche_firstString("\"id\":\"(.*?)\",")
+        content_uri = session_metadata.pregMatche_firstString("\"content_uri\":\"(.*?)\",").pregReplace("\\\\", "")
+        session_metadata = session_metadata.pregReplace("\"content_uri\":\"(.*?)\",", "\"content_uri\":\"${content_uri}\",")
+    }
+    fun Start_HeartBeat() {
+        runBlocking {
+            val url = "https://api.dmc.nico/api/sessions/${session_id}?_format=json&_method=PUT"
+            val body = ""
+            async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+                Post_HeartBeat()
+                timer.schedule(40000, 40000, {
+                     Post_HeartBeat()
+                     println("smNum=${smNum}")
+                     println("CachedMovies.cachedMovies.any{ it.smNum == smNum } ")
+                     println(CachedMovies.cachedMovies.any{ it.smNum == smNum } )
+                     for( m in CachedMovies.cachedMovies ){
+                         println(m.smNum)
+                     }
+                     if( !CachedMovies.cachedMovies.any{ it.smNum == smNum } ){
+                         println("別のをダウンロードに行ってキャッシュから消されてたら終わり")
+                         End_HeartBeat()
+                     }else {
+                         CachedMovies.cachedMovies.indexOfLast { it.smNum == smNum }.let {
+                             if( it != -1 ){
+                                 if( CachedMovies.cachedMovies[it].simpleExoPlayer.bufferedPercentage >= 99 ){
+                                     println("ロード終わり")
+                                     End_HeartBeat()
+                                 }
+                             }
+                         }
+                     }
+                })
+
+            }
+        }
+    }
+    fun Post_HeartBeat() {
+        runBlocking {
+            val url = "https://api.dmc.nico/api/sessions/${session_id}?_format=json&_method=PUT"
+            val body = session_metadata
+            async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+                if (it != null) {
+                    println("HeartBeat Return!")
+                    println(it)
+                    Set_session_metadata(it)
+                }
+            }
+        }
+    }
+    fun End_HeartBeat() {
+        timer.cancel()
+    }
+}
 
 object CachedMovies {
-    //いずれ．．．
-    data class CachedMovie(var url:String, var simpleExoPlayer: SimpleExoPlayer )
+    //
+    data class CachedMovie(var url:String, var smNum: String, var simpleExoPlayer: SimpleExoPlayer )
 
     var cachedMovies:MutableList<CachedMovie> = mutableListOf()
-    fun access(url:String) : SimpleExoPlayer {
+    fun access(url:String,smNum: String) : SimpleExoPlayer {
         //読み込み済みのものがあればそれを返す
         for ( i in 0 until cachedMovies.count()){
-            if( cachedMovies[i].url == url ){
+            if( cachedMovies[i].smNum == smNum ){
                 cachedMovies.add(cachedMovies[i])
                 cachedMovies.removeAt(i)
                 while (cachedMovies.count() > USERDATA.cachedMovieNum){
@@ -132,7 +267,7 @@ object CachedMovies {
         simpleExoPlayer.playWhenReady = true
         simpleExoPlayer.volume = 0.2f
 
-        val cachedMovie = CachedMovie(url,simpleExoPlayer)
+        val cachedMovie = CachedMovie(url,smNum,simpleExoPlayer)
         cachedMovies.add(cachedMovie)
 
         while (cachedMovies.count() > USERDATA.cachedMovieNum){
