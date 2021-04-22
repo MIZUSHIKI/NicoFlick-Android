@@ -11,8 +11,8 @@ android {
         applicationId "com.mizushiki.nicoflick_a"
         minSdkVersion 24
         targetSdkVersion 29
-        versionCode 16
-        versionName "1.7.a0"
+        versionCode 17
+        versionName "1.8.a0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -61,12 +61,12 @@ dependencies {
     //画像ダウンロード
     implementation 'com.squareup.picasso:picasso:2.71828'
     // ExoPlayerの必須ライブラリ
-    implementation 'com.google.android.exoplayer:exoplayer-core:2.11.1'
+    implementation 'com.google.android.exoplayer:exoplayer-core:2.11.3'
     // ExoPlayer HLS対応
-    implementation 'com.google.android.exoplayer:exoplayer-hls:2.11.1'
+    implementation 'com.google.android.exoplayer:exoplayer-hls:2.11.3'
     // ExoPlayer UIを使用する場合
-    implementation 'com.google.android.exoplayer:exoplayer-ui:2.11.1'
-    implementation 'com.google.android.exoplayer:exoplayer-dash:2.11.1'
+    implementation 'com.google.android.exoplayer:exoplayer-ui:2.11.3'
+    implementation 'com.google.android.exoplayer:exoplayer-dash:2.11.3'
     // ライセンス クレジット表示
     implementation 'de.psdev.licensesdialog:licensesdialog:2.1.0'
 }

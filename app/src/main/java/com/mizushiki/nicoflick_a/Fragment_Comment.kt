@@ -157,7 +157,12 @@ private class CommentAdapter(val context: Context,
             }
             position -= 1
         }
-        view.findViewById<TextView>(R.id.name).text =  UserNameDataLists.getUserName(sortedList[position].userID)
+        val id = sortedList[position].userID
+        if( id == USERDATA.UserID ){
+            view.findViewById<TextView>(R.id.name).text = if(USERDATA.UserName != "") USERDATA.UserName else "NO_NAME"
+        }else {
+            view.findViewById<TextView>(R.id.name).text =  UserNameDataLists.getUserName(id)
+        }
         view.findViewById<TextView>(R.id.comment).text = sortedList[position].comment
         val a = sortedList[position].sqlUpdateTime
         val date = Date(a*1000L)

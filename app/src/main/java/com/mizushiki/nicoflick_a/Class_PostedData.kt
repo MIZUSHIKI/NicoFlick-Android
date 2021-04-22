@@ -54,7 +54,11 @@ object UserNameDataLists {
     }
 
     fun getUserName(userID:String) : String {
-        return userNames[userID]?.name ?: "NO_NAME"
+        val name = userNames[userID]?.name ?: "NO_NAME"
+        if( name == "" ){
+            return "NO_NAME"
+        }
+        return name
     }
 
     fun getLastUpdateTime() : Int {

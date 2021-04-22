@@ -138,23 +138,30 @@ class ServerDataHandler {
     }
 
     fun DownloadMusicData(callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
-        val url = GLOBAL.PHP_URL + "?req=musicz&time="+musicDatas.getLastUpdateTimeMusic()
+        val url = GLOBAL.PHP_URL + "?req=musicm&time="+musicDatas.getLastUpdateTimeMusic()
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
                 callback("error")
+                GLOBAL.ServerErrorMessage = "予期しないエラーが発生しました"
                 return@let
             }
-            if (it == "latest") {
+            var htRet = it
+            if( htRet.startsWith("<!--NicoFlickMessage=") ){
+                GLOBAL.ServerErrorMessage = htRet.pregMatche_firstString("^<!--NicoFlickMessage=(.*?)-->")
+                htRet = htRet.pregReplace("^<!--NicoFlickMessage=.*?-->", "" )
+                print(GLOBAL.ServerErrorMessage)
+            }
+            if (htRet == "latest") {
                 callback(null)
                 return@let
-            }else if(it.startsWith("server-url:")){
-                val url = it.removePrefix("server-url:")
+            }else if(htRet.startsWith("server-url:")){
+                val url = htRet.removePrefix("server-url:")
                 DownloadMusicData_FirstData( serverURL = url, callback = callback)
                 return@let
             }
             try {
-                val jsonArray = Json.parse(it).asArray()
+                val jsonArray = Json.parse(htRet).asArray()
                 // ロードした musicデータを処理
                 for (i in 0 until jsonArray.size()) {
                     val json = jsonArray.get(i).asObject()
@@ -186,7 +193,7 @@ class ServerDataHandler {
     fun DownloadMusicData_FirstData(serverURL:String, callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         val url = serverURL + "musicJson"
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
                 callback("error")
                 return@let
@@ -215,22 +222,28 @@ class ServerDataHandler {
                 //もう一度通常取得を試みる（Swiftみたいに上手くできない？ので そのまま全部コピペ）
                 //DownloadMusicData(callback)
                 // ↓
-                val url = GLOBAL.PHP_URL + "?req=musicz&time="+musicDatas.getLastUpdateTimeMusic()
+                val url = GLOBAL.PHP_URL + "?req=musicm&time="+musicDatas.getLastUpdateTimeMusic()
                 //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-                async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+                async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
                     if (it == null) {
                         callback("error")
                         return@let
                     }
-                    if (it == "latest") {
+                    var htRet = it
+                    if( htRet.startsWith("<!--NicoFlickMessage=") ){
+                        //GLOBAL.ServerErrorMessage = htRet.pregMatche_firstString("^<!--NicoFlickMessage=(.*?)-->")
+                        htRet = htRet.pregReplace("^<!--NicoFlickMessage=.*?-->", "" )
+                        //print(GLOBAL.ServerErrorMessage)
+                    }
+                    if (htRet == "latest") {
                         callback(null)
                         return@let
-                    }/*else if(it.startsWith("server-url:")){
-                        val url = it.removePrefix("server-url:")
+                    }/*else if(htRet.startsWith("server-url:")){
+                        val url = htRet.removePrefix("server-url:")
                         DownloadMusicData_FirstData( serverURL = url, callback = callback)
                     }*/
                     try {
-                        val jsonArray = Json.parse(it).asArray()
+                        val jsonArray = Json.parse(htRet).asArray()
                         // ロードした musicデータを処理
                         for (i in 0 until jsonArray.size()) {
                             val json = jsonArray.get(i).asObject()
@@ -271,7 +284,7 @@ class ServerDataHandler {
     fun DownloadLevelData(callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         val url = GLOBAL.PHP_URL + "?req=levelm-noTimetag&userID="+USERDATA.UserID.take(8)+"&time="+musicDatas.getLastUpdateTimeLevel()
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
                 callback("error")
                 return@let
@@ -302,7 +315,7 @@ class ServerDataHandler {
                         creator = json.get("creator").asString(),
                         description = json.get("description").asString(),
                         speed = json.get("speed").asString().toInt(),
-                        noteData = "",
+                        noteData = json.get("bitNote")?.asString() ?: "",
                         updateTime = json.get("updateTime").asString().toInt(),
                         createTime = json.get("createTime").asString().toInt(),
                         playCount = json.get("playCount").asString().toInt(),
@@ -328,7 +341,7 @@ class ServerDataHandler {
     fun DownloadLevelData_FirstData(serverURL: String, callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         val url = serverURL + "levelJson"
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
                 callback("error")
                 return@let
@@ -351,7 +364,7 @@ class ServerDataHandler {
                         creator = json.get("creator").asString(),
                         description = json.get("description").asString(),
                         speed = json.get("speed").asString().toInt(),
-                        noteData = "",
+                        noteData = json.get("bitNote")?.asString() ?: "",
                         updateTime = json.get("updateTime").asString().toInt(),
                         createTime = json.get("createTime").asString().toInt(),
                         playCount = json.get("playCount").asString().toInt(),
@@ -369,7 +382,7 @@ class ServerDataHandler {
                 // ↓
                 val url = GLOBAL.PHP_URL + "?req=levelm-noTimetag&userID="+USERDATA.UserID.take(8)+"&time="+musicDatas.getLastUpdateTimeLevel()
                 //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-                async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+                async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
                     if (it == null) {
                         callback("error")
                         return@let
@@ -399,7 +412,7 @@ class ServerDataHandler {
                                 creator = json.get("creator").asString(),
                                 description = json.get("description").asString(),
                                 speed = json.get("speed").asString().toInt(),
-                                noteData = "",
+                                noteData = json.get("bitNote")?.asString() ?: "",
                                 updateTime = json.get("updateTime").asString().toInt(),
                                 createTime = json.get("createTime").asString().toInt(),
                                 playCount = json.get("playCount").asString().toInt(),
@@ -434,7 +447,7 @@ class ServerDataHandler {
     fun DownloadPlayFavoriteCountData(callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         val url = GLOBAL.PHP_URL + "?req=PcFcCtSt&playcountTime="+musicDatas.getLastUpdateTimeLevel() + "&playcountTime="+musicDatas.getLastPlayCountTimeLevel() + "&favoriteTime="+musicDatas.getLastFavoriteCountTimeLevel() + "&commentTime="+musicDatas.getLastCommentTimeLevel() + "&scoreTime="+musicDatas.getLastScoreTimeLevel()
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
                 callback("error")
                 return@let
@@ -481,7 +494,7 @@ class ServerDataHandler {
     fun DownloadTimetag(level:levelData, callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         val url = GLOBAL.PHP_URL + "?req=timetag&id="+level.sqlID
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
                 callback("error")
                 return@let
@@ -508,7 +521,7 @@ class ServerDataHandler {
         val url = GLOBAL.PHP_URL + "?req=scorez&levelID=$levelID&time="+scoreDatas.getLastUpdateTime(levelID)
         println("score url=$url")
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
                 callback("error")
                 return@let
@@ -547,7 +560,7 @@ class ServerDataHandler {
     fun DownloadCommentData(levelID: Int, callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         val url = GLOBAL.PHP_URL + "?req=commentz&levelID=$levelID&time="+commentDatas.getLastUpdateTime(levelID)
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
                 callback("error")
                 return@let
@@ -592,7 +605,7 @@ class ServerDataHandler {
         //
         val url = GLOBAL.PHP_URL + "?req=usernamez&time=$updateTime"
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
                 callback("error")
                 return@let
@@ -659,7 +672,7 @@ class ServerDataHandler {
         val url = serverURL + "usernameJson${userNameDatas.usernameJsonNumCount}"
         println("url=$url")
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
                 callback("error")
                 return@let
@@ -709,7 +722,7 @@ class ServerDataHandler {
                     //
                     val url = GLOBAL.PHP_URL + "?req=usernamez&time=$updateTime"
                     //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-                    async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+                    async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
                         if (it == null) {
                             callback("error")
                             return@let
@@ -764,7 +777,7 @@ class ServerDataHandler {
     fun GetScoreData(levelID:Int, callback: (JsonArray?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         val url = GLOBAL.PHP_URL + "?req=score&levelID=$levelID"
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
                 callback(null)
                 return@let
@@ -784,7 +797,7 @@ class ServerDataHandler {
     fun GetCommentData(levelID:Int, callback: (JsonArray?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
         val url = GLOBAL.PHP_URL + "?req=comment&levelID=$levelID"
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             println("com="+it)
             if (it == null) {
                 callback(null)
@@ -808,7 +821,7 @@ class ServerDataHandler {
         val body = "req=userName-add&id=${userID}&name=${URLEncoder.encode(name,"utf-8")}"
         println("postbody="+body)
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, noCache = true) }.await().let {
             if (it == null) {
                 callback(false)
                 return@let
@@ -829,7 +842,7 @@ class ServerDataHandler {
         }
         val url = GLOBAL.PHP_URL + "?req=userNameID&id=$userID"
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(url) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
                 callback(false)
                 return@let
@@ -847,7 +860,7 @@ class ServerDataHandler {
         val body = "req=scorez-add&userID=${userID}&userNameID=${USERDATA.UserNameID}&scoreset=${scoreset}&pass=${Crypt.encryptx_urlsafe("ニコFlick", userID)}"
         println("postbody="+body)
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, noCache = true) }.await().let {
             if (it == null) {
                 callback(false)
                 return@let
@@ -865,7 +878,7 @@ class ServerDataHandler {
         //  登録
         val url = GLOBAL.PHP_URL
         val body = "req=playcount-add&playcountset=${playcountset}"
-        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, noCache = true) }.await().let {
             if (it == null) {
                 callback(false)
                 return@let
@@ -882,7 +895,7 @@ class ServerDataHandler {
         //  登録
         val url = GLOBAL.PHP_URL
         val body = "req=favoritez-add&favoritecountset=${favoritecountset}"
-        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, noCache = true) }.await().let {
             if (it == null) {
                 callback(false)
                 return@let
@@ -899,7 +912,7 @@ class ServerDataHandler {
         //  登録
         val url = GLOBAL.PHP_URL
         val body = "req=PlaycountFavoritez-add&PFcountset=${pfcountset}"
-        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, noCache = true) }.await().let {
             if (it == null) {
                 callback(false)
                 return@let
@@ -918,7 +931,7 @@ class ServerDataHandler {
         val body = "req=comment-add&userID=${userID}&levelID=${levelID}&comment=${URLEncoder.encode(comment, "UTF-8")}"
         println("postbody="+body)
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, noCache = true) }.await().let {
             if (it == null) {
                 callback(false)
                 return@let
@@ -933,7 +946,7 @@ class ServerDataHandler {
         val body = "req=musicTag-update&id=${id}&tags=${URLEncoder.encode(tags,"utf-8")}&userID=${userID}&pass=${Crypt.encryptx_urlsafe("ニコFlick", userID)}"
         println("postbody="+body)
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, noCache = true) }.await().let {
             if (it == null) {
                 callback(false)
                 return@let
@@ -954,7 +967,7 @@ class ServerDataHandler {
         val body = "req=report&userID=${userID}&musicID=${musicID}&comment=${URLEncoder.encode(comment, "UTF-8")}"
         println("postbody="+body)
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, noCache = true) }.await().let {
             if (it == null) {
                 callback(false)
                 return@let
@@ -973,7 +986,7 @@ class ServerDataHandler {
         val body = "req=tagsToMusics&tags=${URLEncoder.encode(tags,"UTF-8")}&musics=${URLEncoder.encode(musicsStr, "UTF-8")}"
         println("postbody="+body)
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+        async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, noCache = true) }.await().let {
             if (it == null) {
                 callback(false)
                 return@let

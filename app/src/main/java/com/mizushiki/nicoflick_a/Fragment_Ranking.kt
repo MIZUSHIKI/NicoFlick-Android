@@ -116,7 +116,7 @@ private class RankingAdapter(val context: Context,
         val id = sortedList[position].userID
         if( id == USERDATA.UserID ){
             view.findViewById<TextView>(R.id.name).setTextColor(Color.RED)
-            view.findViewById<TextView>(R.id.name).text =  USERDATA.UserName
+            view.findViewById<TextView>(R.id.name).text = if(USERDATA.UserName != "") USERDATA.UserName else "NO_NAME"
         }else {
             view.findViewById<TextView>(R.id.name).text =  UserNameDataLists.getUserName(id)
         }

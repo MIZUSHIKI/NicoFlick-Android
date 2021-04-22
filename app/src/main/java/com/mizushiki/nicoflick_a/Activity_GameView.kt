@@ -12,6 +12,7 @@ import android.graphics.RectF
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
+import android.provider.Settings
 import android.text.InputFilter
 import android.text.Spanned
 import android.util.TypedValue
@@ -93,6 +94,11 @@ class Activity_GameView : AppCompatActivity() {
     var paused = false
     var resultSegued = false //遷移中フラグ
 
+    var usedSimeji:Boolean = false
+        //maeSourceを30文字ごとに消去する。（editも""にする）
+        //Simejiは一気に30文字以上入力できないらしい。（1秒以上の隙間なく30文字以上来られると強制ミスになってしまう）
+        //今のところ見つけたのはSimejiだけ。(一応Simejiは(超軽量状態にしていたら)editを1文字ごとに""してもラグはなかった)
+
     val mHandler = Handler()
     var timerKill = false
     private var run: Runnable? = null
@@ -108,6 +114,12 @@ class Activity_GameView : AppCompatActivity() {
         //simpleExoPlayer = SimpleExoPlayer.Builder(applicationContext)
         //    .build()
         playerView = findViewById(R.id.playerView)
+
+        // 使用IME名取得
+        val imeString = Settings.Secure.getString(applicationContext.contentResolver,Settings.Secure.DEFAULT_INPUT_METHOD)
+        println("ime = $imeString")
+        usedSimeji = imeString.contains("simeji")
+        println("usedSimeji=$usedSimeji")
 
         if(USERDATA.lookedHelp == false){
             USERDATA.lookedHelp = true
@@ -159,7 +171,7 @@ class Activity_GameView : AppCompatActivity() {
                         maeSource = ""
                         maeSourceClear = false
                     }
-                    //println("$maeSource == ${source.toString()} || ${maeSource.length} > ${source.length}")
+                    //println("$source -- $maeSource == ${source.toString()} || ${maeSource.length} > ${source.length}")
                     if(maeSource == source.toString() || maeSource.length > source.length){
                         //カーソル移動等だったりで、うまくlast()で取得できなくなる可能性があるから消す。
                         FlickInput("x")
@@ -168,6 +180,10 @@ class Activity_GameView : AppCompatActivity() {
                     }else{
                         FlickInput(source.last().toString())
                         maeSource = source.toString()
+                        if( usedSimeji && source.length >= 30 ) {
+                            editText.setText("")
+                            maeSource=""
+                        }
                     }
                 }
                 return ""
@@ -405,6 +421,7 @@ class Activity_GameView : AppCompatActivity() {
             //println("flickTime="+flickTime+", flickedNote="+flickedNote.time)
             //まずフリックした文字とnoteの文字があっているか判定して次にタイミング判定
             val judge = flickedNote.judgeWord(flickWord = string)
+            //println("judge=$judge, ${flickedNote.word} - ${string}")
             if (judge == Note.BAD) {
                 //Bad
                 flickedNote.flickedTime = flickTime

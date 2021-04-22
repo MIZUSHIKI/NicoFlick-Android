@@ -48,11 +48,17 @@ class Activity_SelectorMenu : AppCompatActivity() {
                         val url = "http://timetag.main.jp/nicoflick/index.php"
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                         startActivity(Intent.createChooser(intent, "Browse with"))
+                        GLOBAL.Selector_instance?.let{
+                            it.ThumbMovieStop()
+                        }
                     }
                     1 -> {
                         val url = "https://www.nicovideo.jp/watch/sm33685683"
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                         startActivity(Intent.createChooser(intent, "Browse with"))
+                        GLOBAL.Selector_instance?.let{
+                            it.ThumbMovieStop()
+                        }
                     }
                 }
             })
@@ -116,6 +122,10 @@ class Activity_SelectorMenu : AppCompatActivity() {
         val url = GLOBAL.SelectMUSIC!!.movieURL
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
         startActivity(Intent.createChooser(intent, "Browse with"))
+
+        GLOBAL.Selector_instance?.let{
+            it.ThumbMovieStop()
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

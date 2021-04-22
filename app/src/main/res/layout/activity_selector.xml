@@ -8,6 +8,33 @@
         android:layout_height="match_parent"
         tools:context=".Activity_Selector">
 
+    <com.google.android.exoplayer2.ui.PlayerView
+            android:id="@+id/playerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" app:layout_constraintTop_toTopOf="parent"
+            app:use_controller="false"
+            coverflow:resize_mode="fixed_height"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintVertical_bias="0.0"
+            android:background="@android:color/white">
+    </com.google.android.exoplayer2.ui.PlayerView>
+    <View
+            android:id="@+id/playerView_Alpha"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:alpha="1.0"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:background="@android:color/white"
+    />
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/playerView_SlashShade_layout">
+    </FrameLayout>
+
     <it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow
             android:id="@+id/coverflow"
             android:layout_width="0dp"
@@ -21,7 +48,20 @@
             coverflow:layout_constraintEnd_toEndOf="parent" coverflow:layout_constraintStart_toStartOf="parent"
             coverflow:layout_constraintBottom_toBottomOf="parent"
             coverflow:layout_constraintVertical_bias="0.22"/>
-
+    <Button
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:id="@+id/button_thumbMoviePlay"
+            android:onClick="Button_thumbMoviePlay"
+            android:background="@drawable/exo_icon_circular_play"
+            android:layout_marginStart="8dp"
+            android:scaleX="0.8"
+            android:scaleY="0.8"
+            android:alpha="0.2"
+            coverflow:layout_constraintVertical_bias="0.275"
+            coverflow:layout_constraintStart_toStartOf="@+id/coverflow"
+            coverflow:layout_constraintBottom_toBottomOf="@+id/coverflow"
+            coverflow:layout_constraintTop_toTopOf="@+id/coverflow"/>
     <TextView
             android:layout_width="0dp"
             android:layout_height="46dp"
@@ -57,7 +97,7 @@
             coverflow:layout_constraintEnd_toEndOf="parent" android:layout_marginTop="8dp"
             coverflow:layout_constraintTop_toBottomOf="@+id/text_Length" android:textAlignment="center"
             android:ellipsize="end" android:maxLines="3" android:textSize="10sp"
-            android:textColor="?attr/colorButtonNormal" android:paddingLeft="8dp" android:paddingRight="8dp"/>
+            android:textColor="#BBBBBB" android:paddingLeft="8dp" android:paddingRight="8dp"/>
     <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -126,6 +166,9 @@
         <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:fadingEdge="vertical"
+                android:fadingEdgeLength="150dp"
+                android:requiresFadingEdge="vertical"
                 android:id="@+id/scrollview_levelScroller">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                           android:orientation="vertical"
@@ -136,8 +179,12 @@
                         android:id="@+id/levelScrollerView"/>
             </LinearLayout>
         </ScrollView>
+        <ImageView android:layout_width="match_parent" android:layout_height="80dp"
+                      android:layout_marginTop="60dp" android:orientation="vertical"
+                      android:id="@+id/outputImageView_levelScroller"/>
         <LinearLayout android:layout_width="match_parent" android:layout_height="240dp"
                       android:layout_marginTop="-20dp" android:orientation="vertical"
+                      android:alpha="0.3"
                       android:id="@+id/levelpickerContainer">
             <TextView
                     android:layout_width="match_parent"
@@ -250,16 +297,6 @@
                     android:gravity="right|top"
                     android:id="@+id/date_p1"/>
         </LinearLayout>
-        <View
-                android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:background="@drawable/gradation"
-                android:layout_gravity="top"/>
-        <View
-                android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:background="@drawable/gradation_r"
-                android:layout_gravity="bottom"/>
         <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"

@@ -8,10 +8,18 @@ import okhttp3.RequestBody.Companion.toRequestBody
 object HttpUtil {
     val client = OkHttpClient.Builder().cookieJar(JavaNetCookieJar(GLOBAL.COOKIE_MANAGER)).build()
     //叩きたいREST APIのURLを引数とします
-    fun httpGET(url : String): String? {
-        val request = Request.Builder()
-            .url(url)
-            .build()
+    fun httpGET(url : String, noCache : Boolean = false): String? {
+        val request : Request
+        if( !noCache ){
+            request= Request.Builder()
+                .url(url)
+                .build()
+        }else {
+            request= Request.Builder()
+                .cacheControl(CacheControl.FORCE_NETWORK)
+                .url(url)
+                .build()
+        }
         try {
             val response = client.newCall(request).execute()
             if(!response.isSuccessful){
@@ -24,15 +32,24 @@ object HttpUtil {
         }
     }
 
-    fun httpPOST(url : String, postString : String) : String? {
+    fun httpPOST(url : String, postString : String, noCache: Boolean = false) : String? {
         val MIMEType = "application/x-www-form-urlencoded; charset=utf-8".toMediaTypeOrNull()
         val requestBody = RequestBody.create(MIMEType,postString)
 
         // リクエストオブジェクトを作って
-        val request = Request.Builder()
-            .url(url)
-            .post(requestBody)
-            .build()
+        val request : Request
+        if( !noCache ){
+            request = Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build()
+        }else {
+            request = Request.Builder()
+                .cacheControl(CacheControl.FORCE_NETWORK)
+                .url(url)
+                .post(requestBody)
+                .build()
+        }
         try {
             val response = client.newCall(request).execute()
             if(!response.isSuccessful){

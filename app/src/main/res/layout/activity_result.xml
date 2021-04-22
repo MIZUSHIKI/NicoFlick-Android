@@ -25,6 +25,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView_Artist" app:layout_constraintStart_toEndOf="@+id/imageView_resultThumbnail"
+            android:autoSizeTextType="uniform" android:autoSizeMinTextSize="6sp"
+            android:autoSizeMaxTextSize="14sp"
             app:layout_constraintEnd_toEndOf="parent" android:layout_marginStart="16dp"
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintVertical_bias="0.085"/>
@@ -231,7 +233,7 @@
             app:layout_constraintEnd_toEndOf="@+id/textView_ComboBonus" android:textColor="?attr/actionMenuTextColor"
             android:textSize="18sp"/>
     <TextView
-            android:text="HiScore更新!!"
+            android:text="HighScore更新!!"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/textView_HiScore" android:textColor="@color/colorAccent"

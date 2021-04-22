@@ -299,6 +299,24 @@ object MusicDataLists {
         return 0
     }
 
+    fun getNotesFirstTime(movieURL: String) : Double {
+        levels[movieURL]?.let {
+            var timetag = ""
+            for( levelData in it ){
+                timetag = levelData.noteData.pregMatche_firstString("(\\[\\d\\d\\:\\d\\d[\\:|\\.]\\d\\d\\])")
+                println(timetag)
+                if( timetag != "" ){
+                    val time = timetag.timetagToSeconds()
+                    if( time < 0.0 ){
+                        return 0.0
+                    }
+                    return time
+                }
+            }
+        }
+        return -0.01
+    }
+
     //
     fun getSelectMusics( callback:(ArrayList<musicData>) -> Unit ) {
         //val selectCondition = USERDATA.SelectedMusicCondition //userData読み出し

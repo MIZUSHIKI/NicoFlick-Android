@@ -28,13 +28,16 @@ object GLOBAL {
     lateinit var COOKIE_MANAGER: CookieManager
     val PHP_URL = "http://timetag.main.jp/nicoflick/nicoflick.php"
     //val PHP_URL = "http://192.168.11.6/nicoflick_20201103/nicoflick.php" //windows xampp
-    val Version = 1700
+    val Version = 1800
     //Activity間 オブジェクト受け渡し用
     var SelectMUSIC:musicData? = null
     var SelectLEVEL:levelData? = null
     var CurrentNOTES:Notes? = null
     var ResultFirst = false
     var retString:String? = null //遷移間返り値が上手くいかないところがある
+    var ServerErrorMessage = ""
+
+    var Selector_instance:Activity_Selector? = null //SelectorMenuでThumbMovieStopするため(もう面倒くさくなって・・・)
 }
 
 class MainActivity : AppCompatActivity() {
@@ -74,11 +77,24 @@ class MainActivity : AppCompatActivity() {
                 //return@DownloadMusicDataAndUserNameData
             //}
             progress_circular.isVisible = false
-
-            val intent: Intent = Intent(applicationContext, Activity_Selector::class.java)
-            startActivity(intent)
-            segueing = false
-
+            if( GLOBAL.ServerErrorMessage != "" ){
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("サーバエラー")
+                    .setMessage("・${GLOBAL.ServerErrorMessage}")
+                    .setPositiveButton("OK", { dialog, which ->
+                        GLOBAL.ServerErrorMessage = ""
+                        //エラーメッセージ確認後、遷移
+                        val intent: Intent = Intent(applicationContext, Activity_Selector::class.java)
+                        startActivity(intent)
+                        segueing = false
+                    })
+                    .show()
+            }else {
+                //特にエラーなし遷移
+                val intent: Intent = Intent(applicationContext, Activity_Selector::class.java)
+                startActivity(intent)
+                segueing = false
+            }
         }
     }
 
@@ -382,6 +398,15 @@ iOS11リリース(32bitアプリなので両方起動できなくなる)"""
                 println("お気に入り仕様変更を見せる")
                 USERDATA.lookedChangeFavoSpec_v1500 = false
             }
+        }
+        if( USERDATA.MyVersion < 1800 ){
+            //notesの頭16文字だけ拾ってthumbMovieに使用するため music, level を初期化して再取得
+            MusicDataLists.reset()
+            USERDATA.MusicsJson = ""
+            USERDATA.LevelsJson = ""
+            println("music,level Reset")
+            //exoPlayerの保持しておける数が少ないのでキャッシュ(CachedMovie)は 1曲のみ（デコーダ数の関係らしい）。[CachedThumbMovie_Num=3]
+            USERDATA.cachedMovieNum = 1
         }
     }
 }

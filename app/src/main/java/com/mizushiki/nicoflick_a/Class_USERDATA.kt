@@ -43,8 +43,8 @@ object USERDATA {
             return ""
         }
     //ユーザーネーム
-    var UserName:String = ""
-        get() = dataStore.getString("UserName","")!!
+    var UserName:String = "NO_NAME"
+        get() = dataStore.getString("UserName","NO_NAME")!!
         set(value) {
             dataStore.edit().putString("UserName",value).commit()
             field = value
@@ -222,10 +222,17 @@ object USERDATA {
             dataStore.edit().putString("JudgeOffset",usString).commit()
         }
     //cachedMoviesNum
-    var cachedMovieNum:Int = 20
-        get() = dataStore.getInt("cachedMovieNum",20)
+    var cachedMovieNum:Int = 3
+        get() = dataStore.getInt("cachedMovieNum",3)
         set(value) {
             dataStore.edit().putInt("cachedMovieNum",value).commit()
+            field = value
+        }
+    //曲セレクト画面で30秒プレビューを見るかどうか
+    var thumbMoviePlay:Boolean = false
+        get() = dataStore.getBoolean("thumbMoviePlay",false)
+        set(value) {
+            dataStore.edit().putBoolean("thumbMoviePlay",value).commit()
             field = value
         }
 

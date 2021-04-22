@@ -1,11 +1,8 @@
 package com.mizushiki.nicoflick_a
 
-import android.animation.ValueAnimator
 import android.content.Context
-import android.content.DialogInterface
 import android.content.Intent
-import android.graphics.Color
-import android.net.Uri
+import android.graphics.*
 import android.os.Bundle
 import android.os.Handler
 import android.os.VibrationEffect
@@ -15,22 +12,26 @@ import android.text.Html
 import android.view.KeyEvent.ACTION_UP
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.NumberPicker
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.isGone
-import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
+import com.google.android.exoplayer2.ExoPlayer
+import com.google.android.exoplayer2.Player
+import com.google.android.exoplayer2.SeekParameters
+import com.google.android.exoplayer2.SimpleExoPlayer
+import com.google.android.exoplayer2.ui.PlayerView
 import it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow
 import it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow.OnScrollPositionListener
 import kotlinx.android.synthetic.main.activity_selector.*
-import kotlinx.android.synthetic.main.activity_selector_menu.*
 import kotlinx.android.synthetic.main.activity_settings.progress_circular
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.text.SimpleDateFormat
-import java.time.LocalDate
 import java.util.*
 import kotlin.concurrent.schedule
 
@@ -64,10 +65,17 @@ class Activity_Selector : AppCompatActivity() {
     var containerFirstPos = 0
     var scrollerOneHeight = 100
 
+    private var cacheExoPlayer: SimpleExoPlayer? = null
+    private lateinit var playerView: PlayerView
+
     var segueing = false
+    var leaved = false
+    var flg_notHome = false
+    var flg_thumbMovieStopping = false //曲選択後遅延して再生しているためGame遷移後に再生始まったりするのを防ぐフラグ
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        GLOBAL.Selector_instance = this
         setContentView(R.layout.activity_selector)
 
         //お気に入りソート関係
@@ -78,6 +86,7 @@ class Activity_Selector : AppCompatActivity() {
         coverflow = findViewById<View>(R.id.coverflow) as FeatureCoverFlow
         val coverFlowAdapter = CoverFlowAdapter(this, currentMusics)
         coverflow.adapter = coverFlowAdapter
+        coverflow.setReflectionOpacity(0xFF * 40/100)
         coverflow.setOnScrollPositionListener(object : OnScrollPositionListener {
             override fun onScrolling() {
                 //println("scrolling"+coverflow.scrollPosition)
@@ -85,7 +94,7 @@ class Activity_Selector : AppCompatActivity() {
                     val timerCallback1: TimerTask.() -> Unit = {
                         mHandler.post {
                             //println("TODO")
-                            if ( coverflow.isVisible && indexCoverFlow != coverflow.scrollPosition) {
+                            if (coverflow.isVisible && indexCoverFlow != coverflow.scrollPosition) {
                                 indexCoverFlow = coverflow.scrollPosition
                                 println("index=" + coverflow.scrollPosition)
                                 setCurrentLevels(indexCoverFlow)
@@ -98,16 +107,17 @@ class Activity_Selector : AppCompatActivity() {
             }
 
             override fun onScrolledToPosition(position: Int) {
-                if( coverflow.isVisible ){
+                if (coverflow.isVisible) {
                     //println("pos=$position")
                     indexCoverFlow = position
                     scrollingTimer?.cancel()
                     scrollingTimer = null
 
-                    if( currentMusics.indices.contains(indexCoverFlow) ){
+                    if (currentMusics.indices.contains(indexCoverFlow)) {
                         maeMusic = currentMusics[indexCoverFlow]
                         println("maeMusic=$maeMusic")
                     }
+                    ThumbMoviePlay()
                 }
             }
 
@@ -164,7 +174,7 @@ class Activity_Selector : AppCompatActivity() {
                         }else {
                             //指離した後、スクロールも止まった。
                             levelScroller_maeScrollY = -100
-                            scrollview_levelScroller.smoothScrollTo(0,indexPicker * scrollerOneHeight)
+                            scrollview_levelScroller.smoothScrollTo(0, indexPicker * scrollerOneHeight)
                        }
                     }
                 }
@@ -182,12 +192,14 @@ class Activity_Selector : AppCompatActivity() {
         Handler().postDelayed(Runnable {
             //コンテナの初期値を保存
             containerFirstPos = levelpickerContainer.y.toInt()
+            RedrawLevelpickerSelection()
         }, 100)
 
         text_Tags.setOnClickListener {
             if( currentMusics.size > 0 ){
                 if(segueing){ return@setOnClickListener }
                 segueing = true
+                flg_notHome = true
                 maeTags = USERDATA.SelectedMusicCondition.tags
                 maeSort = USERDATA.SelectedMusicCondition.sortItem
                 maeMusicTags = currentMusics[indexCoverFlow].tags
@@ -219,11 +231,24 @@ class Activity_Selector : AppCompatActivity() {
                     indexCoverFlow = -1 //CoverFlowリロード
                     SetMusicToCoverFlow()
                 }
-                .setNegativeButton("Cancel",null)
+                .setNegativeButton("Cancel", null)
                 .show()
         }
         //
-        showChangeFavoSpecView()
+        scrollview_levelScroller.isHorizontalFadingEdgeEnabled = true
+        //showChangeFavoSpecView() //もういいか
+        playerView = findViewById(R.id.playerView)
+        // FrameLayout のインスタンスを取得
+        val slashShadeLayout: FrameLayout = findViewById(R.id.playerView_SlashShade_layout)
+        val slashShadeView = SlashShadeView(this)
+        slashShadeLayout.addView(slashShadeView)
+        if( USERDATA.thumbMoviePlay ){
+            button_thumbMoviePlay.alpha = 1.0F
+            button_thumbMoviePlay.background.colorFilter = PorterDuffColorFilter(
+                0xFFFF2D71.toInt(),
+                PorterDuff.Mode.SRC_IN
+            )
+        }
     }
     fun gotoSelectorMenuTableForSort() {
         if( currentMusics.size <= 0 ){
@@ -231,6 +256,7 @@ class Activity_Selector : AppCompatActivity() {
         }
         if(segueing){ return }
         segueing = true
+        flg_notHome = true
         maeTags = USERDATA.SelectedMusicCondition.tags
         maeSort = USERDATA.SelectedMusicCondition.sortItem
         maeMusicTags = currentMusics[indexCoverFlow].tags
@@ -308,10 +334,13 @@ class Activity_Selector : AppCompatActivity() {
         var htmlText = currentMusics[index].tags
         for( tagp in USERDATA.SelectedMusicCondition.tag ){
             val tag = tagp.word
-            htmlText = htmlText.pregReplace("(^|\\s)(${Regex.escape(tag)})(\\s|$)","$1<font color='#000000'>$2</font>$3")
+            htmlText = htmlText.pregReplace(
+                "(^|\\s)(${Regex.escape(tag)})(\\s|$)",
+                "$1<font color='#000000'>$2</font>$3"
+            )
 
         }
-        text_Tags.setText( Html.fromHtml( htmlText, Html.FROM_HTML_MODE_COMPACT ) )
+        text_Tags.setText(Html.fromHtml(htmlText, Html.FROM_HTML_MODE_COMPACT))
 
         text_Num.setText("${index + 1} / ${currentMusics.size}")
 
@@ -327,7 +356,12 @@ class Activity_Selector : AppCompatActivity() {
         }
         // LinearLayout(levelScrollerContainer)内の Viewを新しく作り直してAddする（height変更がうまくできなかった）
         levelScrollerContainer.removeAllViews()
-        levelScrollerContainer.addView(View(applicationContext), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,scrollerOneHeight * (currentLevels.size + 1 )))
+        levelScrollerContainer.addView(
+            View(applicationContext), LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                scrollerOneHeight * (currentLevels.size + 1)
+            )
+        )
 
         LevelPickerContainerRedraw()
     }
@@ -336,7 +370,7 @@ class Activity_Selector : AppCompatActivity() {
 
         if(USERDATA.lookedExtend == false){
             var musicIDSet:MutableSet<Int> = mutableSetOf()
-            for( (sKey,_) in USERDATA.Score.scores){
+            for((sKey, _) in USERDATA.Score.scores){
                 for( ms in musicDatas.musics ){
                     if( ms.levelIDs.contains(sKey) ){
                         musicIDSet.add(ms.sqlID)
@@ -386,10 +420,13 @@ class Activity_Selector : AppCompatActivity() {
             return
         }
         segueing = true
+        flg_notHome = true
         println(currentLevels[indexPicker].noteData)
         println("c == ${currentLevels[indexPicker].noteData}")
+        ThumbMovieStop()
+        CachedThumbMovies.allRelease()
         //すでにゲームデータを持っている場合
-        if(currentLevels[indexPicker].noteData != ""){
+        if(currentLevels[indexPicker].noteData.count() >= 20){
             val intent: Intent = Intent(applicationContext, Activity_GameView::class.java)
             GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
             GLOBAL.SelectLEVEL = currentLevels[indexPicker]
@@ -417,6 +454,7 @@ class Activity_Selector : AppCompatActivity() {
             return
         }
         segueing = true
+        flg_notHome = true
         val intent: Intent = Intent(applicationContext, Activity_SelectorMenu::class.java)
         if( currentMusics.size > 0 ) {
             GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
@@ -437,6 +475,14 @@ class Activity_Selector : AppCompatActivity() {
         if(segueing) {
             return
         }
+        ThumbMovieStop()
+        finish()
+    }
+    override fun onBackPressed() {
+        if(segueing) {
+            return
+        }
+        ThumbMovieStop()
         finish()
     }
     fun Button_RankingComment(view: View) {
@@ -445,14 +491,16 @@ class Activity_Selector : AppCompatActivity() {
             return
         }
         segueing = true
+        flg_notHome = true
         val intent: Intent = Intent(applicationContext, Activity_RankingComment::class.java)
         GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
-        println("selector title ="+ GLOBAL.SelectMUSIC!!.title)
+        println("selector title =" + GLOBAL.SelectMUSIC!!.title)
         GLOBAL.SelectLEVEL = currentLevels[indexPicker]
         startActivityForResult(intent, 1003)
     }
     fun Button_StartPage(view: View) {
         println("gotoStartPage")
+        ThumbMovieStop()
         val intent: Intent = Intent(applicationContext, Activity_WikiPageWeb::class.java)
         startActivityForResult(intent, 1005)
     }
@@ -471,7 +519,7 @@ class Activity_Selector : AppCompatActivity() {
             val myFavorite = USERDATA.MyFavorite2
             myFavorite.remove(currentLevel.sqlID)
             USERDATA.MyFavorite2 = myFavorite //ここでDataStoreに保存される
-            USERDATA.FavoriteCount.subFavoriteCount(levelID= currentLevel.sqlID)
+            USERDATA.FavoriteCount.subFavoriteCount(levelID = currentLevel.sqlID)
         }else {
             if( USERDATA.MyFavorite.contains(currentLevel.sqlID) ){
                 //Ver.1.5未満の互換
@@ -510,11 +558,11 @@ class Activity_Selector : AppCompatActivity() {
     fun Button_LevelSort(view: View) {
         println("levelSort")
 
-        val strList = arrayOf("なし","お気に入りを上に集める")
+        val strList = arrayOf("なし", "お気に入りを上に集める")
         AlertDialog.Builder(this) // FragmentではActivityを取得して生成
             .setTitle("お気に入りソート")
             .setItems(strList, { dialog, which ->
-                when(which){
+                when (which) {
                     0 -> {
                         USERDATA.LevelSortCondition = 0
                         SetMusicToCoverFlow()
@@ -532,11 +580,11 @@ class Activity_Selector : AppCompatActivity() {
     }
     fun Button_MusicSort(view: View) {
 
-        val strList = arrayOf("なし","お気に入りを含む曲を先頭に集める")
+        val strList = arrayOf("なし", "お気に入りを含む曲を先頭に集める")
         AlertDialog.Builder(this) // FragmentではActivityを取得して生成
             .setTitle("お気に入りソート")
             .setItems(strList, { dialog, which ->
-                when(which){
+                when (which) {
                     0 -> {
                         USERDATA.MusicSortCondition = 0
                         indexCoverFlow = -1 //CoverFlowリロード
@@ -555,6 +603,200 @@ class Activity_Selector : AppCompatActivity() {
             .show()
     }
 
+    fun Button_thumbMoviePlay(view: View) {
+        USERDATA.thumbMoviePlay = !USERDATA.thumbMoviePlay
+        println(USERDATA.thumbMoviePlay)
+        if( USERDATA.thumbMoviePlay ){
+            ThumbMovieStart(indexCoverFlow)
+            button_thumbMoviePlay.alpha = 1.0F
+            button_thumbMoviePlay.background.colorFilter = PorterDuffColorFilter(
+                0xFFFF2D71.toInt(),
+                PorterDuff.Mode.SRC_IN
+            )
+        }else {
+            button_thumbMoviePlay.alpha = 0.2F
+            button_thumbMoviePlay.background.colorFilter = null
+            ThumbMovieStop()
+        }
+    }
+    fun ThumbMoviePlay(){
+        if( !USERDATA.thumbMoviePlay ){
+            return
+        }
+        //ThumbMovie呼び込み
+        // 一度すべて止める
+        ThumbMovieStop()
+        // 裏側で再生
+        ThumbMovieStart(indexCoverFlow)
+    }
+    fun ThumbMovieStop(){
+        flg_thumbMovieStopping = true
+        //一度すべて止める
+        for( avPlayerVC in CachedThumbMovies.cachedMovies ){
+            avPlayerVC.simpleExoPlayer.playWhenReady = false
+            playerView_Alpha.alpha = 1.0f
+        }
+    }
+    fun ThumbMovieStart(index: Int, loadOnly: Boolean = false){
+        flg_thumbMovieStopping = false
+        if( currentMusics.indices.contains(index) == false ){
+            return
+        }
+        val smNum = currentMusics[index].movieURL.pregMatche_firstString("watch/(.+)$")
+        if( smNum == "" ){
+            return
+        }
+        //val index = indexCoverFlow
+        Handler().postDelayed(Runnable { //0.3秒後
+            if (!USERDATA.thumbMoviePlay) {
+                return@Runnable
+            }
+            if (index == indexCoverFlow || loadOnly == true) {
+                //Movie呼び込み
+                var nicodougaURL = ""
+                println("thumbMovie ${smNum}")
+                MovieAccess(ecoThumb = true).StreamingUrlNicoAccess(smNum) {
+                    // 動画
+                    nicodougaURL = it!!
+                    println("smNum=$smNum, loadOnly=$loadOnly, nicodougaURL=$nicodougaURL")
+                    if (flg_thumbMovieStopping == true) {
+                        println("thumbMovieStopping")
+                        return@StreamingUrlNicoAccess
+                    }
+                    if (loadOnly == true && nicodougaURL == "cached") {
+                        return@StreamingUrlNicoAccess
+                    }
+                    if (index != indexCoverFlow && loadOnly == false) {
+                        return@StreamingUrlNicoAccess
+                    }
+                    //println(applicationContext.packageName)
+                    cacheExoPlayer = CachedThumbMovies.access(nicodougaURL, smNum)
+                    if (loadOnly == false) {
+                        playerView_Alpha.alpha = 1.0f
+                        playerView.player = cacheExoPlayer
+                    }
+                    cacheExoPlayer!!.setSeekParameters(SeekParameters.CLOSEST_SYNC)
+                    var t30 = musicDatas.getNotesFirstTime(currentMusics[index].movieURL)
+                    if (t30 < 0.0) {
+                        t30 = 30.0
+                    } else {
+                        t30 -= 3.0
+                        if (t30 < 0.0) {
+                            t30 = 0.0
+                        }
+                    }
+                    println("t30 = ${t30}")
+                    if (loadOnly == false) {
+                        cacheExoPlayer!!.addListener(object : Player.EventListener {
+                            override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
+                                println("playbackState=" + playbackState)
+                                when (playbackState) {
+                                    ExoPlayer.STATE_ENDED -> {
+                                        println("終了でループ")
+                                        GlobalScope.launch(Dispatchers.Main) {
+                                            playerView.player?.seekTo((t30 * 1000).toLong())
+                                        }
+                                    }
+                                }
+                            }
+                        })
+                        var firstRun = true
+                        for (i in 1..10) {
+                            cacheExoPlayer!!
+                                .createMessage({ messageType, payload ->
+                                    println("フェードイン$i")
+                                    GlobalScope.launch(Dispatchers.Main) {
+                                        val player = playerView.player as SimpleExoPlayer
+                                        player.volume = 0.15f * i / 10
+                                    }
+                                    playerView_Alpha.alpha = 1.0f - 0.25f * i / 10
+                                    if (i == 1 && firstRun == true) {
+                                        firstRun = false
+                                        //前後の曲を読み込んでおく
+                                        val a = if (index + 1 >= currentMusics.size) 0 else index + 1
+                                        val b = if (index - 1 < 0) currentMusics.size - 1 else index - 1
+                                        println("inab = $index, $a, $b")
+                                        ThumbMovieStart(a, true)
+                                        ThumbMovieStart(b, true)
+                                    }
+                                })
+                                .setPosition(((t30 + 0.05 * i) * 1000).toLong())
+                                .setDeleteAfterDelivery(false)
+                                .send()
+                            cacheExoPlayer!!
+                                .createMessage({ messageType, payload ->
+                                    println("フェードアウト$i")
+                                    GlobalScope.launch(Dispatchers.Main) {
+                                        val player = playerView.player as SimpleExoPlayer
+                                        player.volume = 0.15f * (10 - i) / 10
+                                    }
+                                    playerView_Alpha.alpha = 1.0f - 0.25f * (10 - i) / 10
+                                })
+                                .setPosition(((t30 + 29.0 + 0.1 * i) * 1000).toLong())
+                                .setDeleteAfterDelivery(false)
+                                .send()
+                        }
+                        cacheExoPlayer!!
+                            .createMessage({ messageType, payload ->
+                                println("30秒でループ")
+                                GlobalScope.launch(Dispatchers.Main) {
+                                    playerView.player?.seekTo((t30 * 1000).toLong())
+                                }
+                            })
+                            .setPosition(((t30 + 30.0 + 0.1) * 1000).toLong())
+                            .setDeleteAfterDelivery(false)
+                            .send()
+
+                        var nonSeek = false
+                        CachedThumbMovies.cachedMovies.firstOrNull { it.smNum == smNum }?.let {
+                            println("smNum=$smNum|it=${it.smNum} cacheing just=${it.just}")
+                            if (it.just) {
+                                nonSeek = true
+                            }
+                            it.just = false
+                        }
+                        println("nonSeek=$nonSeek")
+                        GlobalScope.launch(Dispatchers.Main) {
+                            if (!nonSeek) {
+                                cacheExoPlayer!!.seekTo((t30 * 1000).toLong())
+                            }
+                            cacheExoPlayer!!.volume = 0.001f
+                            cacheExoPlayer!!.playWhenReady = true
+                        }
+
+                    } else {
+                        //読み込みのみ
+                        cacheExoPlayer!!
+                            .createMessage({ messageType, payload ->
+                                if (currentMusics[indexCoverFlow].movieURL.pregMatche_firstString("watch/(.+)$") != smNum) {
+                                    println("再生された形跡見つけたらムービーを止める")
+                                    CachedThumbMovies.cachedMovies.firstOrNull { it.smNum == smNum }?.let {
+                                        println("smNum=$smNum|it=${it.smNum} cacheing just=${it.just}")
+                                        it.just = true
+                                    }
+                                    GlobalScope.launch(Dispatchers.Main) {
+                                        cacheExoPlayer!!.playWhenReady = false
+                                        //cacheExoPlayer!!.seekTo( (t30*1000).toLong() )
+                                    }
+                                }
+                            })
+                            .setPosition(((t30) * 1000).toLong())
+                            .setDeleteAfterDelivery(true)
+                            .send()
+
+                        val t30_ = if (t30 - 0.5 >= 0) (t30 - 0.5) else 0.0
+                        GlobalScope.launch(Dispatchers.Main) {
+                            cacheExoPlayer!!.seekTo((t30_ * 1000).toLong())
+                            cacheExoPlayer!!.volume = 0.001f
+                            cacheExoPlayer!!.playWhenReady = true
+                        }
+                    }
+
+                }
+            }
+        }, 300)
+    }
+
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -564,7 +806,7 @@ class Activity_Selector : AppCompatActivity() {
             1001 -> {
                 userScore = USERDATA.Score
                 setCurrentLevels(indexCoverFlow)
-                if(!ShowHowToExtendView()){
+                if (!ShowHowToExtendView()) {
                     //ユーザーネームデータをロードするため遷移させないようにする
                     segueing = true
                     progress_circular.isVisible = true
@@ -573,15 +815,16 @@ class Activity_Selector : AppCompatActivity() {
                         progress_circular.isVisible = false
                     }
                 }
+                ThumbMoviePlay()
             }
             1002 -> {
-                if( maeTags != USERDATA.SelectedMusicCondition.tags || maeMusicTags != currentMusics[indexCoverFlow].tags || maeSort != USERDATA.SelectedMusicCondition.sortItem){
+                if (maeTags != USERDATA.SelectedMusicCondition.tags || maeMusicTags != currentMusics[indexCoverFlow].tags || maeSort != USERDATA.SelectedMusicCondition.sortItem) {
                     indexCoverFlow = -1 //CoverFlowリロード
                     SetMusicToCoverFlow()
                 }
             }
             1004 -> {
-                if( maeSort != USERDATA.SelectedMusicCondition.sortItem){
+                if (maeSort != USERDATA.SelectedMusicCondition.sortItem) {
                     indexCoverFlow = -1 //CoverFlowリロード
                     SetMusicToCoverFlow()
                 }
@@ -598,18 +841,18 @@ class Activity_Selector : AppCompatActivity() {
             1005 -> {
                 val modoriStr = data?.getStringExtra("modori") ?: ""
                 println("url = $modoriStr")
-                if( modoriStr != "" ){
-                    val retStr = URLDecoder.decode(modoriStr,"UTF-8")
+                if (modoriStr != "") {
+                    val retStr = URLDecoder.decode(modoriStr, "UTF-8")
                     println(retStr)
                     var retTag = retStr.pregMatche_firstString("tag=(.*?)(&sort=|$)")
                     val retSort = retStr.pregMatche_firstString("sort=(.*?)(&tag=|$)")
                     retTag = retTag.trim()
-                    retTag = retTag.pregReplace("\\s*/(and|AND)/\\s","/and/")
-                    retTag = retTag.pregReplace("\\s+"," or ")
-                    retTag = retTag.pregReplace("/and/"," ")
+                    retTag = retTag.pregReplace("\\s*/(and|AND)/\\s", "/and/")
+                    retTag = retTag.pregReplace("\\s+", " or ")
+                    retTag = retTag.pregReplace("/and/", " ")
 
                     USERDATA.SelectedMusicCondition.tags = retTag
-                    if( retSort != "" ){
+                    if (retSort != "") {
                         USERDATA.SelectedMusicCondition.sortItem = retSort
                     }
 
@@ -617,6 +860,7 @@ class Activity_Selector : AppCompatActivity() {
                     maeMusic = null
                     SetMusicToCoverFlow()
                 }
+                ThumbMoviePlay()
             }
 
         }
@@ -626,24 +870,39 @@ class Activity_Selector : AppCompatActivity() {
     // LevelPicker処理 //
     fun LevelPickerContainerRedraw() {
         if( (levelScroller_index-1) >= 0 &&  (levelScroller_index-1) < currentLevels.count()) {
-            setLevelPickerContainer( currentLevels[levelScroller_index-1], star_m1, creator_m1, score_m1, rank_m1, date_m1 )
+            setLevelPickerContainer(
+                currentLevels[levelScroller_index - 1],
+                star_m1,
+                creator_m1,
+                score_m1,
+                rank_m1,
+                date_m1
+            )
         }else {
-            setLevelPickerContainer( null, star_m1, creator_m1, score_m1, rank_m1, date_m1 )
+            setLevelPickerContainer(null, star_m1, creator_m1, score_m1, rank_m1, date_m1)
         }
         if( levelScroller_index != -1 &&  (levelScroller_index) < currentLevels.count() ){
-            setLevelPickerContainer( currentLevels[levelScroller_index], star, creator, score, rank, date )
-            UpdateObject_Level( currentLevels[levelScroller_index] )
+            setLevelPickerContainer(currentLevels[levelScroller_index], star, creator, score, rank, date)
+            UpdateObject_Level(currentLevels[levelScroller_index])
         }else {
-            setLevelPickerContainer( null, star, creator, score, rank, date )
-            UpdateObject_Level( null )
+            setLevelPickerContainer(null, star, creator, score, rank, date)
+            UpdateObject_Level(null)
         }
         if( levelScroller_index+1 <= currentLevels.size-1  &&  (levelScroller_index+1) < currentLevels.count()){
-            setLevelPickerContainer( currentLevels[levelScroller_index+1], star_p1, creator_p1, score_p1, rank_p1, date_p1 )
+            setLevelPickerContainer(
+                currentLevels[levelScroller_index + 1],
+                star_p1,
+                creator_p1,
+                score_p1,
+                rank_p1,
+                date_p1
+            )
         }else {
-            setLevelPickerContainer( null, star_p1, creator_p1, score_p1, rank_p1, date_p1 )
+            setLevelPickerContainer(null, star_p1, creator_p1, score_p1, rank_p1, date_p1)
         }
+        RedrawLevelpickerSelection()
     }
-    fun UpdateObject_Level( currentLevel:levelData? ){
+    fun UpdateObject_Level(currentLevel: levelData?){
         if( currentLevel == null ){
             text_Speed.setText("")
             star_color.isVisible = false
@@ -652,7 +911,7 @@ class Activity_Selector : AppCompatActivity() {
         currentLevel?.let {
             val currentLevel = it
             //スピード反映
-            text_Speed.setText( "speed: "+currentLevel.speed )
+            text_Speed.setText("speed: " + currentLevel.speed)
             //favorite反映
             star_color.isVisible = USERDATA.MyFavorite2.contains(currentLevel.sqlID)
             star_black.isVisible = USERDATA.MyFavorite.contains(currentLevel.sqlID)
@@ -668,13 +927,13 @@ class Activity_Selector : AppCompatActivity() {
             val nowTime = (Date().time / 1000).toInt()
             val sDateFormat = SimpleDateFormat("yyy.MM.dd")
             if( (USERDATA.SelectedMusicCondition.sortItem == "最近ハイスコアが更新された曲順" || (nowTime - currentLevel.scoreTime)<2592000 ) && currentLevel.scoreTime > 0 ){
-                text_RankingTime.text = sDateFormat.format( Date( currentLevel.scoreTime * 1000L ))
+                text_RankingTime.text = sDateFormat.format(Date(currentLevel.scoreTime * 1000L))
                 text_RankingTime.isVisible = true
             }else{
                 text_RankingTime.isVisible = false
             }
             if( (USERDATA.SelectedMusicCondition.sortItem == "最近コメントされた曲順" || (nowTime - currentLevel.commentTime)<2592000 ) && currentLevel.commentTime > 0 ){
-                text_CommentTime.text = sDateFormat.format( Date( currentLevel.commentTime * 1000L ))
+                text_CommentTime.text = sDateFormat.format(Date(currentLevel.commentTime * 1000L))
                 text_CommentTime.isVisible = true
             }else{
                 text_CommentTime.isVisible = false
@@ -682,40 +941,89 @@ class Activity_Selector : AppCompatActivity() {
 
         }
     }
-    fun setLevelPickerContainer( leveldata:levelData?, _star:TextView, _creator:TextView, _score:TextView, _rank:TextView, _date:TextView ){
+    fun setLevelPickerContainer(
+        leveldata: levelData?,
+        _star: TextView,
+        _creator: TextView,
+        _score: TextView,
+        _rank: TextView,
+        _date: TextView
+    ){
         if( leveldata == null ){
-            _star.setText( "" )
-            _creator.setText( "" )
-            _score.setText( "" )
-            _rank.setText( "" )
-            _date.setText( "" )
+            _star.setText("")
+            _creator.setText("")
+            _score.setText("")
+            _rank.setText("")
+            _date.setText("")
             return
         }
-        _star.setText( leveldata.getLevelAsString() )
-        _creator.setText( leveldata.creator )
+        _star.setText(leveldata.getLevelAsString())
+        _creator.setText(leveldata.creator)
         if( !leveldata.isEditing ){
             if( userScore.scores[leveldata.sqlID] != null ){
                 val scoredata = userScore.scores[leveldata.sqlID]!!
                 println(scoredata)
-                _score.setText( "HighScore: "+ scoredata[UserScore.SCORE] )
+                _score.setText("HighScore: " + scoredata[UserScore.SCORE])
                 var rankStr = Score.RankStr[scoredata[UserScore.RANK]]
                 if( rankStr == "False" ){ rankStr = "" }
-                _rank.setText( rankStr )
+                _rank.setText(rankStr)
             }else {
                 _score.setText("")
                 _rank.setText("")
             }
         }else {
-            _score.setText( "only you can see." )
-            _rank.setText( "編集中" )
+            _score.setText("only you can see.")
+            _rank.setText("編集中")
         }
-        _date.setText( "" )
+        _date.setText("")
 
     }
-    fun LevelPickerContainerSetScrollY(scrollY:Int) {
+    fun LevelPickerContainerSetScrollY(scrollY: Int) {
         val realScrollY = levelpickerContainer.height * (scrollY) / (scrollerOneHeight) / 3
-        levelpickerContainer.layout(0, containerFirstPos-realScrollY, levelpickerContainer.width, containerFirstPos-realScrollY + levelpickerContainer.height)
+        levelpickerContainer.layout(
+            0,
+            containerFirstPos - realScrollY,
+            levelpickerContainer.width,
+            containerFirstPos - realScrollY + levelpickerContainer.height
+        )
+        RedrawLevelpickerSelection()
+    }
+    fun RedrawLevelpickerSelection(){
+        val view = levelpickerContainer
+        if( view.width <=0 || view.height <= 0 ){
+            return
+        }
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.translate(0F, levelpickerContainer.y)
+        view.draw(canvas)
+        // ? アルファ値グラデーションのフィルタが作れるかと思ったら無理(?)だった。
+        //val paint = Paint()
+        //val shader = LinearGradient(0F,0F,0F,50F,0xff000000,0x00000000,Shader.TileMode.CLAMP)
+        //paint.shader = shader
+        //paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+        //canvas.drawRect(0f, 0f, view.width.toFloat(), view.height.toFloat(), paint)
+        val redrawBitmap = Bitmap.createBitmap(bitmap,0,outputImageView_levelScroller.height * 3/4,outputImageView_levelScroller.width,outputImageView_levelScroller.height)
+        outputImageView_levelScroller.setImageBitmap(redrawBitmap)
     }
 
-
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if(flg_notHome == false) {
+            println("Leave!")
+            leaved = true
+            //Thumb止め
+            ThumbMovieStop()
+        }
+    }
+    override fun onResume() {
+        super.onResume()
+        println("Resume!")
+        if( leaved && USERDATA.thumbMoviePlay ){
+            //Thumb開始
+            ThumbMoviePlay()
+        }
+        leaved = false
+        flg_notHome = false
+    }
 }

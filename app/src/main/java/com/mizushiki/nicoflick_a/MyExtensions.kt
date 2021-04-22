@@ -41,6 +41,53 @@ fun String.toHiragana():String{
     }
     return retStr
 }
+
+fun String.secondsToTimetag(seconds:Double, noBrackets:Boolean = false, dot:Boolean = false) : String {
+    if( seconds == -0.001 ){
+        if( noBrackets ){
+            if( dot ){
+                return "**:**.**"
+            }else {
+                return "**:**:**"
+            }
+        }else {
+            if( dot ){
+                return "[**:**.**]"
+            }else {
+                return "[**:**:**]"
+            }
+        }
+    }
+    var format = if(dot) "%02d:%02d.%02d" else "%02d:%02d:%02d"
+    if( !noBrackets ){
+        format = "[${format}]"
+    }
+    val rmirisec = (Math.round(seconds * 100)).toInt() * 10
+    return String.format( format, Int(rmirisec/60000), Int((rmirisec % 60000) / 1000), Int((rmirisec % 1000) / 10) )
+}
+fun String.secondsToDotTimetag(seconds:Double, noBrackets:Boolean = false) : String {
+    if( seconds == -0.001 ){
+        if( noBrackets ){
+            return "**:**.**"
+        }else {
+            return "[**:**.**]"
+        }
+    }
+    val format = if(noBrackets) "%02d:%02d.%02d" else "[%02d:%02d.%02d]"
+    val rmirisec = (Math.round(seconds * 100)).toInt() * 10
+    return String.format( format, Int(rmirisec/60000), Int((rmirisec % 60000) / 1000), Int((rmirisec % 1000) / 10) )
+}
+fun String.timetagToSeconds() : Double {
+    val ans:ArrayList<String> = arrayListOf()
+    if( this.pregMatche("\\[(\\d\\d)\\:(\\d\\d)[\\:|\\.](\\d\\d)\\]", matche= ans) ){
+        return Double(ans[1])*60 + Double(ans[2]) + Double(ans[3])/100
+    }
+    return -0.001
+}
+val String.isDotTimetag : Boolean
+    get() = this.pregMatche("\\[[\\d\\*][\\d\\*]\\:[\\d\\*][\\d\\*]\\.[\\d\\*][\\d\\*]\\]")
+
+
 fun String.pregReplace(pattern:String, with:String): String {
     return Regex(pattern).replace(this, with)
 }
@@ -174,6 +221,33 @@ fun View.convertToBitmap(): Bitmap {
 }
  */
 
+//Viewカスタム
+// Viewを継承したクラス
+class SlashShadeView(context: Context) : View(context) {
+    private var paint: Paint = Paint()
+
+    init {
+    }
+
+    override fun onDraw(canvas: Canvas){
+
+        println("canvas.width=${canvas.width}")
+        println("canvas.height=${canvas.height}")
+        val w = canvas.width
+        val h = canvas.height
+        // ペイントする色の設定
+        paint.color = Color.argb(255, 255, 255, 255)
+
+        // ペイントストロークの太さを設定
+        paint.strokeWidth = 1.75f
+        // Styleのストロークを設定する
+        paint.style = Paint.Style.STROKE
+
+        for( y in 0..(w+h)/4 ){
+            canvas.drawLine( Float(0), Float(y*4), Float(w), Float(y*4-w) ,paint)
+        }
+    }
+}
 //TextView
 var TextView.rectF: RectF
     get() = RectF(this.x,this.y,this.x+this.width,this.y+this.height)

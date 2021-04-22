@@ -2,13 +2,16 @@ package com.mizushiki.nicoflick_a
 
 import android.R
 import android.content.Context
+import android.media.browse.MediaBrowser
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import androidx.core.text.HtmlCompat
 import com.google.android.exoplayer2.DefaultLoadControl
 import com.google.android.exoplayer2.SimpleExoPlayer
+import com.google.android.exoplayer2.source.ConcatenatingMediaSource
 import com.google.android.exoplayer2.source.ProgressiveMediaSource
+import com.google.android.exoplayer2.source.hls.HlsMediaSource
 import com.google.android.exoplayer2.upstream.*
 import com.google.android.exoplayer2.upstream.cache.*
 import com.google.android.exoplayer2.util.Util
@@ -20,16 +23,29 @@ import kotlin.collections.ArrayList
 import kotlin.concurrent.schedule
 
 
-class MovieAccess {
+class MovieAccess(ecoThumb:Boolean = false) {
 
     var firstAttack = true
+
+    val ecoThumb : Boolean
+
+    init {
+        this.ecoThumb = ecoThumb
+    }
 
     fun StreamingUrlNicoAccess(smNum:String, callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
 
         //先にキャッシュ内にあるか確認。あればもうニコニコの動画ページにすらアクセスしないことにする
-        if( CachedMovies.cachedMovies.any{ it.smNum == smNum }){
-            callback("cached")
-            return@launch
+        if( !ecoThumb ){
+            if( CachedMovies.cachedMovies.any{ it.smNum == smNum }){
+                callback("cached")
+                return@launch
+            }
+        }else {
+            if( CachedThumbMovies.containtsWithinExpiration(smNum)){
+                callback("cached")
+                return@launch
+            }
         }
         println("smNum="+smNum)
 
@@ -59,9 +75,12 @@ class MovieAccess {
             async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
                 println("it")
                 if (it != null) {
-                    print(it)
+                    println(it)
                     nicoDmc.Set_session_metadata(it)
-                    nicoDmc.Start_HeartBeat()
+                    //短く再生するだけの場合はハートビートしない（40秒以内）
+                    if( !ecoThumb ){
+                        nicoDmc.Start_HeartBeat()
+                    }
                     callback(nicoDmc.content_uri)
                     return@let
                 }
@@ -99,6 +118,8 @@ class NicoDmc(smNum: String, js_initial_watch_data:String) {
         private set
     var contentKeyTimeout = ""
         private set
+    var priority = ""
+        private set
     var transferPresets = ""
         private set
     var service_id = ""
@@ -117,6 +138,7 @@ class NicoDmc(smNum: String, js_initial_watch_data:String) {
         private set
     var content_uri = ""
         private set
+    var eco = false
     private var timer = Timer()
     init{
         this.smNum = smNum
@@ -129,12 +151,13 @@ class NicoDmc(smNum: String, js_initial_watch_data:String) {
             audios = ans[4]
         }
         ans = arrayListOf()
-        if( js_initial_watch_data.pregMatche("\"signature\":\"(.*?)\",\"contentId\":\"(.*?)\",\"heartbeatLifetime\":(.*?),\"contentKeyTimeout\":(.*?),\"priority\":.*?,\"transferPresets\":\\[(.*?)\\],", matche= ans) ){
+        if( js_initial_watch_data.pregMatche("\"signature\":\"(.*?)\",\"contentId\":\"(.*?)\",\"heartbeatLifetime\":(.*?),\"contentKeyTimeout\":(.*?),\"priority\":(.*?),\"transferPresets\":\\[(.*?)\\],", matche= ans) ){
             signature = ans[1]
             contentId = ans[2]
             heartbeatLifetime = ans[3]
             contentKeyTimeout = ans[4]
-            transferPresets = ans[5]
+            priority = ans[5]
+            transferPresets = ans[6]
         }
         ans = arrayListOf()
         if( js_initial_watch_data.pregMatche("\\\\\"service_id\\\\\":\\\\\"(.*?)\\\\\",\\\\\"player_id\\\\\":\\\\\"(.*?)\\\\\",\\\\\"recipe_id\\\\\":\\\\\".*?\\\\\",\\\\\"service_user_id\\\\\":\\\\\"(.*?)\\\\\",\\\\\"protocols\\\\\":\\[\\{\\\\\"name\\\\\":\\\\\"http\\\\\",\\\\\"auth_type\\\\\":\\\\\"(.*?)\\\\\"\\}", matche= ans) ){
@@ -167,12 +190,22 @@ class NicoDmc(smNum: String, js_initial_watch_data:String) {
             var video_src = videos
             val audio_src = audios
             println("video_src=${video_src}")
-            if( !MovieAccess().isWiFiConnected(GLOBAL.APPLICATIONCONTEXT) ){
-                //Wifi接続なし
+            if( eco ){
+                //強制eco(曲セレクト画面での30秒プレビューに使用)
                 video_src = video_src.pregReplace("^.*,","")
                 println("video_src=${video_src}")
+                //hls
+                return """{"session":{"recipe_id":"${recipeId}","content_id":"${contentId}","content_type":"movie","content_src_id_sets":[{"content_src_ids":[{"src_id_to_mux":{"video_src_ids":[${video_src}],"audio_src_ids":[${audio_src}]}}]}],"timing_constraint":"unlimited","keep_method":{"heartbeat":{"lifetime":${heartbeatLifetime}}},"protocol":{"name":"http","parameters":{"http_parameters":{"parameters":{"hls_parameters":{"use_well_known_port":"yes","use_ssl":"yes","transfer_preset":"${transferPresets}","segment_duration":6000}}}}},"content_uri":"","session_operation_auth":{"session_operation_auth_by_signature":{"token":"${token}","signature":"${signature}"}},"content_auth":{"auth_type":"${auth_type}","content_key_timeout":${contentKeyTimeout},"service_id":"${service_id}","service_user_id":"${service_user_id}"},"client_info":{"player_id":"${playerId}"},"priority":${priority}}}"""
+
+            }else {
+                if( !MovieAccess().isWiFiConnected(GLOBAL.APPLICATIONCONTEXT) ){
+                    //Wifi接続なし
+                    video_src = video_src.pregReplace("^.*,","")
+                    println("video_src=${video_src}")
+                }
+                //mp4
+                return """{"session":{"recipe_id":"${recipeId}","content_id":"${contentId}","content_type":"movie","content_src_id_sets":[{"content_src_ids":[{"src_id_to_mux":{"video_src_ids":[${video_src}],"audio_src_ids":[${audio_src}]}}]}],"timing_constraint":"unlimited","keep_method":{"heartbeat":{"lifetime":${heartbeatLifetime}}},"protocol":{"name":"http","parameters":{"http_parameters":{"parameters":{"http_output_download_parameters":{"use_well_known_port":"yes","use_ssl":"yes","transfer_preset":"${transferPresets}"}}}}},"content_uri":"","session_operation_auth":{"session_operation_auth_by_signature":{"token":"${token}","signature":"${signature}"}},"content_auth":{"auth_type":"${auth_type}","content_key_timeout":${contentKeyTimeout},"service_id":"${service_id}","service_user_id":"${service_user_id}"},"client_info":{"player_id":"${playerId}"},"priority":${priority}}}"""
             }
-            return """{"session":{"recipe_id":"${recipeId}","content_id":"${contentId}","content_type":"movie","content_src_id_sets":[{"content_src_ids":[{"src_id_to_mux":{"video_src_ids":[${video_src}],"audio_src_ids":[${audio_src}]}}]}],"timing_constraint":"unlimited","keep_method":{"heartbeat":{"lifetime":${heartbeatLifetime}}},"protocol":{"name":"http","parameters":{"http_parameters":{"parameters":{"http_output_download_parameters":{"use_well_known_port":"yes","use_ssl":"yes","transfer_preset":"${transferPresets}"}}}}},"content_uri":"","session_operation_auth":{"session_operation_auth_by_signature":{"token":"${token}","signature":"${signature}"}},"content_auth":{"auth_type":"${auth_type}","content_key_timeout":${contentKeyTimeout},"service_id":"${service_id}","service_user_id":"${service_user_id}"},"client_info":{"player_id":"${playerId}"},"priority":0}}"""
         }
     fun Set_session_metadata(ResponseMetadata:String){
         session_metadata = ResponseMetadata.pregMatche_firstString("\"data\":(.*)\\}$")
@@ -242,6 +275,7 @@ object CachedMovies {
                 cachedMovies.add(cachedMovies[i])
                 cachedMovies.removeAt(i)
                 while (cachedMovies.count() > USERDATA.cachedMovieNum){
+                    cachedMovies[0].simpleExoPlayer.release()
                     cachedMovies.removeAt(0)
                 }
                 return cachedMovies.last().simpleExoPlayer
@@ -250,6 +284,7 @@ object CachedMovies {
         for( bi in 0 until cachedMovies.count() ){
             val i = cachedMovies.count() - bi - 1
             if( cachedMovies[i].simpleExoPlayer.bufferedPercentage < 99 ){
+                cachedMovies[i].simpleExoPlayer.release()
                 cachedMovies.removeAt(i)
                 break
             }
@@ -264,17 +299,92 @@ object CachedMovies {
         val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(url))
         simpleExoPlayer.prepare(mediaSource)
 
-        simpleExoPlayer.playWhenReady = true
+        //simpleExoPlayer.playWhenReady = true
         simpleExoPlayer.volume = 0.2f
 
         val cachedMovie = CachedMovie(url,smNum,simpleExoPlayer)
         cachedMovies.add(cachedMovie)
 
         while (cachedMovies.count() > USERDATA.cachedMovieNum){
+            cachedMovies[0].simpleExoPlayer.release()
             cachedMovies.removeAt(0)
         }
 
         return simpleExoPlayer
+    }
+}
+//保持しておけるSimpleExoPlayerの数が非常に少ないのでゲームプレイ時に開放する
+object CachedThumbMovies {
+    //
+    class CachedMovie(var url:String, var smNum: String, var simpleExoPlayer: SimpleExoPlayer, var check:Int, var time:Long = System.currentTimeMillis(), var just:Boolean = false )
+    //AndroidではCheck機能は死に機能。まぁ３つしかキャッシュできないし、くるくる回してりゃリロードされる。
+
+    var cachedMovies:MutableList<CachedMovie> = mutableListOf()
+    fun access(url:String,smNum: String) : SimpleExoPlayer {
+        // プレイ指示して、5秒間再生されてない状態が続くとHeartBeat切れとみなしcheck=2になっている(Selectorで)。なのでキャッシュを削除
+        // もしくは、もう120秒たったら強制的に読み込みしなおしにしてしまう、か。
+        val num = cachedMovies.size
+        for( i in 0 until num ){
+            val index = num - 1 - i
+            if( !withinExpiration(cachedMovies[index]) ){
+                cachedMovies[index].simpleExoPlayer.release()
+                println("cached削除 - ${cachedMovies[index].smNum}")
+                cachedMovies.removeAt(index)
+            }
+        }
+
+        //読み込み済みのものがあればそれを返す
+        for ( i in 0 until cachedMovies.count()){
+            if( cachedMovies[i].smNum == smNum ){
+                cachedMovies.add(cachedMovies[i])
+                cachedMovies.removeAt(i)
+                while (cachedMovies.count() > 3){
+                    cachedMovies[0].simpleExoPlayer.release()
+                    cachedMovies.removeAt(0)
+                }
+                cachedMovies.last().check = 0
+                return cachedMovies.last().simpleExoPlayer
+            }
+        }
+
+        val loadControl = DefaultLoadControl.Builder().setBackBuffer(10*60*1000, true).createDefaultLoadControl()
+        val simpleExoPlayer = SimpleExoPlayer.Builder(GLOBAL.APPLICATIONCONTEXT).setLoadControl(loadControl)
+            .build()
+        val dataSourceFactory = DefaultDataSourceFactory(
+            GLOBAL.APPLICATIONCONTEXT,
+            Util.getUserAgent(GLOBAL.APPLICATIONCONTEXT, GLOBAL.APPLICATIONCONTEXT.packageName)
+        )
+        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(url))
+        simpleExoPlayer.prepare(mediaSource)
+
+        //simpleExoPlayer.playWhenReady = true
+        simpleExoPlayer.volume = 0.2f
+
+        val cachedMovie = CachedMovie(url,smNum,simpleExoPlayer,0)
+        cachedMovies.add(cachedMovie)
+
+        while (cachedMovies.count() > 3){
+            cachedMovies[0].simpleExoPlayer.release()
+            cachedMovies.removeAt(0)
+        }
+
+        return simpleExoPlayer
+    }
+    fun withinExpiration(cachedMovie:CachedMovie) : Boolean {
+        println("cachedMovie.check=${cachedMovie.check}")
+        println("(System.currentTimeMillis() - cachedMovie.time) =${(System.currentTimeMillis() - cachedMovie.time)}")
+        println("(System.currentTimeMillis() - cachedMovie.time) < 120000=${((System.currentTimeMillis() - cachedMovie.time) < 120000)}")
+        return cachedMovie.check != 2 && (System.currentTimeMillis() - cachedMovie.time) < 120000
+    }
+    fun containtsWithinExpiration(smNum: String) : Boolean {
+        return cachedMovies.any { it.smNum == smNum && withinExpiration(it) }
+    }
+    //Android用
+    fun allRelease(){
+        while (cachedMovies.count() > 0){
+            cachedMovies[0].simpleExoPlayer.release()
+            cachedMovies.removeAt(0)
+        }
     }
 }
 internal class CacheDataSourceFactory(
