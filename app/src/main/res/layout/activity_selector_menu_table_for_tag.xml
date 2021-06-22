@@ -57,14 +57,14 @@
             android:textAlignment="center" android:background="@drawable/transparameterClear"/>
 
     <Button
-            android:text="@string/hensyu"
+            android:text="＋時間指定"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/button8" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="@+id/toolbar2" app:layout_constraintBottom_toBottomOf="@+id/toolbar2"
             style="@style/Widget.AppCompat.Button.Borderless.Colored"
-            android:textColor="#FF0000"
-            android:onClick="Button_Hensyu"/>
+            android:textColor="#FFF"
+            android:onClick="Button_jikanSitei"/>
     <ProgressBar
             android:layout_height="wrap_content"
             android:layout_width="wrap_content"
@@ -75,4 +75,15 @@
             app:layout_constraintHorizontal_bias="0.5" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
             android:visibility="invisible"/>
+    <Button
+            android:text="@string/hensyu"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:id="@+id/Button_edimaru" app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:onClick="Button_Hensyu" android:textSize="12sp" style="@style/Widget.AppCompat.Button.Small"
+            android:textColor="#EE0000"
+            android:background="@drawable/circle_button"
+            android:layout_marginBottom="32dp"
+            android:layout_marginRight="32dp"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

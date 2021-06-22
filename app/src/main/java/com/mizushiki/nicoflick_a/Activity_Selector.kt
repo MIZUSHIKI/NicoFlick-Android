@@ -846,12 +846,25 @@ class Activity_Selector : AppCompatActivity() {
                     println(retStr)
                     var retTag = retStr.pregMatche_firstString("tag=(.*?)(&sort=|$)")
                     val retSort = retStr.pregMatche_firstString("sort=(.*?)(&tag=|$)")
+
+                    var jikanSitei = ""
+
+                    val array = retTag.split(" ")
+                    if( array.any { it.startsWith("@t:") } ) {
+                        array.firstOrNull { it.startsWith("@t:") }?.let {
+                            jikanSitei = it
+                        }
+                        //時間指定が機能するように一度削除して最後にもっていく
+                        retTag = retTag.pregReplace("\\s?@t:(\\d+:\\d+)?-?(\\d+:\\d+)?", "")
+                    }
                     retTag = retTag.trim()
                     retTag = retTag.pregReplace("\\s*/(and|AND)/\\s", "/and/")
                     retTag = retTag.pregReplace("\\s+", " or ")
                     retTag = retTag.pregReplace("/and/", " ")
-
-                    USERDATA.SelectedMusicCondition.tags = retTag
+                    if( retTag != "" && jikanSitei != "" ){
+                        jikanSitei = " " + jikanSitei
+                    }
+                    USERDATA.SelectedMusicCondition.tags = retTag + jikanSitei
                     if (retSort != "") {
                         USERDATA.SelectedMusicCondition.sortItem = retSort
                     }

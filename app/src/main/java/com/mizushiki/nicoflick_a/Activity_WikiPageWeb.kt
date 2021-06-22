@@ -55,7 +55,9 @@ class Activity_WikiPageWeb : AppCompatActivity() {
                         return false
                     }
                 }
-                view?.loadUrl(url)
+                if (url != null) {
+                    view?.loadUrl(url)
+                }
                 return true
             }
 

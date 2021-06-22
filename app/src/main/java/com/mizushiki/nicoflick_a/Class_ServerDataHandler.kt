@@ -138,7 +138,7 @@ class ServerDataHandler {
     }
 
     fun DownloadMusicData(callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
-        val url = GLOBAL.PHP_URL + "?req=musicm&time="+musicDatas.getLastUpdateTimeMusic()
+        val url = GLOBAL.PHP_URL + "?req=musicy&time="+musicDatas.getLastUpdateTimeMusic()
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
         async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {

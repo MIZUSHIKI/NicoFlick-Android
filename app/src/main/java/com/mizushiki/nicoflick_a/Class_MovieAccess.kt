@@ -1,6 +1,7 @@
 package com.mizushiki.nicoflick_a
 
 import android.R
+import android.annotation.SuppressLint
 import android.content.Context
 import android.media.browse.MediaBrowser
 import android.net.ConnectivityManager
@@ -89,6 +90,7 @@ class MovieAccess(ecoThumb:Boolean = false) {
         }
     }
 
+    @SuppressLint("ObsoleteSdkInt")
     fun isWiFiConnected(context: Context): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
@@ -96,7 +98,7 @@ class MovieAccess(ecoThumb:Boolean = false) {
             val capabilities = connectivityManager.getNetworkCapabilities(network)
             capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
         } else {
-            connectivityManager.activeNetworkInfo.type == ConnectivityManager.TYPE_WIFI
+            connectivityManager.activeNetworkInfo!!.type == ConnectivityManager.TYPE_WIFI
         }
     }
 }

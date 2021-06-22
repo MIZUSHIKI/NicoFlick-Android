@@ -207,7 +207,7 @@ class Activity_GameView : AppCompatActivity() {
         run = Runnable {
             if (playerView.height == 0) {
                 println("playerView.height=" + playerView.height)
-                mHandler.postDelayed(run, 10)
+                mHandler.postDelayed(run!!, 10)
                 return@Runnable
             }
             //まずプレイヤービューのサイズを指定比率で端末に合わせる
@@ -331,7 +331,7 @@ class Activity_GameView : AppCompatActivity() {
             //タイマー発動
             mHandler.post(timerRun)
         }
-        mHandler.post(run)
+        mHandler.post(run!!)
 
         //保存データの取得
         // スコア読み込み

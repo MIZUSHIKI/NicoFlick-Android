@@ -77,7 +77,7 @@ object MusicDataLists {
     }
 
     fun setMusic(sqlID:Int, movieURL:String, thumbnailURL:String, title:String, artist:String, movieLength:String, tags:String, updateTime:Int, createTime:Int){
-        if(movieURL=="delete"){
+        if(movieURL=="delete" || thumbnailURL == "delete"){
             //削除
             for(index in 0 until musics.size){
                 if(musics[index].sqlID == sqlID){
@@ -327,6 +327,8 @@ object MusicDataLists {
     }
     fun _getSelectMusics( selectCondition:SelectConditions, isMe:Boolean = true ) : ArrayList<musicData> {
         val tagps:ArrayList<SelectConditions.tagp> = arrayListOf()
+        var sita = 0
+        var ue = 99 * 60 + 99
         for( tagp in selectCondition.tag ){
             if( tagp.word.startsWith("@g:") ){
                 val ids = tagp.word.removePrefix("@g:").split("-").map{ Int(it) }
@@ -344,6 +346,23 @@ object MusicDataLists {
             }else if( tagp.word.startsWith("@m:") ){
                 val ids = tagp.word.removePrefix("@m:").split("-").map{ Int(it) }
                 tagps += ids.map{ SelectConditions.tagp(word = "@m:${it}", type = tagp.type) }
+                continue
+            }else if( tagp.word.startsWith("@t:") ){
+                var ans:ArrayList<String> = arrayListOf()
+                if( tagp.word.pregMatche(pattern= "@t:(\\d+:\\d+)-(\\d+:\\d+)$", matche= ans) ){
+                    sita = ans[1].timeToSec(0)
+                    ue = ans[2].timeToSec(99*60+99)
+                }else if( tagp.word.pregMatche(pattern= "@t:(\\d+:\\d+)-$", matche= ans) ){
+                    sita = ans[1].timeToSec(0)
+                }else if( tagp.word.pregMatche(pattern= "@t:-?(\\d+:\\d+)$", matche= ans) ){
+                    ue = ans[1].timeToSec(99*60+99)
+                }
+                if( sita > ue ){
+                    val swap = sita
+                    ue = sita
+                    sita = swap
+                }
+                println("sita=$sita, ue=$ue")
                 continue
             }else if( tagp.word == "@初期楽曲" ){
                 //
@@ -438,6 +457,9 @@ object MusicDataLists {
                     }
                 }
             }
+        }
+        if( sita != 0 || ue != 99*60+99 ){
+            extractMusics = ArrayList(extractMusics.filter { it.movieLength.timeToSec() in sita..ue })
         }
         // 【編集中：】でレベル数が0になる場合、その musicは弾いて表示させないようにする。
         val outputMusics:ArrayList<musicData> = arrayListOf()

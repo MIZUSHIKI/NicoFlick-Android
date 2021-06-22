@@ -264,6 +264,14 @@ object USERDATA {
             dataStore.edit().putBoolean("lookedChangeFavoSpec_v1500",value).commit()
             field = value
         }
+    //デザイン協力募集中
+    var lookedDesignCoop_v1900:Boolean = false
+        get() = dataStore.getBoolean("lookedDesignCoop_v1900",false)
+        set(value) {
+            dataStore.edit().putBoolean("lookedDesignCoop_v1900",value).commit()
+            field = value
+        }
+
 
     //
     var PlayerHeightPer:Int = 10000

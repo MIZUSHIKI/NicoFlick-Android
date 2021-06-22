@@ -1,11 +1,15 @@
 package com.mizushiki.nicoflick_a
 
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
-import android.service.autofill.UserData
 import android.view.View
+import android.view.animation.LinearInterpolator
+import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -16,7 +20,7 @@ import de.psdev.licensesdialog.licenses.ApacheSoftwareLicense20
 import de.psdev.licensesdialog.licenses.MITLicense
 import de.psdev.licensesdialog.model.Notice
 import de.psdev.licensesdialog.model.Notices
-import kotlinx.android.synthetic.main.activity_main.progress_circular
+import kotlinx.android.synthetic.main.activity_main.*
 import java.net.CookieHandler
 import java.net.CookieManager
 import java.net.CookiePolicy
@@ -28,7 +32,8 @@ object GLOBAL {
     lateinit var COOKIE_MANAGER: CookieManager
     val PHP_URL = "http://timetag.main.jp/nicoflick/nicoflick.php"
     //val PHP_URL = "http://192.168.11.6/nicoflick_20201103/nicoflick.php" //windows xampp
-    val Version = 1800
+    val NicoApiURL_GetThumbInfo = "https://ext.nicovideo.jp/api/getthumbinfo/"
+    val Version = 1900
     //Activity間 オブジェクト受け渡し用
     var SelectMUSIC:musicData? = null
     var SelectLEVEL:levelData? = null
@@ -43,6 +48,7 @@ object GLOBAL {
 class MainActivity : AppCompatActivity() {
 
     var segueing = false //遷移中フラグ
+    var slashShadeRepeatCanceled = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,8 +58,8 @@ class MainActivity : AppCompatActivity() {
         GLOBAL.APPLICATIONCONTEXT = applicationContext //onCreate後に作られる
         val uuid = USERDATA.UserID // ここで Userdata object = シングルトン 初期化 （内部で GLOBAL_APPLICATIONCONTEXTを使用）
 
-        println("log:"+USERDATA.UserID)
-        println("log:"+USERDATA.UserIDxxx)
+        println("log:" + USERDATA.UserID)
+        println("log:" + USERDATA.UserIDxxx)
 
         GLOBAL.COOKIE_MANAGER = CookieManager()
         GLOBAL.COOKIE_MANAGER.setCookiePolicy(CookiePolicy.ACCEPT_ORIGINAL_SERVER)
@@ -63,6 +69,21 @@ class MainActivity : AppCompatActivity() {
         //バージョンアップ時に必要な処理があれば実行
         migration()
         USERDATA.MyVersion = GLOBAL.Version
+
+        //「デザイン募集中」が気になる人は消せるように
+        textView_designCoop.isVisible = !USERDATA.lookedDesignCoop_v1900
+
+        // FrameLayout のインスタンスを取得
+        val slashShadeLayout: FrameLayout = findViewById(R.id.title_SlashShade_layout)
+        val slashShadeView = SlashShadeView(this, Color.argb(10, 153, 180, 255), 30.0f, 2.0f)
+        slashShadeLayout.addView(slashShadeView)
+
+        var anime = ObjectAnimator.ofFloat(slashShadeView, "y", -30.0f)
+        anime.duration = 1000
+        anime.setInterpolator(LinearInterpolator())
+        anime.repeatCount = ValueAnimator.INFINITE
+        anime.repeatMode = ValueAnimator.RESTART
+        anime.start()
     }
 
     fun Button_Start(view: View) {
@@ -94,6 +115,7 @@ class MainActivity : AppCompatActivity() {
                 val intent: Intent = Intent(applicationContext, Activity_Selector::class.java)
                 startActivity(intent)
                 segueing = false
+                slashShadeRepeatCanceled = true
             }
         }
     }
@@ -103,15 +125,20 @@ class MainActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
+    fun Label_designCoop(view: View) {
+        USERDATA.lookedDesignCoop_v1900 = true
+        textView_designCoop.isVisible = false
+    }
+
     fun Button_Info(view: View) {
 
-        val strList = arrayOf("🔗 Google Playで見る","🔗 デザイン協力募集中(GitHub)","ライブラリ クレジット")
+        val strList = arrayOf("🔗 Google Playで見る", "🔗 デザイン協力募集中(GitHub)", "ライブラリ クレジット")
 
         val textView = TextView(applicationContext)
         textView.setTextSize(14.0f)
         textView.setPadding(20)
         textView.setText(
-"""NicoFlickはフリック入力リズムゲーである 故「ミクフリック」の パクリ、オマージュ、リスペクト、難民先 作品です。
+            """NicoFlickはフリック入力リズムゲーである 故「ミクフリック」の パクリ、オマージュ、リスペクト、難民先 作品です。
 
 
 -2016年7月19日-
@@ -127,7 +154,7 @@ iOS11リリース(32bitアプリなので両方起動できなくなる)"""
             .setTitle("NicoFlickについて")
             .setView(textView)
             .setItems(strList, { dialog, which ->
-                when(which){
+                when (which) {
                     0 -> {
                         val url = "https://play.google.com/store/apps/details?id=com.mizushiki.nicoflick_a"
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
@@ -146,6 +173,8 @@ iOS11リリース(32bitアプリなので両方起動できなくなる)"""
             .setPositiveButton("OK", null)
             .show()
 
+        USERDATA.lookedDesignCoop_v1900 = false
+        textView_designCoop.isVisible = true
     }
 
     fun ShowLicensesDialog(){
@@ -156,14 +185,16 @@ iOS11リリース(32bitアプリなので両方起動できなくなる)"""
                 "https://github.com/moondroid/CoverFlow",
                 "The MIT License (MIT)\n\nCopyright (c) 2014 Marco Granatiero",
                 MITLicense()
-            ))
+            )
+        )
         notices.addNotice(
             Notice(
                 "OkHttp",
                 "https://square.github.io/okhttp/",
                 "Copyright 2019 Square, Inc.",
                 ApacheSoftwareLicense20()
-            ))
+            )
+        )
         notices.addNotice(
             Notice(
                 "ExoPlayer",
@@ -358,28 +389,66 @@ iOS11リリース(32bitアプリなので両方起動できなくなる)"""
                         "\n" +
                         "   Copyright [yyyy] [name of copyright owner]",
                 ApacheSoftwareLicense20()
-            ))
+            )
+        )
         notices.addNotice(
             Notice(
                 "picasso",
                 "https://github.com/square/picasso",
                 "Copyright 2013 Square, Inc.",
                 ApacheSoftwareLicense20()
-            ))
+            )
+        )
         notices.addNotice(
             Notice(
                 "minimal-json",
                 "https://github.com/ralfstx/minimal-json",
                 "Copyright (c) 2013, 2014 EclipseSource",
                 MITLicense()
-            ))
+            )
+        )
+        notices.addNotice(
+            Notice(
+                "NicoKakuFont",
+                "http://nicofont.pupu.jp/index.html",
+                """丸文字「ニコ角」フォント
+・ニコモジ＋の角ゴシック版
+
+製作者： Ku-Ku
+
+以下、ライセンス等の情報は配布サイトから引用。
+
+- LICENSE ----------------
+二次創作フォントですので、本家サービスの迷惑にならない範囲でご使用をお願いします。
+個人・商用の使用には特に制限は設けていません。
+
+【詳細事項】
+ひらがな・カタカナ・英数字はオリジナルですが、それ以外の文字グリフ（漢字など）は
+オープンソースフォントである「M+フォント」を利用させていただいております。
+Copyright(c) 2014 M+ FONTS PROJECT
+
+「M+フォント」の制作者様・提供者様に心よりお礼申し上げます。
+
+- SPEC -------------------
+フォント名：「ニコモジ＋（プラス）」
+収録文字：ひらがな・漢字・カタカナ・アルファベット大文字・アルファベット小文字・数字など
+フォント形式：TrueTypeフォント（プロポーショナルフォント）
+動作環境：Windows 95以降、Mac OS X 10.3以降
+
+- DATA -------------------
+このフォントの使用によるトラブル・不利益には、一切の責任を負いません。
+またサポートについてはすべて未保証とさせていただきます。"""
+            ,null
+            )
+        )
         notices.addNotice(
             Notice(
                 "LicensesDialog",
                 "https://github.com/PSDev/LicensesDialog",
                 "Copyright 2013 Philip Schiffer",
                 ApacheSoftwareLicense20()
-            ))
+            )
+        )
         LicensesDialog.Builder(this).setNotices(notices).build().show()
     }
 
@@ -409,4 +478,5 @@ iOS11リリース(32bitアプリなので両方起動できなくなる)"""
             USERDATA.cachedMovieNum = 1
         }
     }
+
 }
