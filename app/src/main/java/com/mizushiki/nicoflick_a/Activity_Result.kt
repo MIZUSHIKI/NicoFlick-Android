@@ -156,9 +156,7 @@ class Activity_Result : AppCompatActivity() {
 
         //スコアをデータベースに送信する(送信済みでないもの)
         var scoreset = USERDATA.Score.getSendScoresStr() //送信するデータ
-        println("scoreset = [1] ${scoreset}")
         scoreset = USERDATA.JustPlayedScore.appendSendScoresStr(scoreset)
-        println("scoreset = [2] ${scoreset}")
         //
         //return
         if( scoreset != "" ){

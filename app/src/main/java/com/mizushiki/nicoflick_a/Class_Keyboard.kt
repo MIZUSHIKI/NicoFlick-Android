@@ -145,7 +145,7 @@ class MyKeyboard(context: Context) : LinearLayout(context) {
         bt_KA.layoutParams = kaPara
         kaRetuLayout.addView(bt_KA)
 
-        bt_NA = KeyButton(context,listOf("な","に","ね","ね","の"))
+        bt_NA = KeyButton(context,listOf("な","に","ぬ","ね","の"))
         val naPara = LayoutParams(LayoutParams.MATCH_PARENT,0)
         naPara.weight = 0.25f
         bt_NA.layoutParams = naPara

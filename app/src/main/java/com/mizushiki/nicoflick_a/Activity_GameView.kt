@@ -164,11 +164,8 @@ class Activity_GameView : AppCompatActivity() {
 
         progressBar.postDelayed( {
             progressBar_centerY = progressBar.centerY   //待たないと数値がブレる(?)
-            println("post ${progressBar.centerY} ${progressBar2.centerY}")
             progressBar2_centerY = progressBar2.centerY
-            println("post ${progressBar.centerY} ${progressBar2.centerY}")
 
-            println("post - ${progressBar.centerY} ${progressBar2.centerY}")
             progressBar.isVisible = borderPosUe
             progressBar2.isVisible = !borderPosUe
             if( selectLevel!!.level > 10 ){

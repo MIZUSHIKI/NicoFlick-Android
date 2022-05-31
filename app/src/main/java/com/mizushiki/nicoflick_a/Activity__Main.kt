@@ -38,7 +38,7 @@ object GLOBAL {
     //val PHP_URL = "http://192.168.11.6/nicoflick_20201103/nicoflick.php" //windows xampp
     val NICOWIKI_PATH = "https://main-timetag.ssl-lolipop.jp/nicoflick/wiki/index.php"
     val NicoApiURL_GetThumbInfo = "https://ext.nicovideo.jp/api/getthumbinfo/"
-    val Version:Int = 1903
+    val Version:Int = 1904
     //Activity間 オブジェクト受け渡し用
     var SelectMUSIC:musicData? = null
     var SelectLEVEL:levelData? = null
@@ -95,9 +95,7 @@ class MainActivity : AppCompatActivity() {
 
         seSystemAudio = SESystemAudio //遅延させて読み込み
 
-        println("bt size=${getNavigationBarHeight()}")
         GLOBAL.NavigationBarHeight = getNavigationBarHeight()
-        //keybd.setPaddingKeybd(bottom = GLOBAL.NavigationBarHeight)
     }
     fun Button_Start(view: View) {
         if(segueing) {
