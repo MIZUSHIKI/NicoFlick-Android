@@ -7,6 +7,23 @@
         android:layout_height="match_parent"
         tools:context=".Activity_Result" android:background="#C7E3FF">
 
+    <ImageView
+            android:id="@+id/ResultView_imageAlpha"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:alpha="0.5"
+            android:scaleType="centerCrop"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:background="@android:color/white"
+    />
+    <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/ResultView_SlashShade_layout">
+    </FrameLayout>
     <TextView
             android:text="TextView"
             android:layout_width="0dp"
@@ -16,20 +33,25 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintVertical_bias="0.02"
             android:textAppearance="@style/TextAppearance.AppCompat.Display1"
+            android:fontFamily="@font/nicokaku_v1"
             android:textAlignment="center" android:ellipsize="end" android:maxLines="1"
-            android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12dp" android:gravity="center_vertical"
-            android:paddingLeft="8dp" android:paddingRight="8dp" android:autoSizeMaxTextSize="34dp"
+            android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12dp"
+            android:gravity="center_vertical"
+            android:paddingLeft="8dp" android:paddingRight="8dp" android:autoSizeMaxTextSize="24dp"
             android:textColor="?attr/actionMenuTextColor"/>
     <TextView
-            android:text="TextView"
+            android:text="アーティスト長い文字列長い文字列長い文字列"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:id="@+id/textView_Artist" app:layout_constraintStart_toEndOf="@+id/imageView_resultThumbnail"
+            android:id="@+id/textView_Artist"
+            android:fontFamily="@font/nicokaku_v1"
+            app:layout_constraintStart_toEndOf="@+id/imageView_resultThumbnail"
             android:autoSizeTextType="uniform" android:autoSizeMinTextSize="6sp"
             android:autoSizeMaxTextSize="14sp"
             app:layout_constraintEnd_toEndOf="parent" android:layout_marginStart="16dp"
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintVertical_bias="0.085"/>
+            app:layout_constraintVertical_bias="0.085" android:textColor="?attr/actionMenuTextColor"
+            android:maxLines="1" android:gravity="center_vertical"/>
     <ImageView
             android:layout_width="150dp"
             android:layout_height="80dp" app:srcCompat="@drawable/gradation_r"
@@ -38,30 +60,36 @@
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintHorizontal_bias="0.15" app:layout_constraintVertical_bias="0.100000024"/>
     <TextView
-            android:text="TextView"
+            android:text="0:00"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:id="@+id/textView_Duration" app:layout_constraintStart_toEndOf="@+id/imageView_resultThumbnail"
+            android:id="@+id/textView_Duration"
+            android:fontFamily="@font/nicokaku_v1"
+            app:layout_constraintStart_toEndOf="@+id/imageView_resultThumbnail"
             app:layout_constraintEnd_toEndOf="parent" app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" android:layout_marginStart="16dp"
-            app:layout_constraintVertical_bias="0.12"/>
+            app:layout_constraintVertical_bias="0.12" android:textColor="?attr/actionMenuTextColor"/>
     <TextView
-            android:text="TextView"
+            android:text="★★★★★★☆☆☆☆"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:id="@+id/textView_Star" app:layout_constraintStart_toEndOf="@+id/imageView_resultThumbnail"
+            android:id="@+id/textView_Star"
+            android:fontFamily="@font/nicokaku_v1"
+            app:layout_constraintStart_toEndOf="@+id/imageView_resultThumbnail"
             app:layout_constraintEnd_toEndOf="parent" android:layout_marginStart="16dp"
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintVertical_bias="0.155"/>
+            app:layout_constraintVertical_bias="0.155" android:textColor="?attr/actionMenuTextColor"/>
     <TextView
-            android:text="TextView"
+            android:text="MIZUSHIKI"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:id="@+id/textView_tokosya" android:layout_marginStart="16dp"
+            android:id="@+id/textView_tokosya"
+            android:fontFamily="@font/nicokaku_v1"
+            android:layout_marginStart="16dp"
             app:layout_constraintStart_toEndOf="@+id/imageView_resultThumbnail"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintVertical_bias="0.19"/>
+            app:layout_constraintVertical_bias="0.19" android:textColor="@android:color/tertiary_text_light"/>
     <TextView
             android:text="Total Notes"
             android:layout_width="wrap_content"
@@ -70,16 +98,20 @@
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintVertical_bias="0.25"
             app:layout_constraintEnd_toEndOf="parent" app:layout_constraintHorizontal_bias="0.05"
-            android:textSize="18sp"/>
-    <TextView
+            android:textSize="18sp" android:fontFamily="sans-serif-black"
+            android:textColor="?attr/actionMenuTextColor"/>
+    <com.mizushiki.nicoflick_a.ChainTextView
             android:text="000"
-            android:layout_width="wrap_content"
+            android:layout_width="100dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView_TotalNotes"
             app:layout_constraintTop_toTopOf="@+id/textView18"
             app:layout_constraintBottom_toBottomOf="@+id/textView18"
             app:layout_constraintStart_toEndOf="@+id/textView18"
-            android:textAlignment="viewEnd" android:layout_marginStart="64dp" android:textSize="18sp"/>
+            android:textAlignment="viewEnd" android:layout_marginStart="0dp" android:textSize="18sp"
+            android:textColor="?attr/actionMenuTextColor" android:fontFamily="sans-serif-black"
+            android:visibility="invisible"
+    />
     <TextView
             android:text="Combo"
             android:layout_width="wrap_content"
@@ -87,26 +119,32 @@
             android:id="@+id/textView20" app:layout_constraintStart_toStartOf="@+id/textView18"
             app:layout_constraintEnd_toEndOf="parent" app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintVertical_bias="0.3" android:textSize="18sp"/>
+            app:layout_constraintVertical_bias="0.3" android:textSize="18sp" android:fontFamily="sans-serif-black"
+            android:textColor="?attr/actionMenuTextColor"/>
     <TextView
-            android:text="Perfect"
+            android:text="A"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/textView_Rank"
             app:layout_constraintTop_toTopOf="@+id/textView18"
-            app:layout_constraintBottom_toBottomOf="@+id/textView20" android:textSize="30sp"
-            app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.85" android:textAlignment="center"
-            android:textColor="?attr/actionMenuTextColor"/>
-    <TextView
+            app:layout_constraintBottom_toBottomOf="@+id/textView20" android:textSize="40sp"
+            app:layout_constraintStart_toEndOf="@id/textView_TotalNotes" app:layout_constraintEnd_toEndOf="parent"
+            android:textAlignment="center"
+            android:textColor="?attr/actionMenuTextColor" android:fontFamily="sans-serif-black"
+            android:visibility="invisible"
+    />
+    <com.mizushiki.nicoflick_a.ChainTextView
             android:text="0"
-            android:layout_width="wrap_content"
+            android:layout_width="100dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView_Combo"
             app:layout_constraintBottom_toBottomOf="@+id/textView20"
             app:layout_constraintTop_toTopOf="@+id/textView20"
             app:layout_constraintEnd_toEndOf="@+id/textView_TotalNotes"
-            android:textAlignment="viewEnd" android:textSize="18sp"/>
+            android:textAlignment="viewEnd" android:textSize="18sp" android:textColor="?attr/actionMenuTextColor"
+            android:fontFamily="sans-serif-black"
+            android:visibility="invisible"
+    />
     <TextView
             android:text="Great"
             android:layout_width="wrap_content"
@@ -115,16 +153,20 @@
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintVertical_bias="0.38" app:layout_constraintHorizontal_bias="0.3"
-            android:textSize="18sp"/>
-    <TextView
-            android:text="TextView"
-            android:layout_width="wrap_content"
+            android:textSize="18sp" android:fontFamily="sans-serif-black"
+            android:textColor="?attr/actionMenuTextColor"/>
+    <com.mizushiki.nicoflick_a.ChainTextView
+            android:text="0"
+            android:layout_width="100dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView_GreatNum"
             app:layout_constraintBottom_toBottomOf="@+id/textView23"
             app:layout_constraintTop_toTopOf="@+id/textView23" app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent" app:layout_constraintHorizontal_bias="0.6"
-            android:textSize="18sp"/>
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintHorizontal_bias="0.625"
+            android:textSize="18sp" android:textColor="?attr/actionMenuTextColor"
+            android:fontFamily="sans-serif-black"
+            android:visibility="invisible"
+            android:textAlignment="viewEnd"/>
     <TextView
             android:text="Good"
             android:layout_width="wrap_content"
@@ -132,28 +174,38 @@
             android:id="@+id/textView26"
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintVertical_bias="0.425" app:layout_constraintStart_toStartOf="@+id/textView23"
-            android:textSize="18sp"/>
-    <TextView
-            android:text="TextView"
-            android:layout_width="wrap_content"
+            android:textSize="18sp" android:fontFamily="sans-serif-black"
+            android:textColor="?attr/actionMenuTextColor"/>
+    <com.mizushiki.nicoflick_a.ChainTextView
+            android:text="0"
+            android:layout_width="100dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView_GoodNum" app:layout_constraintEnd_toEndOf="@+id/textView_GreatNum"
             app:layout_constraintTop_toTopOf="@+id/textView26"
-            app:layout_constraintBottom_toBottomOf="@+id/textView26" android:textSize="18sp"/>
+            app:layout_constraintBottom_toBottomOf="@+id/textView26" android:textSize="18sp"
+            android:textColor="?attr/actionMenuTextColor" android:fontFamily="sans-serif-black"
+            android:visibility="invisible"
+            android:textAlignment="viewEnd"
+    />
     <TextView
             android:text="Safe"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/textView28" app:layout_constraintStart_toStartOf="@+id/textView26"
             app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.47" android:textSize="18sp"/>
-    <TextView
-            android:text="TextView"
-            android:layout_width="wrap_content"
+            app:layout_constraintVertical_bias="0.47" android:textSize="18sp" android:fontFamily="sans-serif-black"
+            android:textColor="?attr/actionMenuTextColor"/>
+    <com.mizushiki.nicoflick_a.ChainTextView
+            android:text="0"
+            android:layout_width="100dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView_SafeNum" app:layout_constraintEnd_toEndOf="@+id/textView_GoodNum"
             app:layout_constraintTop_toTopOf="@+id/textView28"
-            app:layout_constraintBottom_toBottomOf="@+id/textView28" android:textSize="18sp"/>
+            app:layout_constraintBottom_toBottomOf="@+id/textView28" android:textSize="18sp"
+            android:textColor="?attr/actionMenuTextColor" android:fontFamily="sans-serif-black"
+            android:visibility="invisible"
+            android:textAlignment="viewEnd"
+    />
     <TextView
             android:text="Bad"
             android:layout_width="wrap_content"
@@ -161,60 +213,80 @@
             android:id="@+id/textView30"
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintVertical_bias="0.515" app:layout_constraintStart_toStartOf="@+id/textView28"
-            android:textSize="18sp"/>
-    <TextView
-            android:text="TextView"
-            android:layout_width="wrap_content"
+            android:textSize="18sp" android:fontFamily="sans-serif-black"
+            android:textColor="?attr/actionMenuTextColor"/>
+    <com.mizushiki.nicoflick_a.ChainTextView
+            android:text="0"
+            android:layout_width="100dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView_BadNum"
             app:layout_constraintTop_toTopOf="@+id/textView30"
             app:layout_constraintBottom_toBottomOf="@+id/textView30"
-            app:layout_constraintEnd_toEndOf="@+id/textView_SafeNum" android:textSize="18sp"/>
+            app:layout_constraintEnd_toEndOf="@+id/textView_SafeNum" android:textSize="18sp"
+            android:textColor="?attr/actionMenuTextColor" android:fontFamily="sans-serif-black"
+            android:visibility="invisible"
+            android:textAlignment="viewEnd"
+    />
     <TextView
             android:text="Miss"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/textView32" app:layout_constraintStart_toStartOf="@+id/textView30"
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintVertical_bias="0.56" android:textSize="18sp"/>
-    <TextView
-            android:text="TextView"
-            android:layout_width="wrap_content"
+            app:layout_constraintVertical_bias="0.56" android:textSize="18sp" android:fontFamily="sans-serif-black"
+            android:textColor="?attr/actionMenuTextColor"/>
+    <com.mizushiki.nicoflick_a.ChainTextView
+            android:text="0"
+            android:layout_width="100dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView_MissNum"
             app:layout_constraintTop_toTopOf="@+id/textView32"
             app:layout_constraintBottom_toBottomOf="@+id/textView32"
-            app:layout_constraintEnd_toEndOf="@+id/textView_BadNum" android:textSize="18sp"/>
+            app:layout_constraintEnd_toEndOf="@+id/textView_BadNum" android:textSize="18sp"
+            android:textColor="?attr/actionMenuTextColor" android:fontFamily="sans-serif-black"
+            android:visibility="invisible"
+            android:textAlignment="viewEnd"
+    />
     <TextView
             android:text="Stage Score"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/textView34" app:layout_constraintStart_toStartOf="@+id/textView20"
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintVertical_bias="0.65" android:textSize="18sp"/>
-    <TextView
-            android:text="TextView"
-            android:layout_width="wrap_content"
+            app:layout_constraintVertical_bias="0.65" android:textSize="18sp" android:fontFamily="sans-serif-black"
+            android:textColor="?attr/actionMenuTextColor"/>
+    <com.mizushiki.nicoflick_a.ChainTextView
+            android:text="00000"
+            android:layout_width="150dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView_StageScore"
             app:layout_constraintTop_toTopOf="@+id/textView34"
             app:layout_constraintBottom_toBottomOf="@+id/textView34" app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent" app:layout_constraintHorizontal_bias="0.7"
-            android:textSize="18sp"/>
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintHorizontal_bias="0.8"
+            android:textSize="18sp" android:textColor="?attr/actionMenuTextColor"
+            android:fontFamily="sans-serif-black"
+            android:visibility="invisible"
+            android:textAlignment="viewEnd"
+    />
     <TextView
             android:text="Combo Bonus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/textView36" app:layout_constraintStart_toStartOf="@+id/textView34"
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintVertical_bias="0.7" android:textSize="18sp"/>
-    <TextView
-            android:text="TextView"
-            android:layout_width="wrap_content"
+            app:layout_constraintVertical_bias="0.7" android:textSize="18sp" android:fontFamily="sans-serif-black"
+            android:textColor="?attr/actionMenuTextColor"/>
+    <com.mizushiki.nicoflick_a.ChainTextView
+            android:text="00000"
+            android:layout_width="150dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView_ComboBonus" app:layout_constraintEnd_toEndOf="@+id/textView_StageScore"
             app:layout_constraintTop_toTopOf="@+id/textView36"
-            app:layout_constraintBottom_toBottomOf="@+id/textView36" android:textSize="18sp"/>
+            app:layout_constraintBottom_toBottomOf="@+id/textView36" android:textSize="18sp"
+            android:textColor="?attr/actionMenuTextColor" android:fontFamily="sans-serif-black"
+            android:visibility="invisible"
+            android:textAlignment="viewEnd"
+    />
     <TextView
             android:text="Total Score"
             android:layout_width="wrap_content"
@@ -222,16 +294,19 @@
             android:id="@+id/textView38" app:layout_constraintStart_toStartOf="@+id/textView36"
             app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintVertical_bias="0.75" android:textColor="?attr/actionMenuTextColor"
-            android:textSize="18sp"/>
-    <TextView
-            android:text="TextView"
-            android:layout_width="wrap_content"
+            android:textSize="18sp" android:fontFamily="sans-serif-black"/>
+    <com.mizushiki.nicoflick_a.ChainTextView
+            android:text="000000"
+            android:layout_width="150dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView_TotalScore"
             app:layout_constraintTop_toTopOf="@+id/textView38"
             app:layout_constraintBottom_toBottomOf="@+id/textView38"
             app:layout_constraintEnd_toEndOf="@+id/textView_ComboBonus" android:textColor="?attr/actionMenuTextColor"
-            android:textSize="18sp"/>
+            android:textSize="18sp" android:fontFamily="sans-serif-black"
+            android:visibility="invisible"
+            android:textAlignment="viewEnd"
+    />
     <TextView
             android:text="HighScore更新!!"
             android:layout_width="wrap_content"
@@ -240,16 +315,20 @@
             android:textSize="24sp" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintVertical_bias="0.81"
-            app:layout_constraintHorizontal_bias="0.80" android:visibility="invisible"/>
+            app:layout_constraintHorizontal_bias="0.80" android:visibility="invisible"
+            android:fontFamily="@font/nicokaku_v1"/>
     <Button
             android:text="@android:string/ok"
-            android:layout_width="wrap_content"
+            android:layout_width="175dp"
             android:layout_height="wrap_content"
-            android:id="@+id/button4" app:layout_constraintEnd_toEndOf="parent"
+            android:id="@+id/button_ResultOK" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintTop_toTopOf="@+id/textView_Title" app:layout_constraintVertical_bias="0.9"
-            style="@style/Widget.AppCompat.Button.Colored" android:background="@android:color/holo_blue_dark"
-            android:onClick="Button_OK"/>/>
+            style="@style/custom_button" android:background="@drawable/custom_button_dark"
+            android:textSize="22sp"
+            android:onClick="Button_OK"
+            android:visibility="invisible"
+    />/>
 
     <Button
             android:text="Ranking\nComment"
@@ -259,19 +338,24 @@
             android:onClick="Button_RankingComment"
             style="@android:style/Widget.Holo.Button.Borderless.Small"
             android:textColor="@android:color/holo_blue_dark" android:textSize="8sp" android:lines="2"
-            android:singleLine="false" app:layout_constraintTop_toTopOf="@+id/button4"
-            app:layout_constraintBottom_toBottomOf="@+id/button4" app:layout_constraintStart_toEndOf="@+id/button4"
-            app:layout_constraintEnd_toEndOf="parent" app:layout_constraintHorizontal_bias="0.75"/>
+            android:singleLine="false" app:layout_constraintTop_toTopOf="@+id/button_ResultOK"
+            app:layout_constraintBottom_toBottomOf="@+id/button_ResultOK" app:layout_constraintStart_toEndOf="@+id/button_ResultOK"
+            app:layout_constraintEnd_toEndOf="parent" app:layout_constraintHorizontal_bias="0.75"
+            android:fontFamily="@font/nicokaku_v1"
+            android:visibility="invisible"
+    />
     <TextView
             android:text="◁"
             android:layout_width="wrap_content"
             android:layout_height="0dp"
-            android:id="@+id/textView14"
+            android:id="@+id/textView_ResultRankingComment_arrow"
             app:layout_constraintTop_toTopOf="@+id/button_RankingComment"
             app:layout_constraintBottom_toBottomOf="@+id/button_RankingComment"
             app:layout_constraintStart_toStartOf="@+id/button_RankingComment"
             android:textSize="8sp"
             android:textColor="@android:color/holo_blue_dark" android:gravity="center_vertical"
             android:textStyle="bold"
-            android:layout_marginStart="2dp"/>
+            android:layout_marginStart="0dp"
+            android:visibility="invisible"
+    />
 </androidx.constraintlayout.widget.ConstraintLayout>

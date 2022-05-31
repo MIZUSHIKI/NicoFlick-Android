@@ -16,7 +16,7 @@
             style="@style/Widget.AppCompat.Button.Small"
             android:onClick="Button_postReport"
             app:layout_constraintEnd_toEndOf="parent" android:layout_marginEnd="16dp"
-            android:background="@color/design_default_color_error" android:textColor="@android:color/darker_gray"/>
+            android:background="@drawable/circle_button_report" android:textColor="@android:color/darker_gray"/>
     <View
             android:layout_width="wrap_content"
             android:layout_height="0dp"
@@ -29,11 +29,13 @@
             android:text="tag"
             android:layout_width="64dp"
             android:layout_height="21dp"
-            android:id="@+id/textView9" android:textColor="@android:color/white"
+            android:id="@+id/textView9"
+            android:fontFamily="@font/nicokaku_v1"
+            android:textColor="@android:color/white"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="@+id/view"
             app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintVertical_bias="0.06"
-            android:textStyle="bold" app:layout_constraintHorizontal_bias="0.0" android:layout_marginStart="16dp"/>
+            app:layout_constraintHorizontal_bias="0.0" android:layout_marginStart="16dp"/>
     <TextView
             android:text="TextView"
             android:layout_width="0dp"
@@ -65,11 +67,13 @@
             android:text="sort"
             android:layout_width="64dp"
             android:layout_height="21dp"
-            android:id="@+id/textView16" android:textColor="@android:color/white"
+            android:id="@+id/textView16"
+            android:fontFamily="@font/nicokaku_v1"
+            android:textColor="@android:color/white"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="@+id/view"
             app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintVertical_bias="0.2"
-            android:textStyle="bold" app:layout_constraintHorizontal_bias="0.0" android:layout_marginStart="16dp"/>
+            app:layout_constraintHorizontal_bias="0.0" android:layout_marginStart="16dp"/>
     <TextView
             android:text="TextView"
             android:layout_width="0dp"
@@ -97,13 +101,12 @@
             app:layout_constraintEnd_toEndOf="@+id/view2"
             android:textColor="@android:color/white" android:gravity="center_vertical"/>
     <Button
-            android:text="戻る"
+            android:text="@string/back"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/button5" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintBottom_toBottomOf="@+id/view"
-            style="@style/Widget.AppCompat.Button.Borderless.Colored"
-            android:textColor="@android:color/holo_blue_light" android:textStyle="bold"
+            style="@style/back_button"
             android:layout_marginBottom="32dp" android:onClick="Button_Back" android:textSize="18sp"/>
     <Button
             android:text="🔗 外部リンク / HowTo動画 他"
@@ -134,7 +137,7 @@
             android:id="@+id/Button_goMovieSite" app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintBottom_toTopOf="@+id/view" android:layout_marginBottom="24dp"
             android:layout_marginStart="16dp" style="@style/Widget.AppCompat.Button.Small"
-            android:onClick="Button_GoMovieSite" android:background="@android:color/holo_blue_bright"
+            android:onClick="Button_GoMovieSite" android:background="@drawable/circle_button_link"
     />
     <TextView
             android:text=""

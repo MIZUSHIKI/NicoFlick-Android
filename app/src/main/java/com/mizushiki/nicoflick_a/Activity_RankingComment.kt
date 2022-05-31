@@ -1,7 +1,9 @@
 package com.mizushiki.nicoflick_a
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.MenuItem
+import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import kotlinx.android.synthetic.main.activity_ranking_comment.*
@@ -12,12 +14,21 @@ class Activity_RankingComment : AppCompatActivity(),BottomNavigationView.OnNavig
     val rankingFragment = RankingFragment()
     val commentFragment = CommentFragment()
     var added:Boolean = false //・・・
+    var maeItemId = -1
+
+    val selectMusic = GLOBAL.SelectMUSIC!!
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_ranking_comment)
 
         btm_navigation.setOnNavigationItemSelectedListener(this)
+
+        // FrameLayout のインスタンスを取得
+        val slashShadeLayout: FrameLayout = findViewById(R.id.RankingCommentView_SlashShade_layout)
+        val slashShadeView = SlashShadeView(this,slashColor=Color.argb(255,204,255,102) )
+        slashShadeLayout.addView(slashShadeView)
+        PicassoLoadImage_NicoThumb(RankingCommentView_imageAlpha, selectMusic.thumbnailURL)
 
         if( savedInstanceState == null ){
             supportFragmentManager.beginTransaction()
@@ -31,6 +42,10 @@ class Activity_RankingComment : AppCompatActivity(),BottomNavigationView.OnNavig
         println("commentFragment.loading= ${commentFragment.loading}")
         if( rankingFragment.loading == true || commentFragment.loading == true ){
             return false
+        }
+        if( maeItemId != item.itemId ){
+            maeItemId = item.itemId
+            SESystemAudio.openSubSePlay()
         }
         when (item.itemId) {
             R.id.item1 -> {

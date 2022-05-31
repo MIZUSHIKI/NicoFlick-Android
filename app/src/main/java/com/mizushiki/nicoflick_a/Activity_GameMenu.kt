@@ -10,6 +10,10 @@ import android.view.View
 import android.widget.SeekBar
 import androidx.core.view.isVisible
 import kotlinx.android.synthetic.main.activity_game_menu.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class Activity_GameMenu : AppCompatActivity() {
 
@@ -91,19 +95,48 @@ class Activity_GameMenu : AppCompatActivity() {
 
         // ↑ かなりとっ散らかってるけど整理整頓は後回し
 
+        val progress1y = getIntent().getFloatExtra("progress1",0.0f)
+        val progress2y = getIntent().getFloatExtra("progress2",0.0f)
+        view_gauge1.centerY = progress1y - 2.0f
+        view_gauge2.centerY = progress2y - 2.0f
+        view_gauge1.isVisible = USERDATA.BorderPosUe
+        view_gauge2.isVisible = !USERDATA.BorderPosUe
+        GLOBAL.SelectLEVEL?.let {
+            if (it.level > 10) {
+                button_gauge.isVisible = false
+                view_gauge1.isVisible = false
+                view_gauge2.isVisible = false
+            }
+        }
+        switch1_gameMenu.isChecked = USERDATA.UseNicoFlickKeyboard
     }
 
     fun Button_GobackMusicSelect(view: View) {
+        SESystemAudio.cansel2SePlay()
         // 返却
         setResult( 10, null )
         finish()
     }
     fun Button_Retry(view: View) {
+        SESystemAudio.canselSePlay()
         // 返却
         setResult( 11, null )
         finish()
     }
     fun Button_Continue(view: View) {
+        SESystemAudio.canselSePlay()
+        // 返却
+        setResult( 12, null )
         finish()
+    }
+
+    fun Button_gauge(view: View) {
+        USERDATA.BorderPosUe = !USERDATA.BorderPosUe
+        view_gauge1.isVisible = USERDATA.BorderPosUe
+        view_gauge2.isVisible = !USERDATA.BorderPosUe
+    }
+
+    fun Switch_useKeyboard(view: View) {
+        USERDATA.UseNicoFlickKeyboard = switch1_gameMenu.isChecked
     }
 }

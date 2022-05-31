@@ -22,6 +22,7 @@ import java.net.URLDecoder
 class Activity_WikiPageWeb : AppCompatActivity() {
 
     //各種データ
+    val selectMusic = GLOBAL.SelectMUSIC!!
     var musicDatas: MusicDataLists = MusicDataLists
     val texts = arrayListOf<String>()
 
@@ -37,7 +38,7 @@ class Activity_WikiPageWeb : AppCompatActivity() {
 
         webView.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         webView.settings.javaScriptEnabled = true
-        webView.loadUrl("https://main-timetag.ssl-lolipop.jp/nicoflick/wiki/index.php")
+        webView.loadUrl(GLOBAL.NICOWIKI_PATH)
         webView.webViewClient = WebViewClient()
 
         webView.webViewClient = object : WebViewClient() {
@@ -86,7 +87,42 @@ class Activity_WikiPageWeb : AppCompatActivity() {
                     }
                 }
 
-                webView.evaluateJavascript("document.getElementById('${USERDATA.UserIDxxx}').style.color = '#F00';",null)
+                webView.evaluateJavascript("""
+                    var element = document.getElementById('${USERDATA.UserIDxxx}');
+                    if( element != null ){ element.style.color = '#F00'; }
+                    var elements = document.getElementsByClassName('${USERDATA.UserIDxxx}');
+                    if( elements != null ){
+                        for( let i = 0; i < elements.length; i++ ){
+                            elements[i].style.color='#F00';
+                        }
+                    }
+                """){
+                    println("wiki- ${it}")
+
+                }
+
+                webView.evaluateJavascript("document.getElementById('SetMusicDataBtn_NicoFlick').id"){
+                    println("it = ${it}")
+                    if( it != "\"SetMusicDataBtn_NicoFlick\"" ){ return@evaluateJavascript }
+
+                    webView.evaluateJavascript("""
+                        if( document.getElementById('SettedMusicDataBtn_NicoFlick') == null ){
+                            var cre = document.createElement('input');
+                            cre.type = 'button';
+                            cre.id = 'SettedMusicDataBtn_NicoFlick';
+                            cre.value = '選択中の楽曲情報を入力ボックスに代入';
+                            cre.addEventListener('click', buttonClick);
+                            var ele = document.getElementById('SetMusicDataBtn_NicoFlick');
+                            ele.appendChild(cre);
+                            ele.appendChild(document.createElement('br'));
+                        }
+                    
+                        function buttonClick(){
+                            document.getElementById('_p_comment_comment_0').value = '[[${selectMusic.title}>nicoflick://tag=@m:${selectMusic.sqlID}]]&br;[[&ref(${selectMusic.thumbnailURL});>nicoflick://tag=@m:${selectMusic.sqlID}]]&br;';
+                        }
+                    """,null)
+                }
+
             }
         }
     }
@@ -101,7 +137,10 @@ class Activity_WikiPageWeb : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when(item.itemId){
-            android.R.id.home -> finish()
+            android.R.id.home -> {
+                SESystemAudio.canselSePlay()
+                finish()
+            }
         }
         return super.onOptionsItemSelected(item)
     }

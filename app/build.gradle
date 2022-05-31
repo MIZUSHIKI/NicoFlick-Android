@@ -11,8 +11,8 @@ android {
         applicationId "com.mizushiki.nicoflick_a"
         minSdkVersion 24
         targetSdkVersion 30
-        versionCode 20
-        versionName "1.9.a0"
+        versionCode 24
+        versionName "1.10.a2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {

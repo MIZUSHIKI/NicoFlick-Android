@@ -396,7 +396,7 @@ class Score {
         const val RankE = 6
         const val RankFalse = 7
 
-        val RankStr = listOf("Perfect","S","A","B","C","D","E","False")
+        val RankStr = listOf("PERFECT","S","A","B","C","D","E","False")
     }
 
     var stageRank = 100

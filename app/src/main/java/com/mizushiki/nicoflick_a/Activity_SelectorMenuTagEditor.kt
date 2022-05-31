@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.text.Html
 import android.view.MenuItem
 import android.view.View
 import androidx.core.view.isVisible
@@ -119,7 +120,7 @@ class Activity_SelectorMenuTagEditor : AppCompatActivity() {
                 //ダメだった
                 return@GetNicoTags
             }
-            editText_nicoTag.setText(it)
+            editText_nicoTag.setText(Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY))
             editText_nicoTag.isVisible = true
         }
     }

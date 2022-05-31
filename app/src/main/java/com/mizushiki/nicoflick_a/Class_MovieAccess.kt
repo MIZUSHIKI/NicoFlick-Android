@@ -24,29 +24,16 @@ import kotlin.collections.ArrayList
 import kotlin.concurrent.schedule
 
 
-class MovieAccess(ecoThumb:Boolean = false) {
+class MovieAccess {
 
     var firstAttack = true
 
-    val ecoThumb : Boolean
-
-    init {
-        this.ecoThumb = ecoThumb
-    }
-
-    fun StreamingUrlNicoAccess(smNum:String, callback: (String?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
+    fun StreamingUrlNicoAccess(smNum:String, callback: (String) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
 
         //先にキャッシュ内にあるか確認。あればもうニコニコの動画ページにすらアクセスしないことにする
-        if( !ecoThumb ){
-            if( CachedMovies.cachedMovies.any{ it.smNum == smNum }){
-                callback("cached")
-                return@launch
-            }
-        }else {
-            if( CachedThumbMovies.containtsWithinExpiration(smNum)){
-                callback("cached")
-                return@launch
-            }
+        if( CachedMovies.cachedMovies.any{ it.smNum == smNum }){
+            callback("cached")
+            return@launch
         }
         println("smNum="+smNum)
 
@@ -79,13 +66,62 @@ class MovieAccess(ecoThumb:Boolean = false) {
                     println(it)
                     nicoDmc.Set_session_metadata(it)
                     //短く再生するだけの場合はハートビートしない（40秒以内）
-                    if( !ecoThumb ){
+                    //if( !ecoThumb ){
                         nicoDmc.Start_HeartBeat()
-                    }
+                    //}
                     callback(nicoDmc.content_uri)
                     return@let
                 }
                 callback("error")
+            }
+        }
+    }
+
+    fun StreamingUrlNicoAccessForThumbMovie(smNum:String, callback: (String,NicoDmc?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
+
+        //先にキャッシュ内にあるか確認。あればもうニコニコの動画ページにすらアクセスしないことにする
+        if( CachedThumbMovies.containtsWithinExpiration(smNum)){
+            callback("cached",null)
+            return@launch
+        }
+        println("smNum="+smNum)
+
+        val strURL = "https://www.nicovideo.jp/watch/"+smNum
+        //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
+        async(Dispatchers.Default) { HttpUtil.httpGET(strURL) }.await().let {
+            println("net")
+            if (it == null) {
+                callback("error",null)
+                return@let
+            }
+            var st = it.pregMatche_firstString("<div id=\"js-initial-watch-data\" data-api-data=\"(.*?)\" hidden></div>")
+            if( st=="" ){ return@let }
+            st = HtmlCompat.fromHtml(st,HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
+            //st = st.pregReplace("\\\\u([0-9a-f]{2})([0-9a-f]{2})","%$1%$2")
+            //st = st.pregReplace("\\\\","")
+            //st = URLDecoder.decode(st,"UTF16")
+
+            println(st)
+            val nicoDmc = NicoDmc(smNum,st,true)
+            if( nicoDmc.token == "" ){
+                return@let
+            }
+
+            val url = "https://api.dmc.nico/api/sessions?_format=json"
+            val body = nicoDmc.sessionFormatJson
+            async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
+                println("it")
+                if (it != null) {
+                    println(it)
+                    nicoDmc.Set_session_metadata(it)
+                    //短く再生するだけの場合はハートビートしない（40秒以内）
+                    //if( !ecoThumb ){
+                    //    nicoDmc.Start_HeartBeat()
+                    //}
+                    callback(nicoDmc.content_uri, nicoDmc)
+                    return@let
+                }
+                callback("error", null)
             }
         }
     }
@@ -102,7 +138,7 @@ class MovieAccess(ecoThumb:Boolean = false) {
         }
     }
 }
-class NicoDmc(smNum: String, js_initial_watch_data:String) {
+class NicoDmc(smNum: String, js_initial_watch_data:String, isThumbMovie:Boolean = false) {
     val smNum : String
     var recipeId = ""
         private set
@@ -140,10 +176,12 @@ class NicoDmc(smNum: String, js_initial_watch_data:String) {
         private set
     var content_uri = ""
         private set
+    var isThumbMovie = false
     var eco = false
-    private var timer = Timer()
+    private var timer:Timer? = null
     init{
         this.smNum = smNum
+        this.isThumbMovie = isThumbMovie
         println("DMC")
         var ans:ArrayList<String> = arrayListOf()
         if( js_initial_watch_data.pregMatche("\"session\":\\{\"recipeId\":\"(.*?)\",\"playerId\":\"(.*?)\",\"videos\":\\[(.*?)\\],\"audios\":\\[(.*?)\\],", matche = ans)){
@@ -191,22 +229,32 @@ class NicoDmc(smNum: String, js_initial_watch_data:String) {
         get() {
             var video_src = videos
             val audio_src = audios
-            println("video_src=${video_src}")
+            if( isThumbMovie && eco == false ){
+                if( !MovieAccess().isWiFiConnected(GLOBAL.APPLICATIONCONTEXT) ){
+                    //Wifi接続なし
+                    eco = true
+                }
+            }
+            println("video_src=${videos} ${eco}")
             if( eco ){
-                //強制eco(曲セレクト画面での30秒プレビューに使用)
-                video_src = video_src.pregReplace("^.*,","")
-                println("video_src=${video_src}")
-                //hls
-                return """{"session":{"recipe_id":"${recipeId}","content_id":"${contentId}","content_type":"movie","content_src_id_sets":[{"content_src_ids":[{"src_id_to_mux":{"video_src_ids":[${video_src}],"audio_src_ids":[${audio_src}]}}]}],"timing_constraint":"unlimited","keep_method":{"heartbeat":{"lifetime":${heartbeatLifetime}}},"protocol":{"name":"http","parameters":{"http_parameters":{"parameters":{"hls_parameters":{"use_well_known_port":"yes","use_ssl":"yes","transfer_preset":"${transferPresets}","segment_duration":6000}}}}},"content_uri":"","session_operation_auth":{"session_operation_auth_by_signature":{"token":"${token}","signature":"${signature}"}},"content_auth":{"auth_type":"${auth_type}","content_key_timeout":${contentKeyTimeout},"service_id":"${service_id}","service_user_id":"${service_user_id}"},"client_info":{"player_id":"${playerId}"},"priority":${priority}}}"""
+                //強制eco(曲セレクト画面でWifiじゃないときの30秒プレビュー)
+                videos = videos.pregReplace("^.*,","")
+                println("video_src=${videos}")
+                //mp4
+                return """{"session":{"recipe_id":"${recipeId}","content_id":"${contentId}","content_type":"movie","content_src_id_sets":[{"content_src_ids":[{"src_id_to_mux":{"video_src_ids":[${videos}],"audio_src_ids":[${audio_src}]}}]}],"timing_constraint":"unlimited","keep_method":{"heartbeat":{"lifetime":${heartbeatLifetime}}},"protocol":{"name":"http","parameters":{"http_parameters":{"parameters":{"http_output_download_parameters":{"use_well_known_port":"yes","use_ssl":"yes","transfer_preset":"${transferPresets}"}}}}},"content_uri":"","session_operation_auth":{"session_operation_auth_by_signature":{"token":"${token}","signature":"${signature}"}},"content_auth":{"auth_type":"${auth_type}","content_key_timeout":${contentKeyTimeout},"service_id":"${service_id}","service_user_id":"${service_user_id}"},"client_info":{"player_id":"${playerId}"},"priority":${priority}}}"""
+                /*
+                //hls ExoPlayerでHlsMediaSourceにして上げないといけないみたいなのでmp4-ecoでいく
+                return """{"session":{"recipe_id":"${recipeId}","content_id":"${contentId}","content_type":"movie","content_src_id_sets":[{"content_src_ids":[{"src_id_to_mux":{"video_src_ids":[${videos}],"audio_src_ids":[${audio_src}]}}]}],"timing_constraint":"unlimited","keep_method":{"heartbeat":{"lifetime":${heartbeatLifetime}}},"protocol":{"name":"http","parameters":{"http_parameters":{"parameters":{"hls_parameters":{"use_well_known_port":"yes","use_ssl":"yes","transfer_preset":"${transferPresets}","segment_duration":6000}}}}},"content_uri":"","session_operation_auth":{"session_operation_auth_by_signature":{"token":"${token}","signature":"${signature}"}},"content_auth":{"auth_type":"${auth_type}","content_key_timeout":${contentKeyTimeout},"service_id":"${service_id}","service_user_id":"${service_user_id}"},"client_info":{"player_id":"${playerId}"},"priority":${priority}}}"""
+                 */
 
             }else {
                 if( !MovieAccess().isWiFiConnected(GLOBAL.APPLICATIONCONTEXT) ){
                     //Wifi接続なし
-                    video_src = video_src.pregReplace("^.*,","")
-                    println("video_src=${video_src}")
+                    videos = videos.pregReplace("^.*,","")
+                    println("video_src=${videos}")
                 }
                 //mp4
-                return """{"session":{"recipe_id":"${recipeId}","content_id":"${contentId}","content_type":"movie","content_src_id_sets":[{"content_src_ids":[{"src_id_to_mux":{"video_src_ids":[${video_src}],"audio_src_ids":[${audio_src}]}}]}],"timing_constraint":"unlimited","keep_method":{"heartbeat":{"lifetime":${heartbeatLifetime}}},"protocol":{"name":"http","parameters":{"http_parameters":{"parameters":{"http_output_download_parameters":{"use_well_known_port":"yes","use_ssl":"yes","transfer_preset":"${transferPresets}"}}}}},"content_uri":"","session_operation_auth":{"session_operation_auth_by_signature":{"token":"${token}","signature":"${signature}"}},"content_auth":{"auth_type":"${auth_type}","content_key_timeout":${contentKeyTimeout},"service_id":"${service_id}","service_user_id":"${service_user_id}"},"client_info":{"player_id":"${playerId}"},"priority":${priority}}}"""
+                return """{"session":{"recipe_id":"${recipeId}","content_id":"${contentId}","content_type":"movie","content_src_id_sets":[{"content_src_ids":[{"src_id_to_mux":{"video_src_ids":[${videos}],"audio_src_ids":[${audio_src}]}}]}],"timing_constraint":"unlimited","keep_method":{"heartbeat":{"lifetime":${heartbeatLifetime}}},"protocol":{"name":"http","parameters":{"http_parameters":{"parameters":{"http_output_download_parameters":{"use_well_known_port":"yes","use_ssl":"yes","transfer_preset":"${transferPresets}"}}}}},"content_uri":"","session_operation_auth":{"session_operation_auth_by_signature":{"token":"${token}","signature":"${signature}"}},"content_auth":{"auth_type":"${auth_type}","content_key_timeout":${contentKeyTimeout},"service_id":"${service_id}","service_user_id":"${service_user_id}"},"client_info":{"player_id":"${playerId}"},"priority":${priority}}}"""
             }
         }
     fun Set_session_metadata(ResponseMetadata:String){
@@ -221,29 +269,35 @@ class NicoDmc(smNum: String, js_initial_watch_data:String) {
             val body = ""
             async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
                 Post_HeartBeat()
-                timer.schedule(40000, 40000, {
-                     Post_HeartBeat()
-                     println("smNum=${smNum}")
-                     println("CachedMovies.cachedMovies.any{ it.smNum == smNum } ")
-                     println(CachedMovies.cachedMovies.any{ it.smNum == smNum } )
-                     for( m in CachedMovies.cachedMovies ){
-                         println(m.smNum)
-                     }
-                     if( !CachedMovies.cachedMovies.any{ it.smNum == smNum } ){
-                         println("別のをダウンロードに行ってキャッシュから消されてたら終わり")
-                         End_HeartBeat()
-                     }else {
-                         CachedMovies.cachedMovies.indexOfLast { it.smNum == smNum }.let {
-                             if( it != -1 ){
-                                 if( CachedMovies.cachedMovies[it].simpleExoPlayer.bufferedPercentage >= 99 ){
-                                     println("ロード終わり")
-                                     End_HeartBeat()
-                                 }
-                             }
-                         }
-                     }
+                timer = Timer()
+                timer?.schedule(40000, 40000, {
+                    Post_HeartBeat()
+                    var checkSurvival = false
+                    if( !isThumbMovie ){
+                        checkSurvival = CachedMovies.cachedMovies.any{ it.smNum == smNum }
+                    }else {
+                        checkSurvival = CachedThumbMovies.cachedMovies.any{ it.smNum == smNum }
+                    }
+                    //println("smNum=${smNum}")
+                    //println("CachedMovies.cachedMovies.any{ it.smNum == smNum } ")
+                    //println(CachedMovies.cachedMovies.any{ it.smNum == smNum } )
+                    //for( m in CachedMovies.cachedMovies ){
+                    //    println(m.smNum)
+                    //}
+                    if( checkSurvival == false ){
+                        println("別のをダウンロードに行ってキャッシュから消されてたら終わり")
+                        End_HeartBeat()
+                    }else {
+                        CachedMovies.cachedMovies.indexOfLast { it.smNum == smNum }.let {
+                            if( it != -1 ){
+                                if( CachedMovies.cachedMovies[it].simpleExoPlayer.bufferedPercentage >= 99 ){
+                                    println("ロード終わり")
+                                    End_HeartBeat()
+                                }
+                            }
+                        }
+                    }
                 })
-
             }
         }
     }
@@ -253,7 +307,7 @@ class NicoDmc(smNum: String, js_initial_watch_data:String) {
             val body = session_metadata
             async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
                 if (it != null) {
-                    println("HeartBeat Return!")
+                    println("HeartBeat Return! ${smNum}")
                     println(it)
                     Set_session_metadata(it)
                 }
@@ -261,7 +315,8 @@ class NicoDmc(smNum: String, js_initial_watch_data:String) {
         }
     }
     fun End_HeartBeat() {
-        timer.cancel()
+        println("HeartBeat End!")
+        timer?.cancel()
     }
 }
 
@@ -302,7 +357,7 @@ object CachedMovies {
         simpleExoPlayer.prepare(mediaSource)
 
         //simpleExoPlayer.playWhenReady = true
-        simpleExoPlayer.volume = 0.2f
+        simpleExoPlayer.volume = 0.2f * USERDATA.SoundVolumeMovie
 
         val cachedMovie = CachedMovie(url,smNum,simpleExoPlayer)
         cachedMovies.add(cachedMovie)
@@ -318,11 +373,11 @@ object CachedMovies {
 //保持しておけるSimpleExoPlayerの数が非常に少ないのでゲームプレイ時に開放する
 object CachedThumbMovies {
     //
-    class CachedMovie(var url:String, var smNum: String, var simpleExoPlayer: SimpleExoPlayer, var check:Int, var time:Long = System.currentTimeMillis(), var just:Boolean = false )
+    class CachedMovie(var url:String, var smNum: String, var simpleExoPlayer: SimpleExoPlayer, var check:Int, var nicoDmc: NicoDmc?, var time:Long = System.currentTimeMillis(), var just:Boolean = false )
     //AndroidではCheck機能は死に機能。まぁ３つしかキャッシュできないし、くるくる回してりゃリロードされる。
 
     var cachedMovies:MutableList<CachedMovie> = mutableListOf()
-    fun access(url:String,smNum: String) : SimpleExoPlayer {
+    fun access(url:String,smNum: String, nicoDmc: NicoDmc?) : SimpleExoPlayer {
         // プレイ指示して、5秒間再生されてない状態が続くとHeartBeat切れとみなしcheck=2になっている(Selectorで)。なのでキャッシュを削除
         // もしくは、もう120秒たったら強制的に読み込みしなおしにしてしまう、か。
         val num = cachedMovies.size
@@ -360,9 +415,9 @@ object CachedThumbMovies {
         simpleExoPlayer.prepare(mediaSource)
 
         //simpleExoPlayer.playWhenReady = true
-        simpleExoPlayer.volume = 0.2f
+        simpleExoPlayer.volume = 0.2f * USERDATA.SoundVolumeMovie
 
-        val cachedMovie = CachedMovie(url,smNum,simpleExoPlayer,0)
+        val cachedMovie = CachedMovie(url,smNum,simpleExoPlayer,0, nicoDmc)
         cachedMovies.add(cachedMovie)
 
         while (cachedMovies.count() > 3){

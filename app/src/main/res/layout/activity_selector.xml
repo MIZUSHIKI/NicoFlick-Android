@@ -48,6 +48,32 @@
             coverflow:layout_constraintEnd_toEndOf="parent" coverflow:layout_constraintStart_toStartOf="parent"
             coverflow:layout_constraintBottom_toBottomOf="parent"
             coverflow:layout_constraintVertical_bias="0.22"/>
+    <View
+            android:id="@+id/coverflow_Huta"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:background="@android:color/white"
+            android:visibility="invisible"
+    />
+    <com.google.android.exoplayer2.ui.PlayerView
+            android:id="@+id/playerView_onCoverFlow"
+            android:layout_width="0dp"
+            android:layout_height="0dp"             app:use_controller="false"
+            coverflow:resize_mode="fit"
+            app:layout_constraintTop_toTopOf="@id/coverflow"
+            app:layout_constraintStart_toStartOf="@id/coverflow" app:layout_constraintEnd_toEndOf="@id/coverflow"
+            app:layout_constraintBottom_toBottomOf="@id/coverflow"
+            android:layout_marginTop="100dp"
+            android:layout_marginBottom="70dp"
+            android:background="@android:color/white"
+            android:clickable="false"
+            android:visibility="invisible"
+    >
+    </com.google.android.exoplayer2.ui.PlayerView>
     <Button
             android:layout_width="40dp"
             android:layout_height="40dp"
@@ -64,22 +90,30 @@
             coverflow:layout_constraintTop_toTopOf="@+id/coverflow"/>
     <TextView
             android:layout_width="0dp"
-            android:layout_height="46dp"
-            android:id="@+id/text_Title_c" coverflow:layout_constraintEnd_toEndOf="parent"
+            android:layout_height="42dp"
+            android:id="@+id/text_Title_c"
+            android:fontFamily="@font/nicokaku_v1"
+            coverflow:layout_constraintEnd_toEndOf="parent"
             coverflow:layout_constraintStart_toStartOf="parent" coverflow:layout_constraintTop_toTopOf="parent"
             android:textAppearance="@style/TextAppearance.AppCompat.Display1"
+            android:textColor="#000"
             android:textAlignment="center" android:ellipsize="end" android:maxLines="1"
-            android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12dp" android:gravity="center_vertical"
-            android:paddingLeft="8dp" android:paddingRight="8dp" android:autoSizeMaxTextSize="34dp"
+            android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12dp"
+            android:gravity="center_vertical"
+            android:paddingLeft="8dp" android:paddingRight="8dp" android:autoSizeMaxTextSize="24dp"
             coverflow:layout_constraintBottom_toBottomOf="parent"
             coverflow:layout_constraintVertical_bias="0.05"/>
     <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:id="@+id/text_Artist" coverflow:layout_constraintStart_toStartOf="parent"
+            android:id="@+id/text_Artist"
+            android:fontFamily="@font/nicokaku_v1"
+            coverflow:layout_constraintStart_toStartOf="parent"
             coverflow:layout_constraintEnd_toEndOf="parent"
             coverflow:layout_constraintTop_toBottomOf="@+id/text_Title_c"
-            android:textAppearance="@style/TextAppearance.AppCompat.Body2" android:textAlignment="center"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body2"
+            android:textSize="16sp"
+            android:textAlignment="center"
             android:ellipsize="end" android:autoSizeTextType="uniform" android:maxLines="1" android:paddingLeft="8dp"
             android:paddingRight="8dp" android:gravity="center_vertical"/>
     <TextView
@@ -88,7 +122,9 @@
             android:id="@+id/text_Length" coverflow:layout_constraintEnd_toEndOf="parent"
             coverflow:layout_constraintStart_toStartOf="parent"
             android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:paddingTop="5dp"
             coverflow:layout_constraintTop_toBottomOf="@+id/text_Artist" android:textAlignment="center"
+            android:fontFamily="@font/nicokaku_v1"
     />
     <TextView
             android:layout_width="0dp"
@@ -101,7 +137,9 @@
     <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:id="@+id/text_Speed" coverflow:layout_constraintEnd_toEndOf="parent"
+            android:id="@+id/text_Speed"
+            android:textSize="10sp"
+            coverflow:layout_constraintEnd_toEndOf="parent"
             coverflow:layout_constraintStart_toStartOf="parent"
             coverflow:layout_constraintTop_toTopOf="@+id/text_Length"
             coverflow:layout_constraintBottom_toBottomOf="@+id/text_Length" android:textAlignment="viewEnd"
@@ -138,12 +176,14 @@
             android:scaleY="0.5"/>
     <Button
             android:text="@string/_go_"
-            android:layout_width="wrap_content"
+            android:layout_width="175dp"
             android:layout_height="wrap_content"
             android:id="@+id/button_Go"
             coverflow:layout_constraintEnd_toEndOf="parent" coverflow:layout_constraintStart_toStartOf="parent"
-            android:textSize="30sp" style="@style/Widget.AppCompat.Button.Colored"
-            android:backgroundTint="@android:color/holo_blue_dark" android:paddingHorizontal="50dp"
+            android:textSize="22sp"
+            style="@style/custom_button"
+            android:background="@drawable/custom_button"
+            android:paddingHorizontal="50dp"
             coverflow:layout_constraintBottom_toBottomOf="parent" android:layout_marginBottom="32dp"
             android:onClick="Button_Go"/>
     <Button
@@ -153,8 +193,8 @@
             android:id="@+id/button_back"
             app:layout_constraintBottom_toBottomOf="parent" android:layout_marginBottom="32dp"
             app:layout_constraintStart_toStartOf="parent"
-            style="@style/Widget.AppCompat.Button.Borderless.Colored"
-            android:textColor="@android:color/holo_blue_dark" android:onClick="Button_Back"/>
+            style="@style/back_button"
+            android:onClick="Button_Back"/>
 
     <FrameLayout
             android:layout_width="match_parent"
@@ -188,21 +228,25 @@
                       android:id="@+id/levelpickerContainer">
             <TextView
                     android:layout_width="match_parent"
-                    android:layout_height="15dp"
+                    android:layout_height="16dp"
                     android:textColor="#999999"
-                    android:textSize="8dp"
+                    android:fontFamily="@font/nicokaku_v1"
+                    android:textSize="9dp"
                     android:layout_marginLeft="10dp"
                     android:gravity="bottom"
                     android:id="@+id/score_m1"/>
             <FrameLayout android:layout_width="match_parent" android:layout_height="50dp">
                 <TextView
-                        android:layout_width="80dp" android:layout_height="match_parent"
+                        android:layout_width="100dp" android:layout_height="match_parent"
                         android:gravity="center"
-                        android:textSize="24sp"
+                        android:textSize="32sp"
+                        android:textStyle="bold"
+                        android:paddingLeft="10dp"
                         android:id="@+id/rank_m1"/>
                 <TextView
                         android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
+                        android:fontFamily="@font/nicokaku_v1"
                         android:textSize="14sp"
                         android:gravity="center"
                         android:id="@+id/star_m1"/>
@@ -225,21 +269,25 @@
 
             <TextView
                     android:layout_width="match_parent"
-                    android:layout_height="15dp"
+                    android:layout_height="16dp"
                     android:textColor="#999999"
-                    android:textSize="8dp"
+                    android:fontFamily="@font/nicokaku_v1"
+                    android:textSize="9dp"
                     android:layout_marginLeft="10dp"
                     android:gravity="bottom"
                     android:id="@+id/score"/>
             <FrameLayout android:layout_width="match_parent" android:layout_height="50dp">
                 <TextView
-                        android:layout_width="80dp" android:layout_height="match_parent"
+                        android:layout_width="100dp" android:layout_height="match_parent"
                         android:gravity="center"
-                        android:textSize="24sp"
+                        android:textSize="32sp"
+                        android:textStyle="bold"
+                        android:paddingLeft="10dp"
                         android:id="@+id/rank"/>
                 <TextView
                         android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
+                        android:fontFamily="@font/nicokaku_v1"
                         android:textSize="14sp"
                         android:gravity="center"
                         android:id="@+id/star"/>
@@ -262,21 +310,25 @@
 
             <TextView
                     android:layout_width="match_parent"
-                    android:layout_height="15dp"
+                    android:layout_height="16dp"
                     android:textColor="#999999"
-                    android:textSize="8dp"
+                    android:fontFamily="@font/nicokaku_v1"
+                    android:textSize="9dp"
                     android:layout_marginLeft="10dp"
                     android:gravity="bottom"
                     android:id="@+id/score_p1"/>
             <FrameLayout android:layout_width="match_parent" android:layout_height="50dp">
                 <TextView
-                        android:layout_width="80dp" android:layout_height="match_parent"
+                        android:layout_width="100dp" android:layout_height="match_parent"
                         android:gravity="center"
-                        android:textSize="24sp"
+                        android:textSize="32sp"
+                        android:textStyle="bold"
+                        android:paddingLeft="10dp"
                         android:id="@+id/rank_p1"/>
                 <TextView
                         android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
+                        android:fontFamily="@font/nicokaku_v1"
                         android:textSize="14sp"
                         android:gravity="center"
                         android:id="@+id/star_p1"/>
@@ -316,6 +368,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/button_RankingComment"
+            android:fontFamily="@font/nicokaku_v1"
             android:onClick="Button_RankingComment"
             style="@android:style/Widget.Holo.Button.Borderless.Small"
             android:textColor="@android:color/holo_blue_dark" android:textSize="8sp" android:lines="2"
@@ -332,7 +385,7 @@
             android:textSize="8sp"
             android:textColor="@android:color/holo_blue_dark" android:gravity="center_vertical"
             android:textStyle="bold" coverflow:layout_constraintStart_toStartOf="@+id/button_RankingComment"
-            android:layout_marginStart="2dp"/>
+            android:layout_marginStart="0dp"/>
     <TextView
             android:text="2021.01.29"
             android:layout_width="0dp"
@@ -447,6 +500,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/button_gotoWiki"
+            android:fontFamily="@font/nicokaku_v1"
             android:onClick="Button_StartPage"
             style="@android:style/Widget.Holo.Button.Borderless.Small"
             android:textColor="@android:color/holo_blue_dark" android:textSize="8sp" android:lines="2"
@@ -462,7 +516,7 @@
             coverflow:layout_constraintTop_toTopOf="@+id/button_gotoWiki"
             coverflow:layout_constraintBottom_toBottomOf="@+id/button_gotoWiki"
             android:textSize="8sp"
-            android:layout_marginRight="10dp"
+            android:layout_marginRight="5dp"
             android:textColor="@android:color/holo_blue_dark" android:gravity="center_vertical"
             android:textStyle="bold" coverflow:layout_constraintEnd_toEndOf="@+id/button_gotoWiki"/>
     <ProgressBar

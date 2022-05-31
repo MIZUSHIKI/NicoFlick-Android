@@ -10,8 +10,11 @@ import android.os.VibrationEffect.DEFAULT_AMPLITUDE
 import android.os.Vibrator
 import android.text.Html
 import android.view.KeyEvent.ACTION_UP
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.AdapterView.OnItemClickListener
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -26,9 +29,11 @@ import com.google.android.exoplayer2.ui.PlayerView
 import it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow
 import it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow.OnScrollPositionListener
 import kotlinx.android.synthetic.main.activity_selector.*
+import kotlinx.android.synthetic.main.activity_selector.view.*
 import kotlinx.android.synthetic.main.activity_settings.progress_circular
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.text.SimpleDateFormat
@@ -67,11 +72,19 @@ class Activity_Selector : AppCompatActivity() {
 
     private var cacheExoPlayer: SimpleExoPlayer? = null
     private lateinit var playerView: PlayerView
+    var nowNicoDmc:NicoDmc? = null
 
     var segueing = false
     var leaved = false
     var flg_notHome = false
     var flg_thumbMovieStopping = false //曲選択後遅延して再生しているためGame遷移後に再生始まったりするのを防ぐフラグ
+    var flg_thumbMovieTopMost = false
+    var volumeForceInResult : Float = 1.0f
+    val ReducedVolumeForceInResult : Float = 0.5f
+
+    enum class ForceInResultType {
+        none, play, loadOnly
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,7 +97,8 @@ class Activity_Selector : AppCompatActivity() {
         //カバーフロー
         val mHandler = Handler()
         coverflow = findViewById<View>(R.id.coverflow) as FeatureCoverFlow
-        val coverFlowAdapter = CoverFlowAdapter(this, currentMusics)
+        var curMusics = if(currentMusics.size == 1){ arrayListOf(currentMusics.first(), currentMusics.last()) }else{ currentMusics }
+        val coverFlowAdapter = CoverFlowAdapter(this, curMusics)
         coverflow.adapter = coverFlowAdapter
         coverflow.setReflectionOpacity(0xFF * 40/100)
         coverflow.setOnScrollPositionListener(object : OnScrollPositionListener {
@@ -94,15 +108,26 @@ class Activity_Selector : AppCompatActivity() {
                     val timerCallback1: TimerTask.() -> Unit = {
                         mHandler.post {
                             //println("TODO")
-                            if (coverflow.isVisible && indexCoverFlow != coverflow.scrollPosition) {
-                                indexCoverFlow = coverflow.scrollPosition
-                                println("index=" + coverflow.scrollPosition)
+                            val coverflow_scrollPosition = if (currentMusics.size == 1) {
+                                0
+                            } else {
+                                coverflow.scrollPosition
+                            }
+                            if (coverflow.isVisible && indexCoverFlow != coverflow_scrollPosition) {
+                                SESystemAudio.shuffleSePlay()
+                                indexCoverFlow = coverflow_scrollPosition
+                                //println("index=" + coverflow_scrollPosition)
                                 setCurrentLevels(indexCoverFlow)
                             }
                         }
                     }
                     scrollingTimer = Timer()
                     scrollingTimer!!.schedule(0, 100, timerCallback1)
+                }
+                if (flg_thumbMovieTopMost) {
+                    flg_thumbMovieTopMost = false
+                    //thumbMovieを最前面表示していたら奥に戻す
+                    setThumbMovieMaeUsiro(usiro = true)
                 }
             }
 
@@ -112,8 +137,14 @@ class Activity_Selector : AppCompatActivity() {
                     indexCoverFlow = position
                     scrollingTimer?.cancel()
                     scrollingTimer = null
+                    if( currentMusics.size == 1 ){
+                        indexCoverFlow = 0
+                    }
 
                     if (currentMusics.indices.contains(indexCoverFlow)) {
+                        if( currentMusics.size == 1 && maeMusic == currentMusics[indexCoverFlow] ){
+                            return
+                        }
                         maeMusic = currentMusics[indexCoverFlow]
                         println("maeMusic=$maeMusic")
                     }
@@ -122,6 +153,21 @@ class Activity_Selector : AppCompatActivity() {
             }
 
         })
+        coverflow.setOnItemClickListener{ parent: AdapterView<*>?, view: View?, position: Int, id: Long -> Unit
+            println("CoverFlow Tap ${position} ${id}")
+
+            if( !USERDATA.thumbMoviePlay ){ return@setOnItemClickListener }
+            if( flg_thumbMovieStopping ){ return@setOnItemClickListener }
+            if( flg_thumbMovieTopMost ){ return@setOnItemClickListener }
+            flg_thumbMovieTopMost = true //thumbMovieを最前面再生しているかどうか
+            volumeForceInResult = 1.0f
+
+            setThumbMovieMaeUsiro(usiro = false)
+
+            nowNicoDmc?.let {
+                it.Start_HeartBeat()
+            }
+        }
         //レベルピッカー(スクロールビューVer)
         scrollerOneHeight = levelScrollerView.layoutParams.height / 2
 
@@ -198,6 +244,7 @@ class Activity_Selector : AppCompatActivity() {
         text_Tags.setOnClickListener {
             if( currentMusics.size > 0 ){
                 if(segueing){ return@setOnClickListener }
+                SESystemAudio.openSePlay()
                 segueing = true
                 flg_notHome = true
                 maeTags = USERDATA.SelectedMusicCondition.tags
@@ -222,7 +269,7 @@ class Activity_Selector : AppCompatActivity() {
             gotoSelectorMenuTableForSort()
         }
         text_Num.setOnClickListener {
-
+            SESystemAudio.openSePlay()
             val a = currentMusics.indices.map { (it + 1).toString() }.toTypedArray()
             AlertDialog.Builder(this)
                 .setTitle("曲の選択")
@@ -250,11 +297,27 @@ class Activity_Selector : AppCompatActivity() {
             )
         }
     }
+    private fun setThumbMovieMaeUsiro(usiro:Boolean){
+        if( !usiro ) {
+            playerView_onCoverFlow.player = cacheExoPlayer
+            playerView.isVisible = false
+            coverflow_Huta.isVisible = true
+            playerView_onCoverFlow.isVisible = true
+            cacheExoPlayer?.volume = 0.18f * USERDATA.SoundVolumeMovie * volumeForceInResult
+        }else {
+            playerView.player = cacheExoPlayer
+            playerView.isVisible = true
+            coverflow_Huta.isVisible = false
+            playerView_onCoverFlow.isVisible = false
+            cacheExoPlayer?.volume = 0.10f * USERDATA.SoundVolumeMovie * volumeForceInResult
+        }
+    }
     fun gotoSelectorMenuTableForSort() {
         if( currentMusics.size <= 0 ){
             return
         }
         if(segueing){ return }
+        SESystemAudio.openSePlay()
         segueing = true
         flg_notHome = true
         maeTags = USERDATA.SelectedMusicCondition.tags
@@ -280,7 +343,8 @@ class Activity_Selector : AppCompatActivity() {
                 var scrollPos = 0
                 if( currentMusics.size > 0 ){
                     coverflow.clearCache()
-                    val coverFlowAdapter = CoverFlowAdapter(this, it)
+                    var curMusics = if(it.size == 1){ arrayListOf(it.first(), it.last()) }else{ it }
+                    val coverFlowAdapter = CoverFlowAdapter(this, curMusics)
                     coverflow.adapter = coverFlowAdapter
                     coverflow.setShouldRepeat(false)
                     //前回選択していた曲に飛べれば飛ぶ
@@ -327,8 +391,8 @@ class Activity_Selector : AppCompatActivity() {
             LevelPickerContainerRedraw()
             return
         }
-        text_Title_c.setText(currentMusics[index].title)
-        text_Artist.setText(currentMusics[index].artist)
+        text_Title_c.setText(HtmlNicokakuMixFixText( currentMusics[index].title ))
+        text_Artist.setText(HtmlNicokakuMixFixText( currentMusics[index].artist ))
         text_Length.setText(currentMusics[index].movieLength)
         text_Tags.setText(currentMusics[index].tags)
         var htmlText = currentMusics[index].tags
@@ -419,6 +483,7 @@ class Activity_Selector : AppCompatActivity() {
         if(segueing) {
             return
         }
+        SESystemAudio.goSePlay()
         segueing = true
         flg_notHome = true
         println(currentLevels[indexPicker].noteData)
@@ -453,6 +518,7 @@ class Activity_Selector : AppCompatActivity() {
         if(segueing) {
             return
         }
+        SESystemAudio.openSelectorMenuSePlay()
         segueing = true
         flg_notHome = true
         val intent: Intent = Intent(applicationContext, Activity_SelectorMenu::class.java)
@@ -469,12 +535,16 @@ class Activity_Selector : AppCompatActivity() {
         }
         maeTags = USERDATA.SelectedMusicCondition.tags
         maeSort = USERDATA.SelectedMusicCondition.sortItem
+        if(currentMusics.size > indexCoverFlow){
+            maeMusicTags = currentMusics[indexCoverFlow].tags
+        }
         startActivityForResult(intent, 1002)
     }
     fun Button_Back(view: View) {
         if(segueing) {
             return
         }
+        SESystemAudio.canselSePlay()
         ThumbMovieStop()
         finish()
     }
@@ -490,6 +560,7 @@ class Activity_Selector : AppCompatActivity() {
         if(segueing) {
             return
         }
+        SESystemAudio.openSePlay()
         segueing = true
         flg_notHome = true
         val intent: Intent = Intent(applicationContext, Activity_RankingComment::class.java)
@@ -501,7 +572,9 @@ class Activity_Selector : AppCompatActivity() {
     fun Button_StartPage(view: View) {
         println("gotoStartPage")
         ThumbMovieStop()
+        SESystemAudio.openSePlay()
         val intent: Intent = Intent(applicationContext, Activity_WikiPageWeb::class.java)
+        GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
         startActivityForResult(intent, 1005)
     }
     fun Button_favorite(view: View) {
@@ -511,11 +584,11 @@ class Activity_Selector : AppCompatActivity() {
         }
         val selectMovieURL:String = currentMusics[indexCoverFlow].movieURL
         if( musicDatas.levels.size > 0 && musicDatas.levels[selectMovieURL] == null ){
-            println()
             return
         }
         val currentLevel = currentLevels[indexPicker]
         if( USERDATA.MyFavorite2.contains(currentLevel.sqlID) ) {
+            SESystemAudio.openSubSePlay()
             val myFavorite = USERDATA.MyFavorite2
             myFavorite.remove(currentLevel.sqlID)
             USERDATA.MyFavorite2 = myFavorite //ここでDataStoreに保存される
@@ -536,6 +609,7 @@ class Activity_Selector : AppCompatActivity() {
             }else {
                 //プレイしたことのあるレベルだけお気に入りできるようにする
                 if( USERDATA.Score.scores.keys.contains(currentLevel.sqlID) ){
+                    SESystemAudio.openSePlay()
                     val myFavo = USERDATA.MyFavorite2
                     myFavo.add(currentLevel.sqlID)
                     USERDATA.MyFavorite2 = myFavo //ここでDataStoreに保存される
@@ -557,6 +631,7 @@ class Activity_Selector : AppCompatActivity() {
     }
     fun Button_LevelSort(view: View) {
         println("levelSort")
+        SESystemAudio.openSubSePlay()
 
         val strList = arrayOf("なし", "お気に入りを上に集める")
         AlertDialog.Builder(this) // FragmentではActivityを取得して生成
@@ -579,7 +654,7 @@ class Activity_Selector : AppCompatActivity() {
             .show()
     }
     fun Button_MusicSort(view: View) {
-
+        SESystemAudio.openSubSePlay()
         val strList = arrayOf("なし", "お気に入りを含む曲を先頭に集める")
         AlertDialog.Builder(this) // FragmentではActivityを取得して生成
             .setTitle("お気に入りソート")
@@ -619,26 +694,40 @@ class Activity_Selector : AppCompatActivity() {
             ThumbMovieStop()
         }
     }
-    fun ThumbMoviePlay(){
-        if( !USERDATA.thumbMoviePlay ){
+    fun ThumbMoviePlay(forceType : ForceInResultType = ForceInResultType.none){
+        if( forceType == ForceInResultType.none && !USERDATA.thumbMoviePlay ){
             return
+        }
+        var typeLoadOnly = false
+        if( !(forceType == ForceInResultType.none) ){
+            volumeForceInResult = ReducedVolumeForceInResult
+            if( forceType == ForceInResultType.loadOnly ){
+                typeLoadOnly = true
+            }
         }
         //ThumbMovie呼び込み
         // 一度すべて止める
-        ThumbMovieStop()
+        if( forceType == ForceInResultType.none ) {
+            ThumbMovieStop()
+        }
         // 裏側で再生
-        ThumbMovieStart(indexCoverFlow)
+        ThumbMovieStart(indexCoverFlow, typeLoadOnly)
     }
     fun ThumbMovieStop(){
+        //前に出していたらひっこめる
+        setThumbMovieMaeUsiro(usiro = true)
         flg_thumbMovieStopping = true
         //一度すべて止める
         for( avPlayerVC in CachedThumbMovies.cachedMovies ){
             avPlayerVC.simpleExoPlayer.playWhenReady = false
             playerView_Alpha.alpha = 1.0f
+            avPlayerVC.nicoDmc?.End_HeartBeat()
         }
+        nowNicoDmc = null
     }
     fun ThumbMovieStart(index: Int, loadOnly: Boolean = false){
         flg_thumbMovieStopping = false
+        flg_thumbMovieTopMost = false
         if( currentMusics.indices.contains(index) == false ){
             return
         }
@@ -648,34 +737,46 @@ class Activity_Selector : AppCompatActivity() {
         }
         //val index = indexCoverFlow
         Handler().postDelayed(Runnable { //0.3秒後
-            if (!USERDATA.thumbMoviePlay) {
+            if (!USERDATA.thumbMoviePlay && volumeForceInResult == 1.0f ) {
                 return@Runnable
             }
             if (index == indexCoverFlow || loadOnly == true) {
                 //Movie呼び込み
                 var nicodougaURL = ""
                 println("thumbMovie ${smNum}")
-                MovieAccess(ecoThumb = true).StreamingUrlNicoAccess(smNum) {
+                MovieAccess().StreamingUrlNicoAccessForThumbMovie(smNum) { url,nicoDmc ->
+                    if(url == "error"){
+                        return@StreamingUrlNicoAccessForThumbMovie
+                    }
                     // 動画
-                    nicodougaURL = it!!
+                    nicodougaURL = url
                     println("smNum=$smNum, loadOnly=$loadOnly, nicodougaURL=$nicodougaURL")
                     if (flg_thumbMovieStopping == true) {
                         println("thumbMovieStopping")
-                        return@StreamingUrlNicoAccess
+                        return@StreamingUrlNicoAccessForThumbMovie
                     }
                     if (loadOnly == true && nicodougaURL == "cached") {
-                        return@StreamingUrlNicoAccess
+                        return@StreamingUrlNicoAccessForThumbMovie
                     }
                     if (index != indexCoverFlow && loadOnly == false) {
-                        return@StreamingUrlNicoAccess
+                        return@StreamingUrlNicoAccessForThumbMovie
                     }
                     //println(applicationContext.packageName)
-                    cacheExoPlayer = CachedThumbMovies.access(nicodougaURL, smNum)
+                    val loadCacheExoPlayer = CachedThumbMovies.access(nicodougaURL, smNum, nicoDmc)
                     if (loadOnly == false) {
+                        ThumbMovieStop()
+                        flg_thumbMovieStopping = false
+                        flg_thumbMovieTopMost = false
+
+                        cacheExoPlayer = loadCacheExoPlayer
                         playerView_Alpha.alpha = 1.0f
                         playerView.player = cacheExoPlayer
+                        nowNicoDmc?.let {
+                            it.End_HeartBeat()
+                        }
+                        nowNicoDmc = CachedThumbMovies.cachedMovies.lastOrNull()?.nicoDmc
                     }
-                    cacheExoPlayer!!.setSeekParameters(SeekParameters.CLOSEST_SYNC)
+                    loadCacheExoPlayer.setSeekParameters(SeekParameters.CLOSEST_SYNC)
                     var t30 = musicDatas.getNotesFirstTime(currentMusics[index].movieURL)
                     if (t30 < 0.0) {
                         t30 = 30.0
@@ -694,7 +795,14 @@ class Activity_Selector : AppCompatActivity() {
                                     ExoPlayer.STATE_ENDED -> {
                                         println("終了でループ")
                                         GlobalScope.launch(Dispatchers.Main) {
-                                            playerView.player?.seekTo((t30 * 1000).toLong())
+                                            if( !flg_thumbMovieTopMost ) {
+                                                cacheExoPlayer?.seekTo((t30 * 1000).toLong())
+                                            }else {
+                                                cacheExoPlayer?.seekTo( 0 )
+                                            }
+                                            cacheExoPlayer?.let{
+                                                it.playWhenReady = true
+                                            }
                                         }
                                     }
                                 }
@@ -704,12 +812,17 @@ class Activity_Selector : AppCompatActivity() {
                         for (i in 1..10) {
                             cacheExoPlayer!!
                                 .createMessage({ messageType, payload ->
-                                    println("フェードイン$i")
-                                    GlobalScope.launch(Dispatchers.Main) {
-                                        val player = playerView.player as SimpleExoPlayer
-                                        player.volume = 0.15f * i / 10
+                                    if( flg_thumbMovieTopMost ){ return@createMessage }
+                                    if( volumeForceInResult > ReducedVolumeForceInResult ){
+                                        volumeForceInResult = 1.0f
                                     }
-                                    playerView_Alpha.alpha = 1.0f - 0.25f * i / 10
+                                    if( volumeForceInResult >= ReducedVolumeForceInResult ){
+                                        println("フェードイン$i")
+                                        GlobalScope.launch(Dispatchers.Main) {
+                                            cacheExoPlayer?.volume = 0.10f * i / 10 * USERDATA.SoundVolumeMovie * volumeForceInResult
+                                        }
+                                        playerView_Alpha.alpha = 1.0f - 0.25f * i / 10
+                                    }
                                     if (i == 1 && firstRun == true) {
                                         firstRun = false
                                         //前後の曲を読み込んでおく
@@ -725,12 +838,17 @@ class Activity_Selector : AppCompatActivity() {
                                 .send()
                             cacheExoPlayer!!
                                 .createMessage({ messageType, payload ->
-                                    println("フェードアウト$i")
-                                    GlobalScope.launch(Dispatchers.Main) {
-                                        val player = playerView.player as SimpleExoPlayer
-                                        player.volume = 0.15f * (10 - i) / 10
+                                    if( flg_thumbMovieTopMost ){ return@createMessage }
+                                    if( volumeForceInResult > ReducedVolumeForceInResult ){
+                                        volumeForceInResult = 1.0f
                                     }
-                                    playerView_Alpha.alpha = 1.0f - 0.25f * (10 - i) / 10
+                                    if( volumeForceInResult >= ReducedVolumeForceInResult ){
+                                        println("フェードアウト$i")
+                                        GlobalScope.launch(Dispatchers.Main) {
+                                            cacheExoPlayer?.volume = 0.10f * (10 - i) / 10 * USERDATA.SoundVolumeMovie * volumeForceInResult
+                                        }
+                                        playerView_Alpha.alpha = 1.0f - 0.25f * (10 - i) / 10
+                                    }
                                 })
                                 .setPosition(((t30 + 29.0 + 0.1 * i) * 1000).toLong())
                                 .setDeleteAfterDelivery(false)
@@ -738,9 +856,11 @@ class Activity_Selector : AppCompatActivity() {
                         }
                         cacheExoPlayer!!
                             .createMessage({ messageType, payload ->
+                                if( flg_thumbMovieTopMost ){ return@createMessage }
                                 println("30秒でループ")
                                 GlobalScope.launch(Dispatchers.Main) {
-                                    playerView.player?.seekTo((t30 * 1000).toLong())
+                                    cacheExoPlayer?.seekTo((t30 * 1000).toLong())
+                                    //playerView.player?.seekTo((t30 * 1000).toLong())
                                 }
                             })
                             .setPosition(((t30 + 30.0 + 0.1) * 1000).toLong())
@@ -766,7 +886,7 @@ class Activity_Selector : AppCompatActivity() {
 
                     } else {
                         //読み込みのみ
-                        cacheExoPlayer!!
+                        loadCacheExoPlayer!!
                             .createMessage({ messageType, payload ->
                                 if (currentMusics[indexCoverFlow].movieURL.pregMatche_firstString("watch/(.+)$") != smNum) {
                                     println("再生された形跡見つけたらムービーを止める")
@@ -775,7 +895,7 @@ class Activity_Selector : AppCompatActivity() {
                                         it.just = true
                                     }
                                     GlobalScope.launch(Dispatchers.Main) {
-                                        cacheExoPlayer!!.playWhenReady = false
+                                        loadCacheExoPlayer!!.playWhenReady = false
                                         //cacheExoPlayer!!.seekTo( (t30*1000).toLong() )
                                     }
                                 }
@@ -786,9 +906,9 @@ class Activity_Selector : AppCompatActivity() {
 
                         val t30_ = if (t30 - 0.5 >= 0) (t30 - 0.5) else 0.0
                         GlobalScope.launch(Dispatchers.Main) {
-                            cacheExoPlayer!!.seekTo((t30_ * 1000).toLong())
-                            cacheExoPlayer!!.volume = 0.001f
-                            cacheExoPlayer!!.playWhenReady = true
+                            loadCacheExoPlayer!!.seekTo((t30_ * 1000).toLong())
+                            loadCacheExoPlayer!!.volume = 0.001f
+                            loadCacheExoPlayer!!.playWhenReady = true
                         }
                     }
 
@@ -803,7 +923,7 @@ class Activity_Selector : AppCompatActivity() {
         segueing = false
         // startActivityForResult()の際に指定した識別コードとの比較
         when( requestCode ){
-            1001 -> {
+            1001 -> { //gameViewから帰還
                 userScore = USERDATA.Score
                 setCurrentLevels(indexCoverFlow)
                 if (!ShowHowToExtendView()) {
@@ -815,10 +935,58 @@ class Activity_Selector : AppCompatActivity() {
                         progress_circular.isVisible = false
                     }
                 }
-                ThumbMoviePlay()
+                if( USERDATA.thumbMoviePlay ){
+                    //ForcePlayして音量がちょい下がっていたら、徐々上げの処理を指示する必要がある
+                    volumeForceInResult += 0.01f
+                    if( volumeForceInResult >= 1.0f ){
+                        volumeForceInResult = 1.0f
+                    }
+                    if( volumeForceInResult != 1.0f ){
+                        //ResultViewでThumbMovieをForcePlayして戻ってきたとき（ 0.51f になっている ）[徐々上げ指示]
+                        GlobalScope.launch(Dispatchers.Main){
+                            while (true) {
+                                if (volumeForceInResult >= 1.0f) {
+                                    volumeForceInResult = 1.0f
+                                    break
+                                }
+                                volumeForceInResult += (1.0f - ReducedVolumeForceInResult) / 15 //1.5秒で戻す
+                                if(volumeForceInResult > 1.0f){ volumeForceInResult = 1.0f }
+                                cacheExoPlayer?.volume = 0.10f * USERDATA.SoundVolumeMovie * volumeForceInResult
+                                delay(100)
+                            }
+                        }
+                    }else {
+                        //GameMenu->Back等で戻ってきたとき（ 1.0f になっている ）
+                        ThumbMoviePlay()
+                    }
+                }else {
+                    //ResultでForcePlayしていて音量がちょい下がっていたら(そのままフェードアウトしたいので)、徐々下げの処理を指示する必要がある
+                    volumeForceInResult -= 0.01f
+                    if( volumeForceInResult >= ReducedVolumeForceInResult ){
+                        //GameMenu->Back等で戻ってきたとき（ 0.99f になっている ）-> 何もしない
+                        volumeForceInResult = 1.0f
+                    }else {
+                        //ResultViewでThumbMovieをForcePlayして戻ってきたとき（ 0.49f になっている ）[徐々下げ指示]
+                        playerView_Alpha.alpha = 1.0f //音を小さくしていくだけなので動画は隠しておく
+                        GlobalScope.launch(Dispatchers.Main){
+                            while (true) {
+                                if (volumeForceInResult <= 0.0f) {
+                                    ThumbMovieStop()
+                                    volumeForceInResult = 1.0f
+                                    break
+                                }
+                                volumeForceInResult -= ReducedVolumeForceInResult / 10 //1.0秒で戻す
+                                if(volumeForceInResult < 0.0f){ volumeForceInResult = 0.0f }
+                                cacheExoPlayer?.volume = 0.10f * USERDATA.SoundVolumeMovie * volumeForceInResult
+                                delay(100)
+                            }
+                        }
+                    }
+                }
             }
             1002 -> {
-                if (maeTags != USERDATA.SelectedMusicCondition.tags || maeMusicTags != currentMusics[indexCoverFlow].tags || maeSort != USERDATA.SelectedMusicCondition.sortItem) {
+                val currentMusicTags = if(currentMusics.size > indexCoverFlow) currentMusics[indexCoverFlow].tags else ""
+                if (maeTags != USERDATA.SelectedMusicCondition.tags || maeMusicTags != currentMusicTags || maeSort != USERDATA.SelectedMusicCondition.sortItem) {
                     indexCoverFlow = -1 //CoverFlowリロード
                     SetMusicToCoverFlow()
                 }
@@ -921,7 +1089,7 @@ class Activity_Selector : AppCompatActivity() {
             star_color.isVisible = false
             return
         }
-        currentLevel?.let {
+        currentLevel.let {
             val currentLevel = it
             //スピード反映
             text_Speed.setText("speed: " + currentLevel.speed)
@@ -979,7 +1147,12 @@ class Activity_Selector : AppCompatActivity() {
                 _score.setText("HighScore: " + scoredata[UserScore.SCORE])
                 var rankStr = Score.RankStr[scoredata[UserScore.RANK]]
                 if( rankStr == "False" ){ rankStr = "" }
-                _rank.setText(rankStr)
+                if( rankStr == "PERFECT" ){
+                    var htmlText = "<font color=\"#FF0000\"><small><small>PERFECT</small></small></font>"
+                    _rank.setText(Html.fromHtml(htmlText, Html.FROM_HTML_MODE_COMPACT))
+                }else {
+                    _rank.setText(rankStr)
+                }
             }else {
                 _score.setText("")
                 _rank.setText("")
@@ -1034,9 +1207,14 @@ class Activity_Selector : AppCompatActivity() {
         println("Resume!")
         if( leaved && USERDATA.thumbMoviePlay ){
             //Thumb開始
-            ThumbMoviePlay()
+            //ThumbMoviePlay()
         }
         leaved = false
         flg_notHome = false
     }
+
+    fun PlayerView_Alpha_Huta(){
+        playerView_Alpha.alpha = 1.0f
+    }
+
 }

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="false">
+        <layer-list>
+            <!-- 本体 -->
+            <item android:bottom="0dp" android:right="0dp">
+                <shape android:shape="oval">
+                    <solid android:color="#DDDDDD"/>
+                    <padding android:bottom="0dp" android:right="0dp"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item android:state_pressed="true">
+        <layer-list>
+            <!-- 本体 -->
+            <item android:bottom="0dp" android:right="0dp">
+                <shape android:shape="oval">
+                    <solid android:color="#CCCCCC"/>
+                    <padding android:bottom="0dp" android:right="0dp"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

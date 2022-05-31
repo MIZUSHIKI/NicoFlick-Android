@@ -5,7 +5,7 @@
             <!-- 影 -->
             <item android:top="10dp" android:left="10dp">
                 <shape android:shape="rectangle">
-                    <solid android:color="#299DD1DA"/>
+                    <solid android:color="#185DAFB9"/>
                     <corners android:radius="100dp"/>
                 </shape>
             </item>
@@ -34,7 +34,7 @@
             <!-- 影 -->
             <item android:top="10dp" android:left="10dp">
                 <shape android:shape="rectangle">
-                    <solid android:color="#299DD1DA"/>
+                    <solid android:color="#185DAFB9"/>
                     <corners android:radius="100dp"/>
                 </shape>
             </item>

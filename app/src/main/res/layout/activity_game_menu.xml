@@ -9,37 +9,44 @@
 
     <Button
             android:text="曲選択"
-            android:layout_width="120dp"
+            android:layout_width="140dp"
             android:layout_height="wrap_content"
             android:id="@+id/gobackMusicSelect"
             app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" android:layout_marginBottom="32dp"
-            android:backgroundTint="@android:color/holo_blue_light" style="@style/Widget.AppCompat.Button.Colored"
-            android:textSize="18sp" android:onClick="Button_GobackMusicSelect"/>
+            style="@style/custom_button"
+            android:background="@drawable/custom_button_dark"
+            android:textSize="20sp" android:onClick="Button_GobackMusicSelect"/>
     <Button
             android:text="リトライ"
-            android:layout_width="120dp"
+            android:layout_width="140dp"
             android:layout_height="wrap_content"
             android:id="@+id/retry"
             app:layout_constraintBottom_toTopOf="@+id/gobackMusicSelect" app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent" android:layout_marginBottom="16dp"
-            android:backgroundTint="@android:color/holo_blue_light" style="@style/Widget.AppCompat.Button.Colored"
-            android:textSize="18sp" android:onClick="Button_Retry"/>
+            app:layout_constraintStart_toStartOf="parent" android:layout_marginBottom="25dp"
+            style="@style/custom_button"
+            android:background="@drawable/custom_button"
+            android:textSize="20sp" android:onClick="Button_Retry"/>
     <Button
             android:text="続ける"
-            android:layout_width="120dp"
+            android:layout_width="140dp"
             android:layout_height="wrap_content"
             android:id="@+id/continu"
-            app:layout_constraintBottom_toTopOf="@+id/retry" android:layout_marginBottom="16dp"
+            app:layout_constraintBottom_toTopOf="@+id/retry" android:layout_marginBottom="25dp"
             app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent"
-            android:backgroundTint="@android:color/holo_blue_light" style="@style/Widget.AppCompat.Button.Colored"
-            android:textSize="18sp" android:onClick="Button_Continue"/>
+            style="@style/custom_button"
+            android:background="@drawable/custom_button"
+            android:textSize="20sp" android:onClick="Button_Continue"/>
     <SeekBar
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:id="@+id/seekBar" app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent" app:layout_constraintBottom_toTopOf="@+id/continu"
-            android:layout_marginBottom="64dp" android:layout_marginEnd="32dp" android:layout_marginStart="32dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintVertical_bias="0.3"
+            android:layout_marginEnd="32dp"
+            android:layout_marginStart="32dp"
             android:min="0" android:max="40"
             android:progressBackgroundTint="@android:color/white"
     />
@@ -54,6 +61,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/textView11"
+            android:fontFamily="@font/nicokaku_v1"
             app:layout_constraintBottom_toTopOf="@+id/textView_judgeOffset" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" android:layout_marginBottom="24dp"
             android:textColor="@android:color/white"/>
@@ -93,4 +101,55 @@
             app:layout_constraintBottom_toTopOf="@+id/playerHeighter"
             app:layout_constraintStart_toStartOf="@+id/playerHeighter" android:textSize="8sp"
             android:textColor="@android:color/white" android:layout_marginStart="8dp" android:visibility="invisible"/>
+
+    <Button
+            android:text="ゲージ位置変更"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/button_gauge"
+            android:textSize="9sp"
+            android:textColor="#FFF"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/seekBar"
+            app:layout_constraintBottom_toTopOf="@+id/continu"
+            app:layout_constraintVertical_bias="0.35"
+            android:onClick="Button_gauge" android:background="@android:drawable/title_bar"/>
+    <Switch
+            android:text="ゲーム内 簡易キーボード"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/switch1_gameMenu"
+            android:textSize="8sp"
+            android:textColor="#CCC"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:layout_marginRight="5dp"
+            android:layout_marginBottom="5dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:onClick="Switch_useKeyboard"
+    />
+    <View
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:id="@+id/view_gauge1"
+            android:background="#9BE"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginLeft="96dp"
+            android:layout_marginRight="96dp"
+            app:layout_constraintTop_toTopOf="parent"
+            android:visibility="invisible"
+            />
+    <View
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:id="@+id/view_gauge2"
+            android:background="#9BE"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginLeft="48dp"
+            android:layout_marginRight="48dp"
+            app:layout_constraintTop_toTopOf="parent"
+            android:visibility="invisible"
+    />
 </androidx.constraintlayout.widget.ConstraintLayout>

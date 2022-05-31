@@ -5,7 +5,6 @@
              xmlns:app="http://schemas.android.com/apk/res-auto"
              android:layout_width="match_parent"
              android:layout_height="match_parent"
-             android:background="#CCFF66"
              tools:context=".RankingFragment">
 
     <ProgressBar
@@ -23,10 +22,13 @@
             android:layout_height="46dp"
             android:id="@+id/text_Title"
             android:text="title"
+            android:fontFamily="@font/nicokaku_v1"
             android:textAppearance="@style/TextAppearance.AppCompat.Display1"
+            android:textColor="#000"
             android:textAlignment="center" android:ellipsize="end" android:maxLines="1"
-            android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12dp" android:gravity="center_vertical"
-            android:paddingLeft="8dp" android:paddingRight="8dp" android:autoSizeMaxTextSize="34dp"
+            android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12dp"
+            android:gravity="bottom|center_vertical"
+            android:paddingLeft="8dp" android:paddingRight="8dp" android:autoSizeMaxTextSize="24dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent"/>
 
@@ -50,7 +52,10 @@
             android:text="TextView"
             android:layout_width="0dp"
             android:layout_height="24dp"
-            android:id="@+id/TextView_Star" app:layout_constraintStart_toStartOf="parent"
+            android:id="@+id/TextView_Star"
+            android:fontFamily="@font/nicokaku_v1"
+            android:textColor="#000"
+            app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" app:layout_constraintTop_toBottomOf="@+id/text_Title"
             android:gravity="center_horizontal|center_vertical"/>
     <Button
@@ -60,7 +65,7 @@
             android:id="@+id/Button_Back"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintBottom_toBottomOf="parent"
             android:layout_marginBottom="8dp"
-            style="@android:style/Widget.Holo.Button.Borderless.Small"
+            style="@style/back_button"
             android:textColor="@android:color/holo_blue_dark"/>
     <TextView
             android:text="Ranking"
@@ -72,29 +77,46 @@
             android:background="@color/exo_edit_mode_background_color" android:textSize="8sp" android:paddingTop="3dp"
             android:paddingBottom="3dp" android:paddingLeft="3dp"/>
     <Button
-            android:text="↧"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:text="↓"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
             android:id="@+id/button_Bottom" app:layout_constraintEnd_toStartOf="@+id/listView"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintBottom_toTopOf="@+id/Button_Back"
-            app:layout_constraintTop_toTopOf="parent" app:layout_constraintVertical_bias="0.85"
-            style="@style/Widget.AppCompat.Button.Small" android:textSize="24sp"/>
+            app:layout_constraintTop_toTopOf="parent" app:layout_constraintVertical_bias="0.9"
+            style="@style/Widget.AppCompat.Button.Small"
+            android:background="@drawable/circle_button_ranking"
+            android:textSize="14sp"/>
     <Button
             android:text="👤"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
             android:id="@+id/button_My"
             app:layout_constraintBottom_toTopOf="@+id/button_Bottom"
             app:layout_constraintEnd_toEndOf="@+id/button_Bottom"
             app:layout_constraintStart_toStartOf="@+id/button_Bottom" android:layout_marginBottom="32dp"
-            style="@style/Widget.AppCompat.Button.Small" android:textSize="24sp"/>
+            style="@style/Widget.AppCompat.Button.Small"
+            android:background="@drawable/circle_button_ranking"
+            android:textSize="14sp"/>
     <Button
-            android:text="↥"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:text="↑"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
             android:id="@+id/button_Top"
             app:layout_constraintBottom_toTopOf="@+id/button_My" app:layout_constraintEnd_toEndOf="@+id/button_My"
-            style="@style/Widget.AppCompat.Button.Small" app:layout_constraintStart_toStartOf="@+id/button_My"
-            android:layout_marginBottom="32dp" android:textSize="24sp"/>
-
+            style="@style/Widget.AppCompat.Button.Small"
+            android:background="@drawable/circle_button_ranking"
+             app:layout_constraintStart_toStartOf="@+id/button_My"
+            android:layout_marginBottom="32dp" android:textSize="14sp"/>
+    <Button
+            android:text="楽曲\nスコア"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:id="@+id/button_musicScore"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toStartOf="@+id/listView"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintBottom_toTopOf="@+id/Button_Back"
+            app:layout_constraintTop_toTopOf="parent" app:layout_constraintVertical_bias="0.15"
+            style="@style/Widget.AppCompat.Button.Small"
+            android:background="@drawable/circle_button_ranking"
+            android:textSize="9sp"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

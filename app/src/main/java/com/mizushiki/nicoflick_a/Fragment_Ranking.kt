@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.ListView
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import com.eclipsesource.json.JsonArray
@@ -20,6 +21,9 @@ import kotlinx.android.synthetic.main.fragment_comment.*
 import kotlinx.android.synthetic.main.fragment_ranking.*
 import kotlinx.android.synthetic.main.fragment_ranking.Button_Back
 import kotlinx.android.synthetic.main.fragment_ranking.TextView_Star
+import java.text.SimpleDateFormat
+import java.time.format.DateTimeFormatter
+import java.util.*
 
 class RankingFragment : Fragment() {
 
@@ -27,6 +31,7 @@ class RankingFragment : Fragment() {
     var userNameDatas:UserNameDataLists = UserNameDataLists
     var scoreDatas:ScoreDataLists = ScoreDataLists
     var rankingData:List<scoreData> = listOf()
+    var musicScoreMessage = ""
 
     var loading:Boolean = false
 
@@ -36,7 +41,10 @@ class RankingFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        Button_Back.setOnClickListener{ activity?.finish() }
+        Button_Back.setOnClickListener{
+            SESystemAudio.canselSePlay()
+            activity?.finish()
+        }
 
         text_Title.setText(GLOBAL.SelectMUSIC!!.title)
         TextView_Star.setText(GLOBAL.SelectLEVEL!!.getLevelAsString())
@@ -88,6 +96,48 @@ class RankingFragment : Fragment() {
                 var ind = it -3
                 if(ind < 0){ ind = 0 }
                 listView.setSelection(ind)
+            }
+        }
+        button_musicScore.setOnClickListener{
+            SESystemAudio.openSePlay()
+            if( musicScoreMessage != "" ){
+                AlertDialog.Builder(this.context!!)
+                    .setTitle("この楽曲の最大スコア")
+                    .setMessage(musicScoreMessage)
+                    .setPositiveButton("OK", null)
+                    .show()
+                return@setOnClickListener
+            }
+            progress_circular_r.isVisible = true
+            ServerDataHandler().GetMusicScoreData(GLOBAL.SelectMUSIC!!.sqlID, USERDATA.UserID){
+                progress_circular_r.isVisible = false
+                if( it == null ){
+                    return@GetMusicScoreData
+                }
+                if( it.get(0).isObject ) {
+                    val json = it.get(0).asObject()
+                    println("json @2")
+                    val formatter = SimpleDateFormat("YYYY/M/d")
+                    if(!json.get("updateTime").isNull){
+                        musicScoreMessage += "\n全期間：${json.get("score").asString()} - ${formatter.format( Date(json.get("updateTime").asString().toLong()*1000) )}"
+                    }
+                    if(!json.get("updateTimeYear").isNull){
+                        musicScoreMessage += "\n年間：${json.get("scoreYear").asString()} - ${formatter.format( Date(json.get("updateTimeYear").asString().toLong()*1000) )}"
+                    }
+                    if(!json.get("updateTimeMonth").isNull){
+                        musicScoreMessage += "\n月間：${json.get("scoreMonth").asString()} - ${formatter.format( Date(json.get("updateTimeMonth").asString().toLong()*1000) )}"
+                    }
+                    if(!json.get("updateTimeWeek").isNull){
+                        musicScoreMessage += "\n週間：${json.get("scoreWeek").asString()} - ${formatter.format( Date(json.get("updateTimeWeek").asString().toLong()*1000) )}"
+                    }
+                    println("json ${musicScoreMessage}")
+                }
+                if( musicScoreMessage == "" ){ musicScoreMessage = "\nあなたの記録はありません" }
+                AlertDialog.Builder(this.context!!)
+                    .setTitle("この楽曲の最大スコア")
+                    .setMessage(musicScoreMessage)
+                    .setPositiveButton("OK", null)
+                    .show()
             }
         }
     }

@@ -621,8 +621,8 @@ class ServerDataHandler {
                     val json = jsonArray.get(0).asObject()
                     val serverURL = json.get("server-url").asString()
                     val createTime = json.get("createTime").asString().toInt()
-                    println(serverURL)
-                    println(createTime)
+                    println("namedata ${serverURL}")
+                    println("namedata ${createTime}")
                     if(userNameDatas.usernameJsonCreateTime == 0){
                         userNameDatas.usernameJsonCreateTime = createTime
                     }else if(userNameDatas.usernameJsonCreateTime != createTime){
@@ -786,6 +786,30 @@ class ServerDataHandler {
             try {
                 jsonArray = Json.parse(it).asArray()
             } catch (e: Exception) {
+                println(e)
+                callback(null)
+                return@let
+            }
+            callback(jsonArray)
+        }
+    }
+
+    fun GetMusicScoreData(musicID:Int, userID:String, callback: (JsonArray?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
+        val url = GLOBAL.PHP_URL + "?req=mscore&musicID=${musicID}&userID=${userID}"
+        //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
+        async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
+            if (it == null) {
+                callback(null)
+                return@let
+            }
+            println("json url = ${url}")
+            val jsonArray: JsonArray
+            try {
+                jsonArray = Json.parse("[${it}]").asArray()
+
+                println("json toreta ${it}")
+            } catch (e: Exception) {
+                println("json sippai ${it}")
                 println(e)
                 callback(null)
                 return@let

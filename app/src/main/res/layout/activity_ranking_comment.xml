@@ -5,7 +5,26 @@
         xmlns:app="http://schemas.android.com/apk/res-auto"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="#CCFF66"
         tools:context=".Activity_RankingComment">
+
+    <ImageView
+            android:id="@+id/RankingCommentView_imageAlpha"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:alpha="0.5"
+            android:scaleType="centerCrop"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:background="@android:color/white"
+    />
+    <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/RankingCommentView_SlashShade_layout">
+    </FrameLayout>
     <FrameLayout
             android:id="@+id/frameLayout"
             android:layout_width="match_parent"

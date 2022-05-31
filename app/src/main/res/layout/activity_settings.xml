@@ -9,10 +9,12 @@
 
     <TextView
             android:text="@string/userid_"
-            android:layout_width="50dp"
+            android:layout_width="70dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView10" app:layout_constraintStart_toStartOf="parent"
             android:layout_marginStart="24dp"
+            android:textSize="14sp"
+            android:fontFamily="@font/nicokaku_v1"
             android:textAppearance="@style/TextAppearance.AppCompat.Body2"
             app:layout_constraintTop_toTopOf="@+id/textView_uniqueUserID"
             app:layout_constraintBottom_toBottomOf="@+id/textView_uniqueUserID"
@@ -29,10 +31,12 @@
             app:layout_constraintEnd_toStartOf="@+id/button_registName" android:layout_marginEnd="8dp"/>
     <TextView
             android:text="@string/name"
-            android:layout_width="50dp"
+            android:layout_width="70dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView8" app:layout_constraintStart_toStartOf="parent"
             android:layout_marginStart="24dp"
+            android:fontFamily="@font/nicokaku_v1"
+            android:textSize="14sp"
             android:textAppearance="@style/TextAppearance.AppCompat.Body2"
             app:layout_constraintTop_toTopOf="@+id/edit_registName"
             app:layout_constraintBottom_toBottomOf="@+id/edit_registName"/>
@@ -41,9 +45,10 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:id="@+id/textView7"
+            android:fontFamily="@font/nicokaku_v1"
             app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintTop_toBottomOf="@+id/toolbar"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintHorizontal_bias="0.0"
-            app:layout_constraintEnd_toEndOf="parent" app:layout_constraintVertical_bias="0.1"
+            app:layout_constraintEnd_toEndOf="parent" app:layout_constraintVertical_bias="0.05"
             android:layout_marginStart="24dp" android:textAppearance="@style/TextAppearance.AppCompat.Large"/>
     <EditText
             android:layout_width="0dp"
@@ -70,7 +75,9 @@
             android:background="?attr/colorPrimary"
             android:theme="?attr/actionBarTheme"
             android:minHeight="?attr/actionBarSize"
-            android:id="@+id/toolbar" app:title="Settings" app:layout_constraintStart_toStartOf="parent"
+            android:id="@+id/toolbar"
+            app:titleTextAppearance="@style/TextAppearance.Toolbar"
+            app:title="SETTINGS" app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" app:layout_constraintTop_toTopOf="parent"/>
     <TextView
             android:text="@string/nicoM_account"
@@ -123,12 +130,12 @@
             android:id="@+id/button_back"
             app:layout_constraintBottom_toBottomOf="parent" android:layout_marginBottom="32dp"
             app:layout_constraintStart_toStartOf="parent"
-            style="@style/Widget.AppCompat.Button.Borderless.Colored"
-            android:textColor="@android:color/holo_blue_dark" android:onClick="Button_Back"/>
+            style="@style/back_button" android:onClick="Button_Back"/>
     <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:id="@+id/textView_uniqueUserID"
+            android:textSize="12sp"
             app:layout_constraintTop_toBottomOf="@+id/edit_registName" android:layout_marginTop="16dp"
             app:layout_constraintStart_toStartOf="@+id/edit_registName"
             app:layout_constraintEnd_toEndOf="@+id/button_registName"/>
@@ -147,4 +154,136 @@
             android:id="@+id/button_DataDelete" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" android:layout_marginBottom="32dp"
             android:layout_marginEnd="8dp" android:alpha="0.2" android:onClick="ButtonLoadDataDelete"/>
+
+    <TextView
+            android:text="音量設定"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/nicokaku_v1"
+            android:id="@+id/textView_VolumeSettings"
+            app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintTop_toBottomOf="@+id/toolbar"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintEnd_toEndOf="parent" app:layout_constraintVertical_bias="0.34"
+            android:layout_marginStart="24dp" android:textAppearance="@style/TextAppearance.AppCompat.Large"/>
+    <TextView
+            android:text="動画音量"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:id="@+id/textView_VolumeSettings_movie"
+            app:layout_constraintStart_toStartOf="@id/textView_VolumeSettings"
+            android:layout_marginTop="10dp"
+            android:layout_marginStart="15dp"
+            app:layout_constraintTop_toBottomOf="@+id/textView_VolumeSettings"/>
+    <TextView
+            android:text="100%"
+            android:layout_width="50dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/textView_VolumeSettings_movie_per"
+            android:fontFamily="@font/nicokaku_v1"
+            android:gravity="right"
+            android:layout_marginTop="5dp"
+            app:layout_constraintTop_toBottomOf="@id/textView_VolumeSettings_movie"
+            app:layout_constraintStart_toStartOf="@id/textView_VolumeSettings_movie"/>
+    <Button
+            android:text="▶ 動画再生：キャッシュなし"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/button_VolumeSettings_movie_play"
+            app:layout_constraintStart_toEndOf="@id/textView_VolumeSettings_movie_per"
+            app:layout_constraintTop_toTopOf="@id/textView_VolumeSettings_movie"
+            app:layout_constraintBottom_toBottomOf="@id/textView_VolumeSettings_movie"
+            style="@style/Widget.AppCompat.Button.Borderless.Colored"
+            android:textSize="10sp"
+            android:textAllCaps="false"
+            android:textColor="@android:color/holo_blue_dark" android:onClick="Button_VolumeSettings_movie_play"/>
+    <SeekBar
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/seekBar_volumesettings_movie"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/textView_VolumeSettings_movie_per"
+            app:layout_constraintTop_toTopOf="@id/textView_VolumeSettings_movie_per"
+            android:layout_marginRight="20dp"
+            android:min="0" android:max="100"
+    />
+    <TextView
+            android:text="ゲーム効果音"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:id="@+id/textView_VolumeSettings_game"
+            android:layout_marginTop="10dp"
+            app:layout_constraintStart_toStartOf="@id/textView_VolumeSettings_movie"
+            app:layout_constraintTop_toBottomOf="@+id/textView_VolumeSettings_movie_per"/>
+    <TextView
+            android:text="100%"
+            android:layout_width="50dp"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/nicokaku_v1"
+            android:id="@+id/textView_VolumeSettings_game_per"
+            android:gravity="right"
+            android:layout_marginTop="5dp"
+            app:layout_constraintStart_toStartOf="@id/textView_VolumeSettings_movie"
+            app:layout_constraintTop_toBottomOf="@+id/textView_VolumeSettings_game"/>
+    <SeekBar
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/seekBar_volumesettings_game"
+            app:layout_constraintEnd_toEndOf="@id/seekBar_volumesettings_movie"
+            app:layout_constraintStart_toStartOf="@id/seekBar_volumesettings_movie"
+            app:layout_constraintTop_toTopOf="@id/textView_VolumeSettings_game_per"
+            android:min="0" android:max="100"
+    />
+    <TextView
+            android:text="システム効果音"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:id="@+id/textView_VolumeSettings_system"
+            android:layout_marginTop="10dp"
+            app:layout_constraintStart_toStartOf="@id/textView_VolumeSettings_movie"
+            app:layout_constraintTop_toBottomOf="@+id/textView_VolumeSettings_game_per"/>
+    <TextView
+            android:text="100%"
+            android:layout_width="50dp"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/nicokaku_v1"
+            android:id="@+id/textView_VolumeSettings_system_per"
+            android:gravity="right"
+            android:layout_marginTop="5dp"
+            app:layout_constraintStart_toStartOf="@id/textView_VolumeSettings_movie"
+            app:layout_constraintTop_toBottomOf="@+id/textView_VolumeSettings_system"/>
+    <SeekBar
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/seekBar_volumesettings_system"
+            app:layout_constraintEnd_toEndOf="@id/seekBar_volumesettings_movie"
+            app:layout_constraintStart_toStartOf="@id/seekBar_volumesettings_movie"
+            app:layout_constraintTop_toTopOf="@id/textView_VolumeSettings_system_per"
+            android:min="0" android:max="100"
+    />
+    <TextView
+            android:text="キーボード設定"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/textView20"
+            android:fontFamily="@font/nicokaku_v1"
+            app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintTop_toBottomOf="@+id/toolbar"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintEnd_toEndOf="parent" app:layout_constraintVertical_bias="0.72"
+            android:layout_marginStart="24dp" android:textAppearance="@style/TextAppearance.AppCompat.Large"/>
+
+    <Button
+            android:text="キーボードタイプ変更 > "
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/button_keyboard"
+            android:drawableRight="@drawable/ic_baseline_build_circle_24"
+            android:drawableEnd="@drawable/ic_baseline_build_circle_24"
+            app:layout_constraintStart_toStartOf="@id/textView20"
+            android:layout_marginTop="10dp"
+            android:layout_marginStart="15dp"
+            app:layout_constraintTop_toBottomOf="@+id/textView20"
+            android:onClick="Button_settings_keyboard"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

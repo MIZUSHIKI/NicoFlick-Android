@@ -3,6 +3,9 @@ package com.mizushiki.nicoflick_a
 import android.content.Context
 import android.graphics.*
 import android.graphics.Paint.Align
+import android.os.Handler
+import android.text.Html
+import android.text.Spanned
 import android.util.AttributeSet
 import android.util.Size
 import android.view.View
@@ -10,9 +13,17 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.view.isInvisible
+import androidx.core.view.isVisible
+import com.eclipsesource.json.Json
 import com.squareup.picasso.Picasso
+import kotlinx.android.synthetic.main.activity_selector.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.Runnable
 import java.nio.channels.FileLock
+import java.util.*
 import java.util.regex.Pattern
+import kotlin.collections.ArrayList
+import kotlin.concurrent.schedule
 
 
 // String
@@ -269,6 +280,33 @@ var TextView.rectF: RectF
         this.width = value.width().toInt()
         this.height = value.height().toInt()
     }
+
+//Nicokaku FontInfo定数
+val FontInfo_NicoKaku_wcRange = FontInfo_NicoKaku1.wcRanges + FontInfo_NicoKaku2.wcRanges
+
+fun HtmlNicokakuMixFixText(string: String) : Spanned {
+    var htmlText = string
+    var checkedWord = ""
+    for ( c in string.toCharArray() ){
+        if( checkedWord.indexOf(c) != -1 ){ continue }
+        checkedWord += c
+        val code = c.hashCode()
+        var check = false
+        for ( i in 0 until FontInfo_NicoKaku_wcRange.size / 2  ){
+            if( FontInfo_NicoKaku_wcRange[i*2] <= code && code <= FontInfo_NicoKaku_wcRange[i*2]+FontInfo_NicoKaku_wcRange[i*2+1]-1 ){
+                check = true
+                break
+            }
+        }
+        if( !check ){
+            htmlText = htmlText.pregReplace(
+                "(${Regex.escape(c.toString())})",
+                "<font face=\'sans-serif\'><small><b>$1<b></small></font>"
+            )
+        }
+    }
+    return Html.fromHtml(htmlText, Html.FROM_HTML_MODE_COMPACT)
+}
 //TextViewカスタム
 class OutlineTextView(context: Context?, val firstRect:RectF) : AppCompatTextView(context) {
     var strokeWidth = 4.0f
@@ -353,6 +391,91 @@ class DecolationLabel @JvmOverloads constructor (context: Context, val attrs: At
         //println("textBounds.height()="+textBounds.height())
     }
 }
+
+class ChainTextView @JvmOverloads constructor (context: Context, val attrs: AttributeSet? = null, val defStyleAttr: Int = 0) : AppCompatTextView(context, attrs, defStyleAttr) {
+    private  var finished = false
+    private  var breaker = false
+
+    //private val timer = Timer()
+    private val mHandler = Handler()
+
+    enum class chainOption {
+        callFinish, callStart, callStartFinish
+    }
+    enum class chainState {
+        finish, start
+    }
+    fun StartNumberRoll(duration:Int, option: chainOption = chainOption.callFinish, callback: (chainState) -> Unit ){
+        this.isVisible = true
+        val text = this.text
+        val rawText = text
+        var remainingText = text
+        this.setText("")
+
+        var maeNum = 0
+        var rolledText = ""
+        var counter = -1
+
+        if( rawText.count() == 0 ){ finished = true }
+        val runb0 = object  : Runnable {
+            override fun run() {
+                if( counter < 0) { //最初の一回
+                    counter = 0
+                    if( (option == chainOption.callStart || option == chainOption.callStartFinish) && breaker == false ){
+                        callback(chainState.start)
+                    }
+                    if( !finished ) {
+                        mHandler.postDelayed(this, 15)
+                        return
+                    }
+                }
+                if( finished ){
+                    this@ChainTextView.setText(rawText)
+                    if( (option == chainOption.callFinish || option == chainOption.callStartFinish) && breaker == false ){
+                        callback(chainState.finish)
+                    }
+                    return
+                }
+                var rndNum = (0..9).random()
+                if( rndNum == maeNum ){
+                    rndNum += 1
+                    rndNum = rndNum % 10
+                }
+                maeNum = rndNum
+                this@ChainTextView.setText(rndNum.toString() + rolledText)
+                if( (counter % 20) == 0 ){
+                    rolledText = remainingText.takeLast(1).toString() + rolledText
+                    remainingText = remainingText.dropLast(1)
+                    this@ChainTextView.setText(rolledText)
+                    if( remainingText.count() <= 0 ){
+                        finished = true
+                        if( (option == chainOption.callFinish || option == chainOption.callStartFinish) && breaker == false ){
+                            callback(chainState.finish)
+                        }
+                        return
+                    }
+                }
+                counter += 1
+                //
+                mHandler.postDelayed(this,15)
+            }
+        }
+        if( !finished ) {
+            mHandler.postDelayed( runb0, duration.toLong() )
+        }else {
+            mHandler.post( runb0 )
+        }
+    }
+    fun chainFinish(){
+        finished = true
+    }
+    fun chainBreak(){
+        finished = true
+        breaker = true
+    }
+
+}
+
 //Picasso
 fun PicassoLoadImage_NicoThumb(imageView:ImageView?, url:String){
     if(imageView == null){ return }

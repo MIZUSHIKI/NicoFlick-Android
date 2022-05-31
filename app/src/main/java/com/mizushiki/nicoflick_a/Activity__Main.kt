@@ -4,10 +4,12 @@ import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
+import android.content.res.Resources
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -21,9 +23,11 @@ import de.psdev.licensesdialog.licenses.MITLicense
 import de.psdev.licensesdialog.model.Notice
 import de.psdev.licensesdialog.model.Notices
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.coroutines.*
 import java.net.CookieHandler
 import java.net.CookieManager
 import java.net.CookiePolicy
+import javax.microedition.khronos.opengles.GL
 
 
 //グローバル
@@ -32,8 +36,9 @@ object GLOBAL {
     lateinit var COOKIE_MANAGER: CookieManager
     val PHP_URL = "http://timetag.main.jp/nicoflick/nicoflick.php"
     //val PHP_URL = "http://192.168.11.6/nicoflick_20201103/nicoflick.php" //windows xampp
+    val NICOWIKI_PATH = "https://main-timetag.ssl-lolipop.jp/nicoflick/wiki/index.php"
     val NicoApiURL_GetThumbInfo = "https://ext.nicovideo.jp/api/getthumbinfo/"
-    val Version = 1900
+    val Version:Int = 1903
     //Activity間 オブジェクト受け渡し用
     var SelectMUSIC:musicData? = null
     var SelectLEVEL:levelData? = null
@@ -42,13 +47,16 @@ object GLOBAL {
     var retString:String? = null //遷移間返り値が上手くいかないところがある
     var ServerErrorMessage = ""
 
-    var Selector_instance:Activity_Selector? = null //SelectorMenuでThumbMovieStopするため(もう面倒くさくなって・・・)
+    var Selector_instance:Activity_Selector? = null //SelectorMenuでThumbMovieStopとかするため(もう面倒くさくなって・・・)
+    var NavigationBarHeight:Int = 0
 }
 
 class MainActivity : AppCompatActivity() {
 
     var segueing = false //遷移中フラグ
     var slashShadeRepeatCanceled = false
+
+    lateinit var seSystemAudio:SESystemAudio
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,19 +87,25 @@ class MainActivity : AppCompatActivity() {
         slashShadeLayout.addView(slashShadeView)
 
         var anime = ObjectAnimator.ofFloat(slashShadeView, "y", -30.0f)
-        anime.duration = 1000
+        anime.duration = 750
         anime.setInterpolator(LinearInterpolator())
         anime.repeatCount = ValueAnimator.INFINITE
         anime.repeatMode = ValueAnimator.RESTART
         anime.start()
-    }
 
+        seSystemAudio = SESystemAudio //遅延させて読み込み
+
+        println("bt size=${getNavigationBarHeight()}")
+        GLOBAL.NavigationBarHeight = getNavigationBarHeight()
+        //keybd.setPaddingKeybd(bottom = GLOBAL.NavigationBarHeight)
+    }
     fun Button_Start(view: View) {
         if(segueing) {
             return
         }
         segueing = true
 
+        SESystemAudio.start2SePlay()
         progress_circular.isVisible = true
         ServerDataHandler().DownloadMusicDataAndUserNameData {
             //if(it!=null) {
@@ -121,6 +135,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun Button_settings(view: View) {
+        SESystemAudio.startSePlay()
         val intent: Intent = Intent(applicationContext, Activity_Settings::class.java)
         startActivity(intent)
     }
@@ -477,6 +492,17 @@ Copyright(c) 2014 M+ FONTS PROJECT
             //exoPlayerの保持しておける数が少ないのでキャッシュ(CachedMovie)は 1曲のみ（デコーダ数の関係らしい）。[CachedThumbMovie_Num=3]
             USERDATA.cachedMovieNum = 1
         }
+        if( USERDATA.MyVersion < 1901 ){
+            //DataStore分割
+            USERDATA.Migration__Version1_9_0_0to1_10_0_0()
+        }
     }
 
+    fun getNavigationBarHeight() : Int {
+        val resources: Resources = this.resources
+        val resourceId: Int = resources.getIdentifier("navigation_bar_height", "dimen", "android")
+        return if (resourceId > 0) {
+            resources.getDimensionPixelSize(resourceId)
+        } else 0
+    }
 }

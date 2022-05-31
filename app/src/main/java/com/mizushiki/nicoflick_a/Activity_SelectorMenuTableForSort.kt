@@ -48,7 +48,10 @@ class Activity_SelectorMenuTableForSort : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when(item.itemId){
-            android.R.id.home -> finish()
+            android.R.id.home -> {
+                SESystemAudio.openSubSePlay()
+                finish()
+            }
         }
         return super.onOptionsItemSelected(item)
     }

@@ -33,6 +33,15 @@ class Activity_SelectorMenu : AppCompatActivity() {
             GLOBAL.SelectLEVEL?.let {
                 val level = it
                 text_music_level_id.text = "musicID=${music.sqlID}, gameID=${level.sqlID}"
+                /*
+                //開発者用
+                if( USERDATA.UserIDxxx == "b49b3e7f-6372-44c5-8576-************" ){
+                    GLOBAL.Selector_instance?.nowNicoDmc?.let {
+                        val eco = if(it.eco == true) "eco" else "normal"
+                        text_music_level_id.text = text_music_level_id.text.toString() + " - ${eco}"
+                    }
+                }
+                */
             }
         }
     }
@@ -94,15 +103,18 @@ class Activity_SelectorMenu : AppCompatActivity() {
             .show()
     }
     fun Button_Back(view: View) {
+        SESystemAudio.canselSePlay()
         setResult( 10, null )
         finish()
     }
     fun TextView_tagOnClick(view: View) {
+        SESystemAudio.openSePlay()
         val intent: Intent = Intent(applicationContext, Activity_SelectorMenuTableForTag::class.java)
         intent.putExtra("fromSelector", false)
         startActivityForResult(intent, 1001)
     }
     fun TextVIew_sortOnClick(view: View) {
+        SESystemAudio.openSePlay()
         val intent: Intent = Intent(applicationContext, Activity_SelectorMenuTableForSort::class.java)
         startActivityForResult(intent, 1002)
         /*

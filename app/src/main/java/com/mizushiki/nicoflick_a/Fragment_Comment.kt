@@ -39,7 +39,10 @@ class CommentFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        Button_Back.setOnClickListener{ activity?.finish() }
+        Button_Back.setOnClickListener{
+            SESystemAudio.canselSePlay()
+            activity?.finish()
+        }
 
         text_Title_c.setText(GLOBAL.SelectMUSIC!!.title)
         TextView_Star.setText(GLOBAL.SelectLEVEL!!.getLevelAsString())
@@ -147,7 +150,7 @@ private class CommentAdapter(val context: Context,
         var position = position
         if(GLOBAL.SelectLEVEL!!.description != ""){
             if(position == 0){
-                view.setBackgroundColor(Color.GREEN)
+                view.setBackgroundColor(Color.argb(255*50/100,255*60/100,255*90/100,255*30/100))
                 val textView_name = view.findViewById<TextView>(R.id.name)
                 textView_name.setTextColor(Color.RED)
                 textView_name.text = GLOBAL.SelectLEVEL!!.creator
