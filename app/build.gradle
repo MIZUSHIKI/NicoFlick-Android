@@ -5,14 +5,13 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
 
 android {
-    compileSdkVersion 30
-    buildToolsVersion "29.0.3"
+    compileSdkVersion 33
     defaultConfig {
         applicationId "com.mizushiki.nicoflick_a"
         minSdkVersion 24
-        targetSdkVersion 30
-        versionCode 25
-        versionName "1.10.a3"
+        targetSdkVersion 33
+        versionCode 26
+        versionName "1.10.a4"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -31,6 +30,9 @@ android {
         jcenter()
     }
     productFlavors {
+    }
+    viewBinding {
+        enabled = true
     }
 }
 

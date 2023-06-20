@@ -150,6 +150,8 @@ class Activity_Settings : AppCompatActivity() {
                 USERDATA.ScoresJson = ""
                 CommentDataLists.reset()
                 USERDATA.CommentsJson = ""
+                USERDATA.SelectedMusicCondition.tags = ""
+                USERDATA.SelectedMusicCondition.sortItem = "曲の投稿が古い順"
 
                 // ver1.9->1.10 からのDataStore整頓が働いていなかったら悲しいのでしっかりと[一定の期間 置いておく]
                 USERDATA.SikkariRemove__Version1_9_0_0to1_10_0_0()

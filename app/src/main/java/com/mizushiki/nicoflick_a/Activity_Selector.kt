@@ -535,8 +535,10 @@ class Activity_Selector : AppCompatActivity() {
         }
         maeTags = USERDATA.SelectedMusicCondition.tags
         maeSort = USERDATA.SelectedMusicCondition.sortItem
-        if(currentMusics.size > indexCoverFlow){
+        if(currentMusics.size > 0 && currentMusics.size > indexCoverFlow){
             maeMusicTags = currentMusics[indexCoverFlow].tags
+        }else {
+            maeMusicTags = ""
         }
         startActivityForResult(intent, 1002)
     }
@@ -574,7 +576,11 @@ class Activity_Selector : AppCompatActivity() {
         ThumbMovieStop()
         SESystemAudio.openSePlay()
         val intent: Intent = Intent(applicationContext, Activity_WikiPageWeb::class.java)
-        GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
+        if( currentMusics.size > 0 ) {
+            GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
+        }else {
+            GLOBAL.SelectMUSIC = null
+        }
         startActivityForResult(intent, 1005)
     }
     fun Button_favorite(view: View) {
@@ -985,7 +991,7 @@ class Activity_Selector : AppCompatActivity() {
                 }
             }
             1002 -> {
-                val currentMusicTags = if(currentMusics.size > indexCoverFlow) currentMusics[indexCoverFlow].tags else ""
+                val currentMusicTags = if(currentMusics.size > 0 && currentMusics.size > indexCoverFlow) currentMusics[indexCoverFlow].tags else ""
                 if (maeTags != USERDATA.SelectedMusicCondition.tags || maeMusicTags != currentMusicTags || maeSort != USERDATA.SelectedMusicCondition.sortItem) {
                     indexCoverFlow = -1 //CoverFlowリロード
                     SetMusicToCoverFlow()

@@ -22,7 +22,7 @@ import java.net.URLDecoder
 class Activity_WikiPageWeb : AppCompatActivity() {
 
     //各種データ
-    val selectMusic = GLOBAL.SelectMUSIC!!
+    val selectMusic = GLOBAL.SelectMUSIC
     var musicDatas: MusicDataLists = MusicDataLists
     val texts = arrayListOf<String>()
 
@@ -101,26 +101,29 @@ class Activity_WikiPageWeb : AppCompatActivity() {
 
                 }
 
-                webView.evaluateJavascript("document.getElementById('SetMusicDataBtn_NicoFlick').id"){
-                    println("it = ${it}")
-                    if( it != "\"SetMusicDataBtn_NicoFlick\"" ){ return@evaluateJavascript }
+                selectMusic?.let {
+                    val selectMusic = it
+                    webView.evaluateJavascript("document.getElementById('SetMusicDataBtn_NicoFlick').id"){
+                        println("it = ${it}")
+                        if( it != "\"SetMusicDataBtn_NicoFlick\"" ){ return@evaluateJavascript }
 
-                    webView.evaluateJavascript("""
-                        if( document.getElementById('SettedMusicDataBtn_NicoFlick') == null ){
-                            var cre = document.createElement('input');
-                            cre.type = 'button';
-                            cre.id = 'SettedMusicDataBtn_NicoFlick';
-                            cre.value = '選択中の楽曲情報を入力ボックスに代入';
-                            cre.addEventListener('click', buttonClick);
-                            var ele = document.getElementById('SetMusicDataBtn_NicoFlick');
-                            ele.appendChild(cre);
-                            ele.appendChild(document.createElement('br'));
-                        }
-                    
-                        function buttonClick(){
-                            document.getElementById('_p_comment_comment_0').value = '[[${selectMusic.title}>nicoflick://tag=@m:${selectMusic.sqlID}]]&br;[[&ref(${selectMusic.thumbnailURL});>nicoflick://tag=@m:${selectMusic.sqlID}]]&br;';
-                        }
-                    """,null)
+                        webView.evaluateJavascript("""
+                            if( document.getElementById('SettedMusicDataBtn_NicoFlick') == null ){
+                                var cre = document.createElement('input');
+                                cre.type = 'button';
+                                cre.id = 'SettedMusicDataBtn_NicoFlick';
+                                cre.value = '選択中の楽曲情報を入力ボックスに代入';
+                                cre.addEventListener('click', buttonClick);
+                                var ele = document.getElementById('SetMusicDataBtn_NicoFlick');
+                                ele.appendChild(cre);
+                                ele.appendChild(document.createElement('br'));
+                            }
+                        
+                            function buttonClick(){
+                                document.getElementById('_p_comment_comment_0').value = '[[${selectMusic.title}>nicoflick://tag=@m:${selectMusic.sqlID}]]&br;[[&ref(${selectMusic.thumbnailURL});>nicoflick://tag=@m:${selectMusic.sqlID}]]&br;';
+                            }
+                        """,null)
+                    }
                 }
 
             }

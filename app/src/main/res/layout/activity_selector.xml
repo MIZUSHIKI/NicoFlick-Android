@@ -74,6 +74,7 @@
             android:visibility="invisible"
     >
     </com.google.android.exoplayer2.ui.PlayerView>
+
     <Button
             android:layout_width="40dp"
             android:layout_height="40dp"
@@ -85,9 +86,9 @@
             android:scaleY="0.8"
             android:alpha="0.2"
             coverflow:layout_constraintVertical_bias="0.275"
-            coverflow:layout_constraintStart_toStartOf="@+id/coverflow"
+            coverflow:layout_constraintStart_toStartOf="parent"
             coverflow:layout_constraintBottom_toBottomOf="@+id/coverflow"
-            coverflow:layout_constraintTop_toTopOf="@+id/coverflow"/>
+            coverflow:layout_constraintTop_toTopOf="@+id/coverflow" />
     <TextView
             android:layout_width="0dp"
             android:layout_height="42dp"
@@ -99,7 +100,7 @@
             android:textColor="#000"
             android:textAlignment="center" android:ellipsize="end" android:maxLines="1"
             android:autoSizeTextType="uniform" android:autoSizeMinTextSize="12dp"
-            android:gravity="center_vertical"
+            android:layout_gravity="center"
             android:paddingLeft="8dp" android:paddingRight="8dp" android:autoSizeMaxTextSize="24dp"
             coverflow:layout_constraintBottom_toBottomOf="parent"
             coverflow:layout_constraintVertical_bias="0.05"/>
@@ -115,7 +116,7 @@
             android:textSize="16sp"
             android:textAlignment="center"
             android:ellipsize="end" android:autoSizeTextType="uniform" android:maxLines="1" android:paddingLeft="8dp"
-            android:paddingRight="8dp" android:gravity="center_vertical"/>
+            android:paddingRight="8dp" android:layout_gravity="center"/>
     <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
