@@ -54,7 +54,7 @@ class Activity_SelectorMenu : AppCompatActivity() {
             .setItems(strList, { dialog, which ->
                 when(which){
                     0 -> {
-                        val url = "http://timetag.main.jp/nicoflick/index.php"
+                        val url = "https://timetag.main.jp/nicoflick/index.php"
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                         startActivity(Intent.createChooser(intent, "Browse with"))
                         GLOBAL.Selector_instance?.let{

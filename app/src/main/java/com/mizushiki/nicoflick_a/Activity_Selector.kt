@@ -72,7 +72,6 @@ class Activity_Selector : AppCompatActivity() {
 
     private var cacheExoPlayer: SimpleExoPlayer? = null
     private lateinit var playerView: PlayerView
-    var nowNicoDmc:NicoDmc? = null
 
     var segueing = false
     var leaved = false
@@ -164,9 +163,6 @@ class Activity_Selector : AppCompatActivity() {
 
             setThumbMovieMaeUsiro(usiro = false)
 
-            nowNicoDmc?.let {
-                it.Start_HeartBeat()
-            }
         }
         //レベルピッカー(スクロールビューVer)
         scrollerOneHeight = levelScrollerView.layoutParams.height / 2
@@ -442,7 +438,7 @@ class Activity_Selector : AppCompatActivity() {
                 }
             }
             println("$musicIDSet ; ${musicIDSet.size}")
-            if( musicIDSet.size >= 5 ){
+            if( musicIDSet.size >= 3 ){
                 USERDATA.lookedExtend = true
                 segueing = true
                 Handler().postDelayed(Runnable {
@@ -727,9 +723,7 @@ class Activity_Selector : AppCompatActivity() {
         for( avPlayerVC in CachedThumbMovies.cachedMovies ){
             avPlayerVC.simpleExoPlayer.playWhenReady = false
             playerView_Alpha.alpha = 1.0f
-            avPlayerVC.nicoDmc?.End_HeartBeat()
         }
-        nowNicoDmc = null
     }
     fun ThumbMovieStart(index: Int, loadOnly: Boolean = false){
         flg_thumbMovieStopping = false
@@ -750,7 +744,7 @@ class Activity_Selector : AppCompatActivity() {
                 //Movie呼び込み
                 var nicodougaURL = ""
                 println("thumbMovie ${smNum}")
-                MovieAccess().StreamingUrlNicoAccessForThumbMovie(smNum) { url,nicoDmc ->
+                MovieAccess().StreamingUrlNicoAccessForThumbMovie(smNum) { url ->
                     if(url == "error"){
                         return@StreamingUrlNicoAccessForThumbMovie
                     }
@@ -768,7 +762,7 @@ class Activity_Selector : AppCompatActivity() {
                         return@StreamingUrlNicoAccessForThumbMovie
                     }
                     //println(applicationContext.packageName)
-                    val loadCacheExoPlayer = CachedThumbMovies.access(nicodougaURL, smNum, nicoDmc)
+                    val loadCacheExoPlayer = CachedThumbMovies.access(nicodougaURL, smNum)
                     if (loadOnly == false) {
                         ThumbMovieStop()
                         flg_thumbMovieStopping = false
@@ -777,10 +771,6 @@ class Activity_Selector : AppCompatActivity() {
                         cacheExoPlayer = loadCacheExoPlayer
                         playerView_Alpha.alpha = 1.0f
                         playerView.player = cacheExoPlayer
-                        nowNicoDmc?.let {
-                            it.End_HeartBeat()
-                        }
-                        nowNicoDmc = CachedThumbMovies.cachedMovies.lastOrNull()?.nicoDmc
                     }
                     loadCacheExoPlayer.setSeekParameters(SeekParameters.CLOSEST_SYNC)
                     var t30 = musicDatas.getNotesFirstTime(currentMusics[index].movieURL)

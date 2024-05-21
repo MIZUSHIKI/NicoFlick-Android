@@ -10,6 +10,8 @@ class musicData {
     var sqlID:Int = 0
     var movieURL:String = ""
     var thumbnailURL:String = ""
+        get() { return field }
+        set(value) { field = value.pregReplace("http://", "https://") }
     var title:String = ""
     var artist:String = ""
     var movieLength:String = ""

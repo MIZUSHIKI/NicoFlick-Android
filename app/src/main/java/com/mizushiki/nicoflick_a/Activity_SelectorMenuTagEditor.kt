@@ -135,11 +135,12 @@ class Activity_SelectorMenuTagEditor : AppCompatActivity() {
                 return@let
             }
             println(it)
-            println(it.pregMatche("<nicovideo_thumb_response status=\"ok\">"))
+//            println(it.pregMatche("<nicovideo_thumb_response status=\"ok\">"))
             if( it.pregMatche("<nicovideo_thumb_response status=\"ok\">") ){
-                println(it.pregMatche("<tags.*?>(.*?)</tags>"))
-                println(it.pregMatche_firstString("<tags.*?>(.*?)</tags>"))
-                callback( it.pregMatche_firstString("<tags.*?>(.*?)</tags>").pregReplace("</?tag.*?>","").pregReplace("\n"," ").pregReplace(" +"," ").trim() )
+//                println(it.pregMatche("<tags.*?>(.*?)</tags>"))
+//                println(it.pregMatche_firstString("<tags.*?>(.*?)</tags>"))
+                callback( it.pregMatche_firstString("<tags.*?>(.*?)</tags>").pregReplace("<tag.*?>", "").pregReplace("</tag>", " ").pregReplace("\n|\r\n|\r", "").pregReplace(" +", " ").trim() )
+//                callback( it.pregMatche_firstString("<tags.*?>(.*?)</tags>").pregReplace("</?tag.*?>","").pregReplace("\n"," ").pregReplace(" +"," ").trim() )
                 return@let
             }
         }

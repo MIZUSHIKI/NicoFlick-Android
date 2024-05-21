@@ -2,6 +2,8 @@ package com.mizushiki.nicoflick_a
 
 import android.content.Intent
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.MenuItem
 import android.view.View
@@ -15,6 +17,7 @@ import androidx.core.view.isVisible
 import kotlinx.android.synthetic.main.activity_main.progress_circular
 import kotlinx.android.synthetic.main.activity_selector_menu_table_for_tag.*
 import okhttp3.internal.format
+import okhttp3.internal.notifyAll
 
 
 class Activity_SelectorMenuTableForTag : AppCompatActivity() {
@@ -22,6 +25,7 @@ class Activity_SelectorMenuTableForTag : AppCompatActivity() {
     //各種データ
     var musicDatas: MusicDataLists = MusicDataLists
     var texts = arrayListOf<String>()
+    var _texts = arrayListOf<String>()
 
     var segueing = false //遷移中フラグ
 
@@ -38,18 +42,73 @@ class Activity_SelectorMenuTableForTag : AppCompatActivity() {
 
         if( getIntent().getBooleanExtra("fromSelector", false) ){
             texts.addAll(GLOBAL.SelectMUSIC!!.tag)
+            _texts.addAll(texts)
         }else {
             texts.addAll(musicDatas.taglist.toList().sortedBy { -it.second }.map { it.first })
+            _texts.addAll(texts)
             Button_edimaru.isVisible = false
         }
         // simple_list_item_1 は、 もともと用意されている定義済みのレイアウトファイルのID
         val arrayAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, texts)
         listView.setAdapter(arrayAdapter)
 
+        // editTextに入力したときの処理
+        editText_tags.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                if (s.toString() == ""){
+                    ResetTableView()
+                    return
+                }
+
+                //時間指定が含まれていたら一度削除
+                var array = s.toString().pregReplace("@初期楽曲", "").pregReplace("\\s?@t:(\\d+:\\d+)?-?(\\d+:\\d+)?", "").pregReplace(" +", " ").trim().split(" ").toMutableList()
+                println("editChanged size=${array.size}")
+                if (array.size <= 0){ return }
+                println("array = ${array.joinToString (", " )}")
+
+                var arrayInList:MutableList<String> = mutableListOf()
+
+                val count = array.size
+                for( i in 0 until count ){
+                    println("array[count-1-i]=${array[count-1-i]}")
+                    if( _texts.contains(array[count-1-i]) ){
+                        arrayInList.add(array[count-1-i])
+                        array.removeAt(count-1-i)
+                        println("array=${array.joinToString(", ")}")
+                    }
+                }
+
+
+                if (array.isEmpty()) {
+                    ResetTableView()
+                    return
+                }
+                texts = ArrayList(_texts.filter {
+                    if (arrayInList.contains(it)) { return@filter true }
+                    for (a in array) {
+                        if (it.lowercase().contains(a.lowercase())) {
+                            return@filter true
+                        }
+                    }
+                    return@filter false
+                })
+                println(texts.joinToString(", "))
+                val adapter = listView.adapter as ArrayAdapter<String>
+                adapter.clear()
+                adapter.addAll(texts)
+                adapter.notifyDataSetChanged()
+
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
         // 項目をタップしたときの処理
         listView.setOnItemClickListener { parent, view, position, id ->
+            if(texts.size <= position){ return@setOnItemClickListener }
+            val tappedTag = texts[position]
             val sp = editText_tags.text.split(" ")
-            if( sp.contains(texts[position]) ) {
+            if( sp.contains(tappedTag) ) {
                 return@setOnItemClickListener
             }
             var jikanSitei = ""
@@ -60,10 +119,26 @@ class Activity_SelectorMenuTableForTag : AppCompatActivity() {
                 //時間指定が機能するように一度削除して最後にもっていく
                 editText_tags.setText( editText_tags.text.toString().pregReplace("\\s?@t:(\\d+:\\d+)?-?(\\d+:\\d+)?", "") )
             }
+            if (!texts.equals(_texts)) {
+                println(editText_tags.text.toString().pregMatche_firstString("\\s?(\\S+?)$"))
+                editText_tags.setText( editText_tags.text.toString().pregReplace("\\s?\\S+?$", "") )
+                print(editText_tags.text.toString())
+            }
             if( !editText_tags.text.isEmpty() && !editText_tags.text.endsWith("-") ){
                 editText_tags.text.append(" ")
             }
-            editText_tags.text.append(texts[position] + jikanSitei)
+            editText_tags.text.append(tappedTag + jikanSitei)
+
+            ResetTableView()
+        }
+    }
+    fun ResetTableView() {
+        if (!texts.equals(_texts)) {
+            texts = ArrayList(_texts)
+            val adapter = listView.adapter as ArrayAdapter<String>
+            adapter.clear()
+            adapter.addAll(texts)
+            adapter.notifyDataSetChanged()
         }
     }
 
@@ -79,6 +154,7 @@ class Activity_SelectorMenuTableForTag : AppCompatActivity() {
 
     fun Button_Delete(view: View) {
         editText_tags.setText("")
+        ResetTableView()
     }
 
     override fun onPause() {
@@ -89,6 +165,7 @@ class Activity_SelectorMenuTableForTag : AppCompatActivity() {
 
     fun Button_SyokiGakkyoku(view: View) {
         editText_tags.setText("@初期楽曲")
+        ResetTableView()
     }
 
     fun Button_Hensyu(view: View) {

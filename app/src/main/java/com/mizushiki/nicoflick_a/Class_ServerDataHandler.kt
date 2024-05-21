@@ -142,6 +142,7 @@ class ServerDataHandler {
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
         async(Dispatchers.Default) { HttpUtil.httpGET(url, noCache = true) }.await().let {
             if (it == null) {
+                println("")
                 callback("error")
                 GLOBAL.ServerErrorMessage = "予期しないエラーが発生しました"
                 return@let
@@ -150,6 +151,10 @@ class ServerDataHandler {
             if( htRet.startsWith("<!--NicoFlickMessage=") ){
                 GLOBAL.ServerErrorMessage = htRet.pregMatche_firstString("^<!--NicoFlickMessage=(.*?)-->")
                 htRet = htRet.pregReplace("^<!--NicoFlickMessage=.*?-->", "" )
+                val res = GLOBAL.ServerErrorMessage.pregMatche_strings("\\[([Android,iOS ]+)\\]")
+                if (!res.isEmpty() && !res.last().pregMatche("Android")) {
+                    GLOBAL.ServerErrorMessage = ""
+                }
                 print(GLOBAL.ServerErrorMessage)
             }
             if (htRet == "latest") {

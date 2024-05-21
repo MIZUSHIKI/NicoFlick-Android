@@ -108,7 +108,6 @@ class Activity_Settings : AppCompatActivity() {
 
     fun Button_Regist(view: View) {
         SESystemAudio.start2SePlay()
-        return
         progress_circular.isVisible = true
         USERDATA.UserName = edit_registName.text.toString()
 

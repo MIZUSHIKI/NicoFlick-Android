@@ -141,6 +141,17 @@ fun String.pregMatches(pattern: String, matches: ArrayList<String>): Boolean {
     }
     return false
 }
+fun String.pregMatche_strings(pattern: String): ArrayList<String> {
+    val boo = Regex(pattern,RegexOption.DOT_MATCHES_ALL).findAll(this)
+    val matches = arrayListOf<String>()
+    if(boo != null){
+        for( bo in boo ){
+            matches.addAll(bo.groupValues)
+        }
+        return matches
+    }
+    return matches
+}
 fun String.pregMatches(pattern: String): MutableList<String> {
     return Regex(pattern,RegexOption.DOT_MATCHES_ALL).find(this)?.groupValues!!.toMutableList()
 }

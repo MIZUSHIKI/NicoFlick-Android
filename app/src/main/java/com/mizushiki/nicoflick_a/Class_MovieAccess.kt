@@ -17,6 +17,7 @@ import com.google.android.exoplayer2.upstream.*
 import com.google.android.exoplayer2.upstream.cache.*
 import com.google.android.exoplayer2.util.Util
 import kotlinx.coroutines.*
+import okhttp3.internal.toImmutableMap
 import java.io.File
 import java.net.URLDecoder
 import java.util.*
@@ -53,35 +54,54 @@ class MovieAccess {
             //st = URLDecoder.decode(st,"UTF16")
 
             println(st)
-            val nicoDmc = NicoDmc(smNum,st)
-            if( nicoDmc.token == "" ){
-                return@let
-            }
 
-            val url = "https://api.dmc.nico/api/sessions?_format=json"
-            val body = nicoDmc.sessionFormatJson
-            async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
-                println("it")
-                if (it != null) {
-                    println(it)
-                    nicoDmc.Set_session_metadata(it)
-                    //短く再生するだけの場合はハートビートしない（40秒以内）
-                    //if( !ecoThumb ){
-                        nicoDmc.Start_HeartBeat()
-                    //}
-                    callback(nicoDmc.content_uri)
-                    return@let
+            val watchTrackId = st.pregMatche_firstString("\"watchTrackId\":\"([a-zA-Z0-9_]+?)\"")
+            println("watchTrackId=$watchTrackId")
+            val accessRightKey = st.pregMatche_firstString("\"accessRightKey\":\"([a-zA-Z0-9_\\.-]+?)\"")
+            println("accessRightKey=$accessRightKey")
+            var videos = st.pregMatche_strings("\"id\":\"(video-[a-zA-Z0-9]+-\\d+p(?:-low(?:est)?)?)\",\"isAvailable\":true")
+            println(videos.joinToString(", "))
+            var audios = st.pregMatche_strings("\"id\":\"(audio-[a-zA-Z0-9]+-\\d+kbps)\",\"isAvailable\":true")
+            println(audios.joinToString(", "))
+            if (watchTrackId != "" && accessRightKey != "" && !videos.isEmpty() && !audios.isEmpty()) {
+                var video = ""
+                var audio = audios[1]
+                if (isWiFiConnected(GLOBAL.APPLICATIONCONTEXT)){
+                    video = videos[1]
+                }else {
+                    video = videos[videos.count() - 1]
                 }
-                callback("error")
+
+                val url = "https://nvapi.nicovideo.jp/v1/watch/"+smNum+"/access-rights/hls?actionTrackId="+watchTrackId
+                print("https://nvapi.nicovideo.jp/v1/watch/"+smNum+"/access-rights/hls?actionTrackId="+watchTrackId)
+                val headers = mutableMapOf<String,String>()
+                headers.put("X-Access-Right-Key",accessRightKey)
+                headers.put("X-Frontend-Id", "6")
+                headers.put("X-Frontend-Version", "0")
+                headers.put("X-Request-With", "https://www.nicovideo.jp")
+                val body = "{\"outputs\": [[\"${video}\",\"${audio}\"]]}"
+                println(body)
+                print("CMAF:post")
+                async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, headers = headers.toMap(), eatCookie = true) }.await().let {
+                    println("it")
+                    it?.let{
+                        println(it)
+                        val contentUrl = it.pregMatche_firstString("\"contentUrl\":\"(.+?)\"")
+                        println(it)
+                        callback(contentUrl)
+                        return@let
+                    }
+                    callback("error")
+                }
             }
         }
     }
 
-    fun StreamingUrlNicoAccessForThumbMovie(smNum:String, callback: (String,NicoDmc?) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
+    fun StreamingUrlNicoAccessForThumbMovie(smNum:String, callback: (String) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
 
         //先にキャッシュ内にあるか確認。あればもうニコニコの動画ページにすらアクセスしないことにする
         if( CachedThumbMovies.containtsWithinExpiration(smNum)){
-            callback("cached",null)
+            callback("cached")
             return@launch
         }
         println("smNum="+smNum)
@@ -91,7 +111,7 @@ class MovieAccess {
         async(Dispatchers.Default) { HttpUtil.httpGET(strURL) }.await().let {
             println("net")
             if (it == null) {
-                callback("error",null)
+                callback("error")
                 return@let
             }
             var st = it.pregMatche_firstString("<div id=\"js-initial-watch-data\" data-api-data=\"(.*?)\" hidden></div>")
@@ -102,26 +122,40 @@ class MovieAccess {
             //st = URLDecoder.decode(st,"UTF16")
 
             println(st)
-            val nicoDmc = NicoDmc(smNum,st,true)
-            if( nicoDmc.token == "" ){
-                return@let
-            }
 
-            val url = "https://api.dmc.nico/api/sessions?_format=json"
-            val body = nicoDmc.sessionFormatJson
-            async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
-                println("it")
-                if (it != null) {
-                    println(it)
-                    nicoDmc.Set_session_metadata(it)
-                    //短く再生するだけの場合はハートビートしない（40秒以内）
-                    //if( !ecoThumb ){
-                    //    nicoDmc.Start_HeartBeat()
-                    //}
-                    callback(nicoDmc.content_uri, nicoDmc)
-                    return@let
+            val watchTrackId = st.pregMatche_firstString("\"watchTrackId\":\"([a-zA-Z0-9_]+?)\"")
+            println("watchTrackId=$watchTrackId")
+            val accessRightKey = st.pregMatche_firstString("\"accessRightKey\":\"([a-zA-Z0-9_\\.-]+?)\"")
+            println("accessRightKey=$accessRightKey")
+            var videos = st.pregMatche_strings("\"id\":\"(video-[a-zA-Z0-9]+-\\d+p(?:-low(?:est)?)?)\",\"isAvailable\":true")
+            println(videos.joinToString(", "))
+            var audios = st.pregMatche_strings("\"id\":\"(audio-[a-zA-Z0-9]+-\\d+kbps)\",\"isAvailable\":true")
+            println(audios.joinToString(", "))
+            if (watchTrackId != "" && accessRightKey != "" && !videos.isEmpty() && !audios.isEmpty()) {
+                var video = videos[videos.count() - 1]
+                var audio = audios[1]
+
+                val url = "https://nvapi.nicovideo.jp/v1/watch/"+smNum+"/access-rights/hls?actionTrackId="+watchTrackId
+                print("https://nvapi.nicovideo.jp/v1/watch/"+smNum+"/access-rights/hls?actionTrackId="+watchTrackId)
+                val headers = mutableMapOf<String,String>()
+                headers.put("X-Access-Right-Key",accessRightKey)
+                headers.put("X-Frontend-Id", "6")
+                headers.put("X-Frontend-Version", "0")
+                headers.put("X-Request-With", "https://www.nicovideo.jp")
+                val body = "{\"outputs\": [[\"${video}\",\"${audio}\"]]}"
+                println(body)
+                print("CMAF:post")
+                async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, headers = headers.toMap(), eatCookie = true) }.await().let {
+                    println("it")
+                    it?.let{
+                        println(it)
+                        val contentUrl = it.pregMatche_firstString("\"contentUrl\":\"(.+?)\"")
+                        println(it)
+                        callback(contentUrl)
+                        return@let
+                    }
+                    callback("error")
                 }
-                callback("error", null)
             }
         }
     }
@@ -138,188 +172,6 @@ class MovieAccess {
         }
     }
 }
-class NicoDmc(smNum: String, js_initial_watch_data:String, isThumbMovie:Boolean = false) {
-    val smNum : String
-    var recipeId = ""
-        private set
-    var playerId = ""
-        private set
-    var videos = ""
-        private set
-    var audios = ""
-        private set
-    var signature = ""
-        private set
-    var contentId = ""
-        private set
-    var heartbeatLifetime = ""
-        private set
-    var contentKeyTimeout = ""
-        private set
-    var priority = ""
-        private set
-    var transferPresets = ""
-        private set
-    var service_id = ""
-        private set
-    var player_id = ""
-        private set
-    var service_user_id = ""
-        private set
-    var auth_type = ""
-        private set
-    var token = ""
-        private set
-    var session_metadata = ""
-        private set
-    var session_id = ""
-        private set
-    var content_uri = ""
-        private set
-    var isThumbMovie = false
-    var eco = false
-    private var timer:Timer? = null
-    init{
-        this.smNum = smNum
-        this.isThumbMovie = isThumbMovie
-        println("DMC")
-        var ans:ArrayList<String> = arrayListOf()
-        if( js_initial_watch_data.pregMatche("\"session\":\\{\"recipeId\":\"(.*?)\",\"playerId\":\"(.*?)\",\"videos\":\\[(.*?)\\],\"audios\":\\[(.*?)\\],", matche = ans)){
-            recipeId = ans[1]
-            playerId = ans[2]
-            videos = ans[3]
-            audios = ans[4]
-        }
-        ans = arrayListOf()
-        if( js_initial_watch_data.pregMatche("\"signature\":\"(.*?)\",\"contentId\":\"(.*?)\",\"heartbeatLifetime\":(.*?),\"contentKeyTimeout\":(.*?),\"priority\":(.*?),\"transferPresets\":\\[(.*?)\\],", matche= ans) ){
-            signature = ans[1]
-            contentId = ans[2]
-            heartbeatLifetime = ans[3]
-            contentKeyTimeout = ans[4]
-            priority = ans[5]
-            transferPresets = ans[6]
-        }
-        ans = arrayListOf()
-        if( js_initial_watch_data.pregMatche("\\\\\"service_id\\\\\":\\\\\"(.*?)\\\\\",\\\\\"player_id\\\\\":\\\\\"(.*?)\\\\\",\\\\\"recipe_id\\\\\":\\\\\".*?\\\\\",\\\\\"service_user_id\\\\\":\\\\\"(.*?)\\\\\",\\\\\"protocols\\\\\":\\[\\{\\\\\"name\\\\\":\\\\\"http\\\\\",\\\\\"auth_type\\\\\":\\\\\"(.*?)\\\\\"\\}", matche= ans) ){
-            service_id = ans[1]
-            player_id = ans[2]
-            service_user_id = ans[3]
-            auth_type = ans[4]
-        }
-        ans = arrayListOf()
-        if( js_initial_watch_data.pregMatche("\"token\":\"(.*?\\\\\"transfer_presets\\\\\":.*?\\})\",", matche= ans) ){
-            token = ans[1]
-        }
-        println("recipeId= ${recipeId}")
-        println("playerId= ${playerId}")
-        println("videos= ${videos}")
-        println("audios= ${audios}")
-        println("signature= ${signature}")
-        println("contentId= ${contentId}")
-        println("heartbeatLifetime= ${heartbeatLifetime}")
-        println("contentKeyTimeout= ${contentKeyTimeout}")
-        println("transferPresets= ${transferPresets}")
-        println("service_id= ${service_id}")
-        println("player_id= ${player_id}")
-        println("service_user_id= ${service_user_id}")
-        println("auth_type= ${auth_type}")
-        println("token= ${token}")
-    }
-    var sessionFormatJson : String = ""
-        get() {
-            var video_src = videos
-            val audio_src = audios
-            if( isThumbMovie && eco == false ){
-                if( !MovieAccess().isWiFiConnected(GLOBAL.APPLICATIONCONTEXT) ){
-                    //Wifi接続なし
-                    eco = true
-                }
-            }
-            println("video_src=${videos} ${eco}")
-            if( eco ){
-                //強制eco(曲セレクト画面でWifiじゃないときの30秒プレビュー)
-                videos = videos.pregReplace("^.*,","")
-                println("video_src=${videos}")
-                //mp4
-                return """{"session":{"recipe_id":"${recipeId}","content_id":"${contentId}","content_type":"movie","content_src_id_sets":[{"content_src_ids":[{"src_id_to_mux":{"video_src_ids":[${videos}],"audio_src_ids":[${audio_src}]}}]}],"timing_constraint":"unlimited","keep_method":{"heartbeat":{"lifetime":${heartbeatLifetime}}},"protocol":{"name":"http","parameters":{"http_parameters":{"parameters":{"http_output_download_parameters":{"use_well_known_port":"yes","use_ssl":"yes","transfer_preset":"${transferPresets}"}}}}},"content_uri":"","session_operation_auth":{"session_operation_auth_by_signature":{"token":"${token}","signature":"${signature}"}},"content_auth":{"auth_type":"${auth_type}","content_key_timeout":${contentKeyTimeout},"service_id":"${service_id}","service_user_id":"${service_user_id}"},"client_info":{"player_id":"${playerId}"},"priority":${priority}}}"""
-                /*
-                //hls ExoPlayerでHlsMediaSourceにして上げないといけないみたいなのでmp4-ecoでいく
-                return """{"session":{"recipe_id":"${recipeId}","content_id":"${contentId}","content_type":"movie","content_src_id_sets":[{"content_src_ids":[{"src_id_to_mux":{"video_src_ids":[${videos}],"audio_src_ids":[${audio_src}]}}]}],"timing_constraint":"unlimited","keep_method":{"heartbeat":{"lifetime":${heartbeatLifetime}}},"protocol":{"name":"http","parameters":{"http_parameters":{"parameters":{"hls_parameters":{"use_well_known_port":"yes","use_ssl":"yes","transfer_preset":"${transferPresets}","segment_duration":6000}}}}},"content_uri":"","session_operation_auth":{"session_operation_auth_by_signature":{"token":"${token}","signature":"${signature}"}},"content_auth":{"auth_type":"${auth_type}","content_key_timeout":${contentKeyTimeout},"service_id":"${service_id}","service_user_id":"${service_user_id}"},"client_info":{"player_id":"${playerId}"},"priority":${priority}}}"""
-                 */
-
-            }else {
-                if( !MovieAccess().isWiFiConnected(GLOBAL.APPLICATIONCONTEXT) ){
-                    //Wifi接続なし
-                    videos = videos.pregReplace("^.*,","")
-                    println("video_src=${videos}")
-                }
-                //mp4
-                return """{"session":{"recipe_id":"${recipeId}","content_id":"${contentId}","content_type":"movie","content_src_id_sets":[{"content_src_ids":[{"src_id_to_mux":{"video_src_ids":[${videos}],"audio_src_ids":[${audio_src}]}}]}],"timing_constraint":"unlimited","keep_method":{"heartbeat":{"lifetime":${heartbeatLifetime}}},"protocol":{"name":"http","parameters":{"http_parameters":{"parameters":{"http_output_download_parameters":{"use_well_known_port":"yes","use_ssl":"yes","transfer_preset":"${transferPresets}"}}}}},"content_uri":"","session_operation_auth":{"session_operation_auth_by_signature":{"token":"${token}","signature":"${signature}"}},"content_auth":{"auth_type":"${auth_type}","content_key_timeout":${contentKeyTimeout},"service_id":"${service_id}","service_user_id":"${service_user_id}"},"client_info":{"player_id":"${playerId}"},"priority":${priority}}}"""
-            }
-        }
-    fun Set_session_metadata(ResponseMetadata:String){
-        session_metadata = ResponseMetadata.pregMatche_firstString("\"data\":(.*)\\}$")
-        session_id = session_metadata.pregMatche_firstString("\"id\":\"(.*?)\",")
-        content_uri = session_metadata.pregMatche_firstString("\"content_uri\":\"(.*?)\",").pregReplace("\\\\", "")
-        session_metadata = session_metadata.pregReplace("\"content_uri\":\"(.*?)\",", "\"content_uri\":\"${content_uri}\",")
-    }
-    fun Start_HeartBeat() {
-        runBlocking {
-            val url = "https://api.dmc.nico/api/sessions/${session_id}?_format=json&_method=PUT"
-            val body = ""
-            async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
-                Post_HeartBeat()
-                timer = Timer()
-                timer?.schedule(40000, 40000, {
-                    Post_HeartBeat()
-                    var checkSurvival = false
-                    if( !isThumbMovie ){
-                        checkSurvival = CachedMovies.cachedMovies.any{ it.smNum == smNum }
-                    }else {
-                        checkSurvival = CachedThumbMovies.cachedMovies.any{ it.smNum == smNum }
-                    }
-                    //println("smNum=${smNum}")
-                    //println("CachedMovies.cachedMovies.any{ it.smNum == smNum } ")
-                    //println(CachedMovies.cachedMovies.any{ it.smNum == smNum } )
-                    //for( m in CachedMovies.cachedMovies ){
-                    //    println(m.smNum)
-                    //}
-                    if( checkSurvival == false ){
-                        println("別のをダウンロードに行ってキャッシュから消されてたら終わり")
-                        End_HeartBeat()
-                    }else {
-                        CachedMovies.cachedMovies.indexOfLast { it.smNum == smNum }.let {
-                            if( it != -1 ){
-                                if( CachedMovies.cachedMovies[it].simpleExoPlayer.bufferedPercentage >= 99 ){
-                                    println("ロード終わり")
-                                    End_HeartBeat()
-                                }
-                            }
-                        }
-                    }
-                })
-            }
-        }
-    }
-    fun Post_HeartBeat() {
-        runBlocking {
-            val url = "https://api.dmc.nico/api/sessions/${session_id}?_format=json&_method=PUT"
-            val body = session_metadata
-            async(Dispatchers.Default) { HttpUtil.httpPOST(url, body) }.await().let {
-                if (it != null) {
-                    println("HeartBeat Return! ${smNum}")
-                    println(it)
-                    Set_session_metadata(it)
-                }
-            }
-        }
-    }
-    fun End_HeartBeat() {
-        println("HeartBeat End!")
-        timer?.cancel()
-    }
-}
-
 object CachedMovies {
     //
     data class CachedMovie(var url:String, var smNum: String, var simpleExoPlayer: SimpleExoPlayer )
@@ -349,11 +201,10 @@ object CachedMovies {
         val loadControl = DefaultLoadControl.Builder().setBackBuffer(10*60*1000, true).createDefaultLoadControl()
         val simpleExoPlayer = SimpleExoPlayer.Builder(GLOBAL.APPLICATIONCONTEXT).setLoadControl(loadControl)
             .build()
-        val dataSourceFactory = DefaultDataSourceFactory(
-            GLOBAL.APPLICATIONCONTEXT,
+        val dataSourceFactory = DefaultHttpDataSourceFactory(
             Util.getUserAgent(GLOBAL.APPLICATIONCONTEXT, GLOBAL.APPLICATIONCONTEXT.packageName)
         )
-        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(url))
+        val mediaSource = HlsMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(url))
         simpleExoPlayer.prepare(mediaSource)
 
         //simpleExoPlayer.playWhenReady = true
@@ -373,11 +224,11 @@ object CachedMovies {
 //保持しておけるSimpleExoPlayerの数が非常に少ないのでゲームプレイ時に開放する
 object CachedThumbMovies {
     //
-    class CachedMovie(var url:String, var smNum: String, var simpleExoPlayer: SimpleExoPlayer, var check:Int, var nicoDmc: NicoDmc?, var time:Long = System.currentTimeMillis(), var just:Boolean = false )
+    class CachedMovie(var url:String, var smNum: String, var simpleExoPlayer: SimpleExoPlayer, var check:Int, var time:Long = System.currentTimeMillis(), var just:Boolean = false )
     //AndroidではCheck機能は死に機能。まぁ３つしかキャッシュできないし、くるくる回してりゃリロードされる。
 
     var cachedMovies:MutableList<CachedMovie> = mutableListOf()
-    fun access(url:String,smNum: String, nicoDmc: NicoDmc?) : SimpleExoPlayer {
+    fun access(url:String,smNum: String) : SimpleExoPlayer {
         // プレイ指示して、5秒間再生されてない状態が続くとHeartBeat切れとみなしcheck=2になっている(Selectorで)。なのでキャッシュを削除
         // もしくは、もう120秒たったら強制的に読み込みしなおしにしてしまう、か。
         val num = cachedMovies.size
@@ -407,17 +258,16 @@ object CachedThumbMovies {
         val loadControl = DefaultLoadControl.Builder().setBackBuffer(10*60*1000, true).createDefaultLoadControl()
         val simpleExoPlayer = SimpleExoPlayer.Builder(GLOBAL.APPLICATIONCONTEXT).setLoadControl(loadControl)
             .build()
-        val dataSourceFactory = DefaultDataSourceFactory(
-            GLOBAL.APPLICATIONCONTEXT,
+        val dataSourceFactory = DefaultHttpDataSourceFactory(
             Util.getUserAgent(GLOBAL.APPLICATIONCONTEXT, GLOBAL.APPLICATIONCONTEXT.packageName)
         )
-        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(url))
+        val mediaSource = HlsMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(url))
         simpleExoPlayer.prepare(mediaSource)
 
         //simpleExoPlayer.playWhenReady = true
         simpleExoPlayer.volume = 0.2f * USERDATA.SoundVolumeMovie
 
-        val cachedMovie = CachedMovie(url,smNum,simpleExoPlayer,0, nicoDmc)
+        val cachedMovie = CachedMovie(url,smNum,simpleExoPlayer,0)
         cachedMovies.add(cachedMovie)
 
         while (cachedMovies.count() > 3){
