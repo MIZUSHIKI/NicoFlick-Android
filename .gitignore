@@ -12,6 +12,11 @@
 /captures
 .externalNativeBuild
 .cxx
+/SELECTOR_DIAGNOSTICS.md
+/README_EDITOR_JA.md
+/README_PORTING_JA.md
+/reference_images/
+/docs/
 
 # JVM crash diagnostic logs
 hs_err_pid*.log
