@@ -1,5 +1,7 @@
 package com.mizushiki.nicoflick_a
 
+import com.mizushiki.nicoflick_a.databinding.FragmentHowToGameBinding
+
 
 import android.os.Bundle
 import androidx.fragment.app.Fragment
@@ -9,11 +11,18 @@ import android.view.ViewGroup
 import androidx.core.view.isVisible
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.FragmentStatePagerAdapter
-import kotlinx.android.synthetic.main.activity_how_to_game.*
-import kotlinx.android.synthetic.main.fragment_how_to_game.*
-import kotlinx.android.synthetic.main.fragment_ranking.*
+
 
 class Fragment_HowToGame : Fragment() {
+
+    private var _binding: FragmentHowToGameBinding? = null
+    private val binding get() = checkNotNull(_binding)
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+
 
     companion object {
         fun newInstance(Rdrawable: Int): Fragment_HowToGame {
@@ -29,20 +38,21 @@ class Fragment_HowToGame : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        return inflater.inflate(R.layout.fragment_how_to_game, container, false)
+        _binding = FragmentHowToGameBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
     override fun onStart() {
         super.onStart()
-        button_HowToGame_OK.setOnClickListener{ activity?.finish() }
+        binding.buttonHowToGameOK.setOnClickListener{ activity?.finish() }
 
         val Rdrawable = arguments!!.getInt("Rdrawable")
         if( Rdrawable == 0 ){
-            imageView_HowToGame.isVisible = false
+            binding.imageViewHowToGame.isVisible = false
             return
         }
-        button_HowToGame_OK.isVisible = false
-        imageView_HowToGame.setImageResource(Rdrawable)
+        binding.buttonHowToGameOK.isVisible = false
+        binding.imageViewHowToGame.setImageResource(Rdrawable)
     }
 }
 

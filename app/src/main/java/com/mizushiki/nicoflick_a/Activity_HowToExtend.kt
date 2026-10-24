@@ -1,18 +1,24 @@
 package com.mizushiki.nicoflick_a
 
+import com.mizushiki.nicoflick_a.databinding.ActivityHowToExtendBinding
+
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.View
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.viewpager.widget.ViewPager
-import kotlinx.android.synthetic.main.activity_how_to_game.*
+
 
 class Activity_HowToExtend : AppCompatActivity() {
 
+    private lateinit var binding: ActivityHowToExtendBinding
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_how_to_extend)
+        binding = ActivityHowToExtendBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         /// フラグメントのリストを作成
         val fragmentList = arrayListOf<Fragment>(
@@ -25,14 +31,14 @@ class Activity_HowToExtend : AppCompatActivity() {
         /// adapterのインスタンス生成
         val adapter = HowToGameAdapter(supportFragmentManager, fragmentList)
         /// adapterをセット
-        viewPager_HowToGame.adapter = adapter
+        binding.viewPagerHowToGame.adapter = adapter
 
         // 最後のページに来たらnextボタンを消す
-        viewPager_HowToGame.addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
+        binding.viewPagerHowToGame.addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
                 if( position >= fragmentList.size-1){
-                    button_nextPage.isVisible = false
+                    binding.buttonNextPage.isVisible = false
                 }
             }
         })
@@ -43,6 +49,6 @@ class Activity_HowToExtend : AppCompatActivity() {
 
     fun Button_NextPage(view: View) {
         // ページを1つ進める
-        viewPager_HowToGame.currentItem += 1
+        binding.viewPagerHowToGame.currentItem += 1
     }
 }

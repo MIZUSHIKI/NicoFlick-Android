@@ -5,4 +5,6 @@
     <dimen name="appbar_padding">16dp</dimen>
     <dimen name="fab_margin">16dp</dimen>
     <dimen name="appbar_padding_top">8dp</dimen>
+    <!-- 練習操作エリア下端とmenu上端の間隔。大きくすると上へ移動する。 -->
+    <dimen name="practice_controls_menu_gap">8dp</dimen>
 </resources>

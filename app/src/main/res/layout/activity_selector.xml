@@ -35,7 +35,7 @@
         android:id="@+id/playerView_SlashShade_layout">
     </FrameLayout>
 
-    <it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow
+    <it.moondroid.coverflow.components.ui.containers.StableFeatureCoverFlow
             android:id="@+id/coverflow"
             android:layout_width="0dp"
             android:layout_height="400dp"
@@ -80,7 +80,7 @@
             android:layout_height="40dp"
             android:id="@+id/button_thumbMoviePlay"
             android:onClick="Button_thumbMoviePlay"
-            android:background="@drawable/exo_icon_circular_play"
+            android:background="@drawable/video_off"
             android:layout_marginStart="8dp"
             android:scaleX="0.8"
             android:scaleY="0.8"
@@ -148,23 +148,12 @@
     />
     <TextView
             android:layout_width="100dp"
-            android:layout_height="wrap_content"
+            android:layout_height="35dp"
+            android:gravity="center_vertical|end"
             android:id="@+id/text_Num"
             coverflow:layout_constraintEnd_toEndOf="@+id/text_Title_c"
             coverflow:layout_constraintBottom_toTopOf="@+id/text_Title_c" android:layout_marginEnd="8dp"
             android:layout_marginStart="8dp" android:textAlignment="viewEnd" android:textSize="10sp"/>
-    <Button
-            android:layout_width="35dp"
-            android:layout_height="20dp"
-            android:id="@+id/button_musicSort"
-            android:onClick="Button_MusicSort"
-            android:background="@drawable/cursor_lr"
-            android:layout_marginStart="8dp"
-            android:scaleX="0.8"
-            android:scaleY="0.8"
-            android:alpha="0.3"
-            coverflow:layout_constraintStart_toStartOf="@+id/text_Title_c"
-            coverflow:layout_constraintBottom_toTopOf="@+id/text_Title_c"/>
     <Button
             android:layout_width="50dp"
             android:layout_height="50dp"
@@ -223,10 +212,12 @@
         <ImageView android:layout_width="match_parent" android:layout_height="80dp"
                       android:layout_marginTop="60dp" android:orientation="vertical"
                       android:id="@+id/outputImageView_levelScroller"/>
-        <LinearLayout android:layout_width="match_parent" android:layout_height="240dp"
+        <LinearLayout android:layout_width="match_parent" android:layout_height="320dp"
                       android:layout_marginTop="-20dp" android:orientation="vertical"
                       android:alpha="0.3"
                       android:id="@+id/levelpickerContainer">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="80dp"
+                    android:orientation="vertical" android:id="@+id/picker_row_m1">
             <TextView
                     android:layout_width="match_parent"
                     android:layout_height="16dp"
@@ -245,12 +236,23 @@
                         android:paddingLeft="10dp"
                         android:id="@+id/rank_m1"/>
                 <TextView
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_width="match_parent" android:layout_height="match_parent"
                         android:layout_marginTop="5dp"
                         android:fontFamily="@font/nicokaku_v1"
                         android:textSize="14sp"
-                        android:gravity="center"
+                        android:gravity="top|center_horizontal"
                         android:id="@+id/star_m1"/>
+                <TextView
+                        android:id="@+id/calc_level_m1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="top|center_horizontal"
+                        android:layout_marginTop="20dp"
+                        android:textSize="9sp"
+                        android:textColor="#BBBBBB"
+                        android:includeFontPadding="false"
+                        android:singleLine="true"
+                        android:visibility="gone"/>
                 <TextView
                         android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:layout_marginTop="30dp"
@@ -268,6 +270,9 @@
                     android:gravity="right|top"
                     android:id="@+id/date_m1"/>
 
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="80dp"
+                    android:orientation="vertical" android:id="@+id/picker_row_center">
             <TextView
                     android:layout_width="match_parent"
                     android:layout_height="16dp"
@@ -286,12 +291,23 @@
                         android:paddingLeft="10dp"
                         android:id="@+id/rank"/>
                 <TextView
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_width="match_parent" android:layout_height="match_parent"
                         android:layout_marginTop="5dp"
                         android:fontFamily="@font/nicokaku_v1"
                         android:textSize="14sp"
-                        android:gravity="center"
+                        android:gravity="top|center_horizontal"
                         android:id="@+id/star"/>
+                <TextView
+                        android:id="@+id/calc_level"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="top|center_horizontal"
+                        android:layout_marginTop="20dp"
+                        android:textSize="9sp"
+                        android:textColor="#BBBBBB"
+                        android:includeFontPadding="false"
+                        android:singleLine="true"
+                        android:visibility="gone"/>
                 <TextView
                         android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:layout_marginTop="30dp"
@@ -309,6 +325,9 @@
                     android:gravity="right|top"
                     android:id="@+id/date"/>
 
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="80dp"
+                    android:orientation="vertical" android:id="@+id/picker_row_p1">
             <TextView
                     android:layout_width="match_parent"
                     android:layout_height="16dp"
@@ -327,12 +346,23 @@
                         android:paddingLeft="10dp"
                         android:id="@+id/rank_p1"/>
                 <TextView
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_width="match_parent" android:layout_height="match_parent"
                         android:layout_marginTop="5dp"
                         android:fontFamily="@font/nicokaku_v1"
                         android:textSize="14sp"
-                        android:gravity="center"
+                        android:gravity="top|center_horizontal"
                         android:id="@+id/star_p1"/>
+                <TextView
+                        android:id="@+id/calc_level_p1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="top|center_horizontal"
+                        android:layout_marginTop="20dp"
+                        android:textSize="9sp"
+                        android:textColor="#BBBBBB"
+                        android:includeFontPadding="false"
+                        android:singleLine="true"
+                        android:visibility="gone"/>
                 <TextView
                         android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:layout_marginTop="30dp"
@@ -349,6 +379,63 @@
                     android:textSize="8dp"
                     android:gravity="right|top"
                     android:id="@+id/date_p1"/>
+
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="80dp"
+                    android:orientation="vertical" android:id="@+id/picker_row_p2">
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="16dp"
+                    android:textColor="#999999"
+                    android:fontFamily="@font/nicokaku_v1"
+                    android:textSize="9dp"
+                    android:layout_marginLeft="10dp"
+                    android:gravity="bottom"
+                    android:id="@+id/score_p2"/>
+            <FrameLayout android:layout_width="match_parent" android:layout_height="50dp">
+                <TextView
+                        android:layout_width="100dp" android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:textSize="32sp"
+                        android:textStyle="bold"
+                        android:paddingLeft="10dp"
+                        android:id="@+id/rank_p2"/>
+                <TextView
+                        android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:layout_marginTop="5dp"
+                        android:fontFamily="@font/nicokaku_v1"
+                        android:textSize="14sp"
+                        android:gravity="top|center_horizontal"
+                        android:id="@+id/star_p2"/>
+                <TextView
+                        android:id="@+id/calc_level_p2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="top|center_horizontal"
+                        android:layout_marginTop="20dp"
+                        android:textSize="9sp"
+                        android:textColor="#BBBBBB"
+                        android:includeFontPadding="false"
+                        android:singleLine="true"
+                        android:visibility="gone"/>
+                <TextView
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="30dp"
+                        android:textSize="8sp"
+                        android:textColor="#999999"
+                        android:gravity="center"
+                        android:id="@+id/creator_p2"/>
+
+            </FrameLayout>
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="15dp"
+                    android:textColor="#999999"
+                    android:textSize="8dp"
+                    android:gravity="right|top"
+                    android:id="@+id/date_p2"/>
+
+            </LinearLayout>
         </LinearLayout>
         <View
                 android:layout_width="match_parent"
@@ -362,6 +449,22 @@
                 android:layout_marginBottom="60dp"
                 android:background="#DDDDDD"
                 android:layout_gravity="bottom"/>
+        <View
+                android:layout_width="match_parent"
+                android:layout_height="24dp"
+                android:layout_gravity="top"
+                android:background="@drawable/gradation"
+                android:clickable="false"
+                android:focusable="false"
+                android:importantForAccessibility="no"/>
+        <View
+                android:layout_width="match_parent"
+                android:layout_height="24dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/gradation_r"
+                android:clickable="false"
+                android:focusable="false"
+                android:importantForAccessibility="no"/>
 
     </FrameLayout>
     <Button
@@ -409,93 +512,138 @@
             android:layout_marginRight="10dp"
             android:textSize="7sp"
             android:textColor="#999999"/>
-    <Button
+    <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/layout_like"
             android:layout_width="35dp"
             android:layout_height="35dp"
-            android:id="@+id/button_favoriteWaku"
-            android:onClick="Button_favorite"
-            android:background="@drawable/hukidasi"
             android:layout_marginEnd="16dp"
-            android:scaleX="1.0"
-            android:scaleY="1.0"
-            android:alpha="0.2"
-            coverflow:layout_constraintTop_toTopOf="@+id/frameLayout"
-            coverflow:layout_constraintBottom_toTopOf="@+id/button_RankingComment"
-            coverflow:layout_constraintEnd_toEndOf="@+id/frameLayout"/>
-    <Button
-            android:layout_width="20dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            coverflow:layout_constraintTop_toTopOf="@id/frameLayout"
+            coverflow:layout_constraintBottom_toTopOf="@id/button_RankingComment"
+            coverflow:layout_constraintEnd_toEndOf="@id/frameLayout">
+        <Button
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:id="@+id/button_likeWaku"
+                android:onClick="Button_like"
+                android:background="@drawable/hukidasi"
+                android:scaleX="1.0"
+                android:scaleY="1.0"
+                android:alpha="0.2"
+                coverflow:layout_constraintTop_toTopOf="parent"
+                coverflow:layout_constraintBottom_toBottomOf="parent"
+                coverflow:layout_constraintEnd_toEndOf="parent"
+                coverflow:layout_constraintStart_toStartOf="parent"/>
+        <ImageView
+                android:src="@drawable/heart"
+                android:layout_width="19dp"
+                android:layout_height="19dp" android:id="@+id/heart_mono"
+                app:layout_constraintBottom_toBottomOf="@+id/button_likeWaku"
+                app:layout_constraintTop_toTopOf="@+id/button_likeWaku"
+                app:layout_constraintStart_toStartOf="@+id/button_likeWaku"
+                app:layout_constraintEnd_toEndOf="@+id/button_likeWaku"
+                android:scaleX="0.9"
+                android:scaleY="0.9"
+                android:alpha="0.5"
+                android:visibility="visible"/>
+        <ImageView
+                android:src="@drawable/heart_color"
+                android:layout_width="19dp"
+                android:layout_height="19dp" android:id="@+id/heart_color"
+                app:layout_constraintBottom_toBottomOf="@+id/button_likeWaku"
+                app:layout_constraintTop_toTopOf="@+id/button_likeWaku"
+                app:layout_constraintStart_toStartOf="@+id/button_likeWaku"
+                app:layout_constraintEnd_toEndOf="@+id/button_likeWaku"
+                android:visibility="invisible"/>
+        <ImageView
+                android:src="@drawable/heart_black"
+                android:layout_width="19dp"
+                android:layout_height="19dp" android:id="@+id/heart_black"
+                app:layout_constraintBottom_toBottomOf="@+id/button_likeWaku"
+                app:layout_constraintTop_toTopOf="@+id/button_likeWaku"
+                app:layout_constraintStart_toStartOf="@+id/button_likeWaku"
+                app:layout_constraintEnd_toEndOf="@+id/button_likeWaku"
+                android:visibility="invisible"/>
+        <com.mizushiki.nicoflick_a.DecolationLabel
+                android:text="100"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:id="@+id/text_LikeNum"
+                coverflow:layout_constraintStart_toStartOf="@+id/button_likeWaku"
+                coverflow:layout_constraintEnd_toEndOf="@+id/button_likeWaku" android:layout_marginBottom="2px"
+                coverflow:layout_constraintBottom_toBottomOf="@+id/button_likeWaku" android:textAlignment="center"
+                android:ellipsize="end" android:maxLines="1" android:textSize="8sp"
+                android:textColor="#111111"
+                app:stroke_size="2"
+                app:stroke_color="#FFFFFF"/>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+    <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/layout_favorite"
+            android:layout_width="35dp"
             android:layout_height="35dp"
-            android:id="@+id/button_levelSort"
-            android:onClick="Button_LevelSort"
-            android:background="@drawable/cursor_ud"
-            android:scaleX="0.8"
-            android:scaleY="0.8"
-            android:alpha="0.3"
-            coverflow:layout_constraintTop_toTopOf="@+id/button_favoriteWaku"
-            coverflow:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku"
-            coverflow:layout_constraintEnd_toStartOf="@+id/button_favoriteWaku"/>
-    <ImageView
-            android:src="@drawable/star"
-            android:layout_width="19dp"
-            android:layout_height="19dp" android:id="@+id/star_mono"
-            app:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku"
-            app:layout_constraintTop_toTopOf="@+id/button_favoriteWaku"
-            app:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
-            app:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku"
-            android:scaleX="0.9"
-            android:scaleY="0.9"
-            android:alpha="0.5"
-            android:visibility="visible"/>
-    <ImageView
-            android:src="@drawable/star_color"
-            android:layout_width="19dp"
-            android:layout_height="19dp" android:id="@+id/star_color"
-            app:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku"
-            app:layout_constraintTop_toTopOf="@+id/button_favoriteWaku"
-            app:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
-            app:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku"
-            android:visibility="invisible"/>
-    <ImageView
-            android:src="@drawable/star_bk"
-            android:layout_width="19dp"
-            android:layout_height="19dp" android:id="@+id/star_black"
-            app:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku"
-            app:layout_constraintTop_toTopOf="@+id/button_favoriteWaku"
-            app:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
-            app:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku"
-            android:visibility="invisible"/>
-    <TextView
-            android:text=""
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:id="@+id/text_FavoriteNum3"
-            coverflow:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
-            coverflow:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku" android:layout_marginBottom="3px"
-             android:layout_marginEnd="1px"
-            coverflow:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku" android:textAlignment="center"
-            android:ellipsize="end" android:maxLines="1" android:textSize="8sp"
-            android:textColor="#FFFFFF"/>
-    <TextView
-            android:text=""
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:id="@+id/text_FavoriteNum2"
-            coverflow:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
-            coverflow:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku" android:layout_marginBottom="1px"
-            android:layout_marginStart="1px"
-            coverflow:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku" android:textAlignment="center"
-            android:ellipsize="end" android:maxLines="1" android:textSize="8sp"
-            android:textColor="#FFFFFF"/>
-    <TextView
-            android:text="100"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:id="@+id/text_FavoriteNum"
-            coverflow:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
-            coverflow:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku" android:layout_marginBottom="2px"
-            coverflow:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku" android:textAlignment="center"
-            android:ellipsize="end" android:maxLines="1" android:textSize="8sp"
-            android:textColor="#111111"/>
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            coverflow:layout_constraintTop_toTopOf="@id/button_thumbMoviePlay"
+            coverflow:layout_constraintBottom_toBottomOf="@id/button_thumbMoviePlay"
+            coverflow:layout_constraintEnd_toEndOf="@id/layout_like">
+        <Button
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:id="@+id/button_favoriteWaku"
+                android:onClick="Button_MusicFavorite"
+                android:contentDescription="楽曲のお気に入り"
+                android:background="@drawable/hukidasi"
+                android:scaleX="1.0"
+                android:scaleY="1.0"
+                android:alpha="0.2"
+                coverflow:layout_constraintTop_toTopOf="parent"
+                coverflow:layout_constraintBottom_toBottomOf="parent"
+                coverflow:layout_constraintEnd_toEndOf="parent"
+                coverflow:layout_constraintStart_toStartOf="parent"/>
+        <ImageView
+                android:src="@drawable/star"
+                android:layout_width="19dp"
+                android:layout_height="19dp" android:id="@+id/star_mono"
+                app:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku"
+                app:layout_constraintTop_toTopOf="@+id/button_favoriteWaku"
+                app:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
+                app:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku"
+                android:scaleX="0.9"
+                android:scaleY="0.9"
+                android:alpha="0.5"
+                android:visibility="visible"/>
+        <ImageView
+                android:src="@drawable/star_color"
+                android:layout_width="19dp"
+                android:layout_height="19dp" android:id="@+id/star_color"
+                app:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku"
+                app:layout_constraintTop_toTopOf="@+id/button_favoriteWaku"
+                app:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
+                app:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku"
+                android:visibility="invisible"/>
+        <ImageView
+                android:src="@drawable/star_bk"
+                android:layout_width="19dp"
+                android:layout_height="19dp" android:id="@+id/star_black"
+                app:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku"
+                app:layout_constraintTop_toTopOf="@+id/button_favoriteWaku"
+                app:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
+                app:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku"
+                android:visibility="invisible"/>
+        <com.mizushiki.nicoflick_a.DecolationLabel
+                android:text=""
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:id="@+id/text_FavoriteNum"
+                coverflow:layout_constraintStart_toStartOf="@+id/button_favoriteWaku"
+                coverflow:layout_constraintEnd_toEndOf="@+id/button_favoriteWaku" android:layout_marginBottom="2px"
+                coverflow:layout_constraintBottom_toBottomOf="@+id/button_favoriteWaku" android:textAlignment="center"
+                android:ellipsize="end" android:maxLines="1" android:textSize="8sp"
+                android:textColor="#111111"
+                app:stroke_size="2"
+                app:stroke_color="#FFFFFF"/>
+    </androidx.constraintlayout.widget.ConstraintLayout>
     <Button
             android:text="Start\nPage"
             android:layout_width="wrap_content"
@@ -529,4 +677,17 @@
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintHorizontal_bias="0.5"
             app:layout_constraintEnd_toEndOf="parent" android:visibility="invisible"/>
 
+    <Button
+        android:id="@+id/button_sortMenu"
+        android:layout_width="35dp"
+        android:layout_height="35dp"
+        android:layout_marginStart="2dp"
+        android:alpha="0.3"
+        android:background="@drawable/music_old"
+        android:contentDescription="楽曲の並べ替え"
+        android:minWidth="0dp"
+        android:scaleX="0.7"
+        android:scaleY="0.7"
+        coverflow:layout_constraintStart_toStartOf="parent"
+        coverflow:layout_constraintTop_toTopOf="parent" />
 </androidx.constraintlayout.widget.ConstraintLayout>

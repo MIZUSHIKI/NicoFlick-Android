@@ -185,6 +185,11 @@ class MyKeyboard(context: Context) : LinearLayout(context) {
         setPaddingKeybd()
     }
 
+    fun keyboardTopOnScreen():Int {
+        val location = IntArray(2)
+        shitaLayout.getLocationOnScreen(location)
+        return location[1] + shitaLayout.paddingTop
+    }
     fun setPaddingKeybd(left:Int = padding_left, top:Int = padding_top, right:Int = padding_right, bottom:Int = padding_bottom){
         padding_left = left
         padding_top = top
@@ -208,8 +213,8 @@ class MyKeyboard(context: Context) : LinearLayout(context) {
     class WakuView(context: Context) : View(context){
         private var paint: Paint = Paint()
         override fun onDraw(canvas: Canvas){
-            println("canvas.width=${canvas.width}")
-            println("canvas.height=${canvas.height}")
+            // println("canvas.width=${canvas.width}")
+            // println("canvas.height=${canvas.height}")
             val w = canvas.width
             val h = canvas.height
             paint.strokeWidth = 1.75f
@@ -293,7 +298,7 @@ class MyKeyboard(context: Context) : LinearLayout(context) {
                                 this.gravity = (Gravity.BOTTOM).or(Gravity.CENTER)
                             }
                         }
-                        println("bt xy= ${dragX},${dragY} - ${strokeSens} - ${selectID} / ${(this.height - dragY)}")
+                        // println("bt xy= ${dragX},${dragY} - ${strokeSens} - ${selectID} / ${(this.height - dragY)}")
                     }
                     MotionEvent.ACTION_UP -> {
                         onKeylistener(wordList[selectID])
@@ -308,7 +313,7 @@ class MyKeyboard(context: Context) : LinearLayout(context) {
         override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
             super.onLayout(changed, left, top, right, bottom)
             if( layouted ){ return }
-            println("aa ${this.width} ${this.height} ${this.textSize}")
+            // println("aa ${this.width} ${this.height} ${this.textSize}")
             val jgpad = ( (this.height - this.textSize) / 4 ).toInt()
             val sypad = ((this.width - this.textSize * 1.15 ) / 2).toInt() - jgpad
             this.setPadding( sypad, jgpad, sypad, jgpad )

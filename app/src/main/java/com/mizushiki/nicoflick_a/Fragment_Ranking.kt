@@ -1,5 +1,7 @@
 package com.mizushiki.nicoflick_a
 
+import com.mizushiki.nicoflick_a.databinding.FragmentRankingBinding
+
 import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
@@ -11,65 +13,125 @@ import android.widget.BaseAdapter
 import android.widget.ListView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.doOnNextLayout
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import com.eclipsesource.json.JsonArray
 import com.eclipsesource.json.JsonObject
-import kotlinx.android.synthetic.main.activity_selector.*
-import kotlinx.android.synthetic.main.activity_settings.*
-import kotlinx.android.synthetic.main.fragment_comment.*
-import kotlinx.android.synthetic.main.fragment_ranking.*
-import kotlinx.android.synthetic.main.fragment_ranking.Button_Back
-import kotlinx.android.synthetic.main.fragment_ranking.TextView_Star
+
 import java.text.SimpleDateFormat
 import java.time.format.DateTimeFormatter
 import java.util.*
 
 class RankingFragment : Fragment() {
 
+    private var _binding: FragmentRankingBinding? = null
+    private val binding get() = checkNotNull(_binding)
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        musicScoreDialog?.dismiss()
+        musicScoreDialog = null
+        pendingMusicScoreMessage = null
+        musicScoreLoading = false
+        rankingLoadRequest++
+        _binding = null
+        loading = false
+    }
+
+
     var myIndex:Int? = null
     var userNameDatas:UserNameDataLists = UserNameDataLists
     var scoreDatas:ScoreDataLists = ScoreDataLists
     var rankingData:List<scoreData> = listOf()
     var musicScoreMessage = ""
+    private var musicScoreLoading = false
+    private var rankingLoadRequest = 0
+    private var pendingMusicScoreMessage: String? = null
+    private var musicScoreDialog: AlertDialog? = null
+
+    private fun showPendingMusicScore() {
+        val host = activity ?: return
+        if (_binding == null || !isResumed || isHidden || host.isFinishing || host.isDestroyed) return
+        if (musicScoreDialog?.isShowing == true) return
+        val message = pendingMusicScoreMessage ?: return
+        pendingMusicScoreMessage = null
+        musicScoreDialog = AlertDialog.Builder(host)
+            .setTitle("この楽曲の最大スコア")
+            .setMessage(message)
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        showPendingMusicScore()
+    }
+
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
+        if (hidden) {
+            musicScoreDialog?.dismiss()
+            musicScoreDialog = null
+        } else showPendingMusicScore()
+    }
+
+    override fun onStop() {
+        musicScoreDialog?.dismiss()
+        musicScoreDialog = null
+        super.onStop()
+    }
 
     var loading:Boolean = false
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        return inflater.inflate(R.layout.fragment_ranking, container, false)
+        _binding = FragmentRankingBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
     override fun onStart() {
         super.onStart()
-        Button_Back.setOnClickListener{
+        val host = activity ?: return
+        if (host.isFinishing || host.isDestroyed) return
+        val selectedMusic = GLOBAL.SelectMUSIC
+        val selectedLevel = GLOBAL.SelectLEVEL
+        if (selectedMusic == null || selectedLevel == null) {
+            host.returnToStartAfterStateLoss()
+            return
+        }
+        val binding = this.binding
+        binding.ButtonBack.setOnClickListener{
             SESystemAudio.canselSePlay()
             activity?.finish()
         }
 
-        text_Title.setText(GLOBAL.SelectMUSIC!!.title)
-        TextView_Star.setText(GLOBAL.SelectLEVEL!!.getLevelAsString())
+        binding.textTitle.setText(selectedMusic.title)
+        binding.TextViewStar.setText(selectedLevel.getLevelAsString())
         if( userNameDatas.usernameJsonNumCount >= 0 ){
-            textView_usernameNum.text = "ユーザーネームデータ分割${userNameDatas.usernameJsonNumCount}まで取得済み"
+            binding.textViewUsernameNum.text = "ユーザーネームデータ分割${userNameDatas.usernameJsonNumCount}まで取得済み"
         }
 
-        progress_circular_r.isVisible = true
+        binding.progressCircularR.isVisible = true
         loading = true
+        val loadRequest = ++rankingLoadRequest
         ServerDataHandler().DownloadUserNameData {
+            if (_binding !== binding || loadRequest != rankingLoadRequest || host.isFinishing || host.isDestroyed) return@DownloadUserNameData
             if (it != null) { /*なんらかのエラー*/ }
-            ServerDataHandler().DownloadScoreData(GLOBAL.SelectLEVEL!!.sqlID){
-                progress_circular_r.isVisible = false
+            ServerDataHandler().DownloadScoreData(selectedLevel.sqlID){
+                if (_binding !== binding || loadRequest != rankingLoadRequest || host.isFinishing || host.isDestroyed) return@DownloadScoreData
+                binding.progressCircularR.isVisible = musicScoreLoading
                 loading = false
 
                 if(userNameDatas.usernameJsonNumCount == -1){
-                    textView_usernameNum.isVisible = false
+                    binding.textViewUsernameNum.isVisible = false
                 }
-                textView_usernameNum.text = "ユーザーネームデータ分割${userNameDatas.usernameJsonNumCount}まで取得済み"
+                binding.textViewUsernameNum.text = "ユーザーネームデータ分割${userNameDatas.usernameJsonNumCount}まで取得済み"
 
-                val itto = scoreDatas.getSortedScores(GLOBAL.SelectLEVEL!!.sqlID)
-                listView.adapter = RankingAdapter(GLOBAL.APPLICATIONCONTEXT, itto)
+                val itto = scoreDatas.getSortedScores(selectedLevel.sqlID)
+                binding.listView.adapter = RankingAdapter(GLOBAL.APPLICATIONCONTEXT, itto)
 
                 val myID = USERDATA.UserID
-                println("myID="+myID)
+                // println("myID="+myID)
 
                 for( (index,scoredata) in itto.withIndex()){
                     val id = scoredata.userID
@@ -77,7 +139,7 @@ class RankingFragment : Fragment() {
                         myIndex = index
                         var ind = index -3
                         if(ind < 0){ ind = 0 }
-                        listView.setSelection(ind)
+                        binding.listView.setSelection(ind)
                         break
                     }
                 }
@@ -85,59 +147,78 @@ class RankingFragment : Fragment() {
 
         }
 
-        button_Top.setOnClickListener{
-            listView.setSelection(0)
-        }
-        button_Bottom.setOnClickListener {
-            listView.setSelection(listView.count - 1)
-        }
-        button_My.setOnClickListener {
-            myIndex?.let{
-                var ind = it -3
-                if(ind < 0){ ind = 0 }
-                listView.setSelection(ind)
+        var scrollRequest = 0
+        fun scrollToRankingPosition(position: Int) {
+            val listView = binding.listView
+            if (listView.count == 0) return
+            val targetPosition = position.coerceIn(0, listView.count - 1)
+            val currentPosition = listView.firstVisiblePosition
+            val request = ++scrollRequest
+            val threshold = 10
+            if (kotlin.math.abs(targetPosition - currentPosition) > threshold) {
+                val nearbyPosition = if (targetPosition > currentPosition) {
+                    targetPosition - threshold * 2
+                } else {
+                    targetPosition + threshold
+                }
+                // 移動方向に合わせて手前へジャンプし、行配置の確定後にアニメーションする。
+                listView.doOnNextLayout {
+                    if (_binding === binding && request == scrollRequest) {
+                        listView.smoothScrollToPositionFromTop(targetPosition, 0, 300)
+                    }
+                }
+                listView.setSelectionFromTop(nearbyPosition.coerceIn(0, listView.count - 1), 0)
+            } else {
+                listView.smoothScrollToPositionFromTop(targetPosition, 0, 300)
             }
         }
-        button_musicScore.setOnClickListener{
-            SESystemAudio.openSePlay()
-            if( musicScoreMessage != "" ){
-                AlertDialog.Builder(this.context!!)
-                    .setTitle("この楽曲の最大スコア")
-                    .setMessage(musicScoreMessage)
-                    .setPositiveButton("OK", null)
-                    .show()
+
+        binding.buttonTop.setOnClickListener{
+            scrollToRankingPosition(0)
+        }
+        binding.buttonBottom.setOnClickListener {
+            scrollToRankingPosition(binding.listView.count - 1)
+        }
+        binding.buttonMy.setOnClickListener {
+            myIndex?.let{
+                scrollToRankingPosition((it - 3).coerceAtLeast(0))
+            }
+        }
+        binding.buttonMusicScore.setOnClickListener {
+            if (musicScoreLoading || musicScoreDialog?.isShowing == true ||
+                pendingMusicScoreMessage != null || host.isFinishing || host.isDestroyed) {
                 return@setOnClickListener
             }
-            progress_circular_r.isVisible = true
-            ServerDataHandler().GetMusicScoreData(GLOBAL.SelectMUSIC!!.sqlID, USERDATA.UserID){
-                progress_circular_r.isVisible = false
-                if( it == null ){
+            SESystemAudio.openSePlay()
+            if (musicScoreMessage.isNotEmpty()) {
+                pendingMusicScoreMessage = musicScoreMessage
+                showPendingMusicScore()
+                return@setOnClickListener
+            }
+            musicScoreLoading = true
+            binding.buttonMusicScore.isEnabled = false
+            binding.progressCircularR.isVisible = true
+            var completed = false
+            ServerDataHandler().GetMusicScoreData(selectedMusic.sqlID, USERDATA.UserID) { response ->
+                if (completed || _binding !== binding || host.isFinishing || host.isDestroyed) {
                     return@GetMusicScoreData
                 }
-                if( it.get(0).isObject ) {
-                    val json = it.get(0).asObject()
-                    println("json @2")
-                    val formatter = SimpleDateFormat("YYYY/M/d")
-                    if(!json.get("updateTime").isNull){
-                        musicScoreMessage += "\n全期間：${json.get("score").asString()} - ${formatter.format( Date(json.get("updateTime").asString().toLong()*1000) )}"
+                completed = true
+                musicScoreLoading = false
+                binding.buttonMusicScore.isEnabled = true
+                binding.progressCircularR.isVisible = loading
+                val records = parseMusicScoreResponse(response)
+                // 空応答や通信失敗も記録なしとして記憶し、再タップで再取得しない。
+                musicScoreMessage = if (records.isNullOrEmpty()) {
+                    "\nあなたの記録はありません"
+                } else {
+                    val formatter = SimpleDateFormat("yyyy/M/d", Locale.getDefault())
+                    records.joinToString(separator = "\n", prefix = "\n") {
+                        "${it.label}：${it.score} - ${formatter.format(Date(it.updatedAtMillis))}"
                     }
-                    if(!json.get("updateTimeYear").isNull){
-                        musicScoreMessage += "\n年間：${json.get("scoreYear").asString()} - ${formatter.format( Date(json.get("updateTimeYear").asString().toLong()*1000) )}"
-                    }
-                    if(!json.get("updateTimeMonth").isNull){
-                        musicScoreMessage += "\n月間：${json.get("scoreMonth").asString()} - ${formatter.format( Date(json.get("updateTimeMonth").asString().toLong()*1000) )}"
-                    }
-                    if(!json.get("updateTimeWeek").isNull){
-                        musicScoreMessage += "\n週間：${json.get("scoreWeek").asString()} - ${formatter.format( Date(json.get("updateTimeWeek").asString().toLong()*1000) )}"
-                    }
-                    println("json ${musicScoreMessage}")
                 }
-                if( musicScoreMessage == "" ){ musicScoreMessage = "\nあなたの記録はありません" }
-                AlertDialog.Builder(this.context!!)
-                    .setTitle("この楽曲の最大スコア")
-                    .setMessage(musicScoreMessage)
-                    .setPositiveButton("OK", null)
-                    .show()
+                pendingMusicScoreMessage = musicScoreMessage
+                showPendingMusicScore()
             }
         }
     }

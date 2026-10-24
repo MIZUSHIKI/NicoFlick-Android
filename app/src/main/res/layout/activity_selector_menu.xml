@@ -100,6 +100,13 @@
             app:layout_constraintBottom_toBottomOf="@+id/textView_sortWords"
             app:layout_constraintEnd_toEndOf="@+id/view2"
             android:textColor="@android:color/white" android:gravity="center_vertical"/>
+    <Button android:id="@+id/buttonEditor" android:text="ゲームエディター"
+            android:visibility="invisible"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:onClick="Button_Editor" android:textColor="@android:color/holo_blue_light"
+            style="@style/Widget.AppCompat.Button.Borderless.Colored"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/view3" android:layout_marginTop="8dp" />
     <Button
             android:text="@string/back"
             android:layout_width="wrap_content"

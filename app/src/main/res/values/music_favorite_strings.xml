@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="music_favorite_title">この曲をお気に入り</string>
+    <string name="music_favorite_add">お気に入りに追加</string>
+    <string name="music_favorite_remove">お気に入りを解除</string>
+    <string name="music_favorite_sort">お気に入りを先頭に集める</string>
+</resources>

@@ -1,5 +1,7 @@
 package com.mizushiki.nicoflick_a
 
+import com.mizushiki.nicoflick_a.databinding.ActivityGameViewBinding
+
 import android.animation.Animator
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
@@ -12,18 +14,21 @@ import android.graphics.RectF
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
-import android.provider.Settings
-import android.text.InputFilter
-import android.text.Spanned
 import android.util.TypedValue
 import android.view.MotionEvent
+import android.view.Choreographer
+import android.widget.SeekBar
+import android.graphics.Rect
+import androidx.appcompat.app.AlertDialog
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
-import android.widget.TextView
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.os.postDelayed
+import androidx.core.view.doOnPreDraw
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.postDelayed
@@ -34,6 +39,7 @@ import com.google.android.exoplayer2.source.MediaSourceEventListener
 import com.google.android.exoplayer2.source.ProgressiveMediaSource
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
 import com.google.android.exoplayer2.ui.PlayerView
+import com.google.android.exoplayer2.ui.AspectRatioFrameLayout
 import com.google.android.exoplayer2.upstream.BandwidthMeter
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
@@ -41,10 +47,7 @@ import com.google.android.exoplayer2.upstream.cache.NoOpCacheEvictor
 import com.google.android.exoplayer2.upstream.cache.SimpleCache
 import com.google.android.exoplayer2.util.Clock
 import com.google.android.exoplayer2.util.Util
-import kotlinx.android.synthetic.main.activity_game_view.*
-import kotlinx.android.synthetic.main.activity_game_view.editText
-import kotlinx.android.synthetic.main.activity_settings_keyboard.*
-import kotlinx.android.synthetic.main.fragment_ranking.*
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -53,6 +56,19 @@ import kotlin.math.abs
 
 
 class Activity_GameView : AppCompatActivity() {
+
+    // プロセス内だけ保持し、アプリのキル後は再び準備する。
+    companion object {
+        private var keyboardPrepared = false
+    }
+    private var waitingForKeyboard = !keyboardPrepared
+    private var keyboardPreparationOverlay: FrameLayout? = null
+    private var keyboardPreparationMessage: android.widget.TextView? = null
+
+    private lateinit var binding: ActivityGameViewBinding
+    private val movieScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Main)
+    private var movieLoadJob: kotlinx.coroutines.Job? = null
+
 
     //各種データ
     var musicDatas: MusicDataLists = MusicDataLists
@@ -72,8 +88,6 @@ class Activity_GameView : AppCompatActivity() {
     var animationEndYsa = 0.0f
     var comboanimeStartYsa = 0.0f
     var comboanimeEndYsa = 0.0f
-    var comboanimeStartYsa2 = 0.0f
-    var comboanimeEndYsa2 = 0.0f
 
 
     //ゲーム　表示、判定　定数データ
@@ -89,9 +103,6 @@ class Activity_GameView : AppCompatActivity() {
     var playerviewHeight = 0
     var playerviewOriginalHeight = 0
 
-    var progressBar_centerY = 0.0f //ボーダーの位置。なんだか上手く取れないぞ？
-    var progressBar2_centerY = 0.0f
-
     var t03:Double = 3.0
     var time3secMediaTime:Double? = null
     var saveData_time3sec:Double? = null
@@ -103,35 +114,119 @@ class Activity_GameView : AppCompatActivity() {
 
     //private lateinit var simpleExoPlayer: SimpleExoPlayer
     private var cacheExoPlayer: SimpleExoPlayer? = null
-    private lateinit var playerView: PlayerView
+    private val playerView: PlayerView get() = binding.playerView
 
-    var maeSource = ""
-    var maeSourceClear = false
-    var editFlg = 0
     var paused = false
+    private var gameViewResumed = false
+    private var gameMenuOpen = false
+    private var initialPlaybackReady = false
+    private var countdownPausedAt: Double? = null
+    private val startPlayback = Runnable {
+        // 動画とノーツの準備が整うまで、先行ノーツの時計を開始しない。
+        if (waitingForKeyboard || !gameViewResumed || initialPlaybackReady || !notesReady ||
+            cacheExoPlayer?.playbackState != Player.STATE_READY ||
+            !GamePlaying || timerKill || isFinishing || isDestroyed) return@Runnable
+        initialPlaybackReady = true
+        time3secMediaTime = if (t03 <= 0.0) null else android.os.SystemClock.elapsedRealtime() / 1000.0
+        updatePlaybackState()
+    }
+
+    private fun updatePlaybackState() {
+        val shouldPlay = gameViewResumed && !gameMenuOpen &&
+            GamePlaying && !timerKill && !isFinishing && !isDestroyed &&
+            initialPlaybackReady && !waitingForKeyboard && !practiceSeeking && pendingSeekSeconds == null
+        // 開始前のカウントダウンも、メニューやバックグラウンド中は進めない。
+        val now = android.os.SystemClock.elapsedRealtime() / 1000.0
+        if (time3secMediaTime == null) {
+            countdownPausedAt = null
+        } else if (!shouldPlay) {
+            if (countdownPausedAt == null) countdownPausedAt = now
+        } else {
+            countdownPausedAt?.let { time3secMediaTime = time3secMediaTime!! + now - it }
+            countdownPausedAt = null
+        }
+        cacheExoPlayer?.playWhenReady = shouldPlay
+    }
     var resultSegued = false //遷移中フラグ
 
     var GamePlaying = true
 
-    var usedSimeji:Boolean = false
-        //maeSourceを30文字ごとに消去する。（editも""にする）
-        //Simejiは一気に30文字以上入力できないらしい。（1秒以上の隙間なく30文字以上来られると強制ミスになってしまう）
-        //今のところ見つけたのはSimejiだけ。(一応Simejiは(超軽量状態にしていたら)editを1文字ごとに""してもラグはなかった)
     var myKeybd:MyKeyboard? = null
     var useMyKeybd = USERDATA.UseNicoFlickKeyboard
     var borderPosUe = USERDATA.BorderPosUe
 
     val mHandler = Handler()
     var timerKill = false
+    var practiceMode = false
+        private set(value) {
+            field = value
+            if (value) noteData.score.markNonStandardConditions()
+        }
+    private var practiceSeeking = false
+    private var waitingForFlickAfterSeek = false
+    private var nextMissCheckIndex = 0
+    private var nextAutoPlayIndex = 0
+    private var practiceRate = 1.0f
+    private var notesReady = false
+    private var hasPassedFirstNote = false
+    private var pendingSeekSeconds:Double? = null
+    private var frameScheduled = false
+    private val choreographer by lazy { Choreographer.getInstance() }
+    private val frameCallback = object : Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos:Long) {
+            frameScheduled = false
+            if (timerKill || !notesReady || !GamePlaying) return
+            timerRun.run()
+            startFrames()
+        }
+    }
+    private fun startFrames() {
+        if (!frameScheduled && !timerKill && notesReady && GamePlaying) {
+            frameScheduled = true
+            choreographer.postFrameCallback(frameCallback)
+        }
+    }
+    private fun stopFrames() {
+        choreographer.removeFrameCallback(frameCallback)
+        frameScheduled = false
+    }
+    private var playbackListener:Player.EventListener? = null
+
     private var run: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_game_view)
+        binding = ActivityGameViewBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        selectMusic = GLOBAL.SelectMUSIC ?: return returnToStartAfterStateLoss()
+        selectLevel = GLOBAL.SelectLEVEL ?: return returnToStartAfterStateLoss()
+        configurePracticeControls()
+        binding.textViewJudgeOffset.isVisible = USERDATA.showOffsetLabel
+        window.decorView.viewTreeObserver.addOnGlobalLayoutListener {
+            updateMovieLayout()
+            updateKeyboardPreparationLayout()
+        }
+
+        // 初回描画前に実測座標で前回の高さを適用する。
+        val previousKeyboardTop = USERDATA.maeKeyboardTop
+        if (USERDATA.fitsMovieToKeyboardHeight && previousKeyboardTop != 0) {
+            binding.root.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    binding.root.viewTreeObserver.removeOnPreDrawListener(this)
+                    val location = IntArray(2); playerView.getLocationOnScreen(location)
+                    val progressSpace = binding.progressBarLoaded.height
+                    val available = (previousKeyboardTop - location[1] - progressSpace).coerceAtLeast(1)
+                    if (playerView.layoutParams.height == available) return true
+                    playerView.layoutParams.height = available
+                    playerView.requestLayout()
+                    // 高さを反映したレイアウトが終わるまで初回描画を待つ。
+                    return false
+                }
+            })
+        }
 
         //Selectorからデータ受け取り
-        selectMusic = GLOBAL.SelectMUSIC!!
-        selectLevel = GLOBAL.SelectLEVEL!!
+        // 必須データはUIや非同期処理の初期化前に検証済み。
 
         val timetag = selectLevel.noteData.pregMatche_firstString("^(\\[\\d\\d\\:\\d\\d[\\:|\\.]\\d\\d\\])")
         if( timetag != "" ){
@@ -140,7 +235,7 @@ class Activity_GameView : AppCompatActivity() {
         }
         //simpleExoPlayer = SimpleExoPlayer.Builder(applicationContext)
         //    .build()
-        playerView = findViewById(R.id.playerView)
+
 
         //簡易キーボード
         val point = Point()
@@ -154,27 +249,16 @@ class Activity_GameView : AppCompatActivity() {
         }
         myKeybd?.setPaddingKeybd(top = (viewHeight / 4).toInt() * (10000 - USERDATA.NicoFlickKeyboardHeightPer) / 10000, bottom = GLOBAL.NavigationBarHeight)
         myKeybd?.isHidden = !useMyKeybd
-        editText.isEnabled = !useMyKeybd
+        binding.editText.isEnabled = !useMyKeybd
 
-        // 使用IME名取得
-        val imeString = Settings.Secure.getString(applicationContext.contentResolver,Settings.Secure.DEFAULT_INPUT_METHOD)
-        println("ime = $imeString")
-        usedSimeji = imeString.contains("simeji")
-        println("usedSimeji=$usedSimeji")
+        binding.editText.captureInputTime = { captureFlickTime() }
+        binding.editText.onFlickInput = { word, inputTime ->
+            if (!useMyKeybd) FlickInput(word, inputTime)
+        }
 
-        progressBar.postDelayed( {
-            progressBar_centerY = progressBar.centerY   //待たないと数値がブレる(?)
-            progressBar2_centerY = progressBar2.centerY
-
-            progressBar.isVisible = borderPosUe
-            progressBar2.isVisible = !borderPosUe
-            if( selectLevel!!.level > 10 ){
-                progressBar.isVisible = false
-                progressBar2.isVisible = false
-            }
-            progressBar.alpha = 1.0f
-            progressBar2.alpha = 1.0f
-        },100)
+        ShowHideBorder(borderPosUe)
+        binding.progressBar.alpha = 1.0f
+        binding.progressBar2.alpha = 1.0f
 
         if(USERDATA.lookedHelp == false){
             USERDATA.lookedHelp = true
@@ -186,52 +270,98 @@ class Activity_GameView : AppCompatActivity() {
             onCreate2()
         }
     }
+    private fun showKeyboardPreparation() {
+        if (!waitingForKeyboard || keyboardPreparationOverlay != null) return
+        val overlay = FrameLayout(this)
+        overlay.setBackgroundColor(0x99000000.toInt())
+        val message = android.widget.TextView(this).apply {
+            text = "キーボードの準備をします\n好きな文字を一度フリックしてください"
+            isInvisible = true
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            gravity = android.view.Gravity.CENTER
+            setPadding(PX(16f), 0, PX(16f), 0)
+        }
+        overlay.addView(message, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // ゲーム側のボタンは遮り、簡易キーボードには入力を通す。
+        overlay.setOnTouchListener { _, event -> event.y < message.height }
+        keyboardPreparationOverlay = overlay
+        keyboardPreparationMessage = message
+        addContentView(overlay, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        overlay.post { updateKeyboardPreparationLayout() }
+    }
+
+    private fun updateKeyboardPreparationLayout() {
+        val overlay = keyboardPreparationOverlay ?: return
+        val message = keyboardPreparationMessage ?: return
+        val location = IntArray(2)
+        overlay.getLocationOnScreen(location)
+        val keyboardTop = if (useMyKeybd) {
+            val keyboard = myKeybd ?: return
+            if (!keyboard.isShown || keyboard.height == 0) {
+                message.isInvisible = true
+                return
+            }
+            keyboard.keyboardTopOnScreen()
+        } else {
+            val decor = window.decorView
+            val visible = Rect()
+            decor.getWindowVisibleDisplayFrame(visible)
+            val decorLocation = IntArray(2)
+            decor.getLocationOnScreen(decorLocation)
+            val hiddenHeight = decorLocation[1] + decor.height - visible.bottom
+            if (hiddenHeight <= GLOBAL.NavigationBarHeight + PX(100f)) {
+                message.isInvisible = true
+                return
+            }
+            visible.bottom
+        }
+        if (overlay.height == 0) return
+        val available = (keyboardTop - location[1]).coerceIn(1, overlay.height)
+        if (message.layoutParams.height != available) {
+            message.isInvisible = true
+            message.layoutParams.height = available
+            message.requestLayout()
+        } else {
+            // キーボード検知後、指定した高さのレイアウトが完了してから表示する。
+            message.isInvisible = message.height != available
+        }
+    }
+
     fun onCreate2() {
+        showKeyboardPreparation()
         //動画 No.
-        val smNum = Regex("watch/(.+)$").find(selectMusic.movieURL)!!.groupValues.get(1)
+        val smNum = MediaInput.watchId(selectMusic.movieURL)
+        if (smNum == null) {
+            android.widget.Toast.makeText(this, "動画IDを読み取れませんでした。選曲画面に戻ります。", android.widget.Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
 
         //Movie呼び込み
         var nicodougaURL = ""
-        MovieAccess().StreamingUrlNicoAccess(smNum) {
+        movieLoadJob?.cancel()
+        movieLoadJob = MovieAccess().StreamingUrlNicoAccess(smNum, movieScope) {
             // 動画
+            if (isFinishing || isDestroyed) return@StreamingUrlNicoAccess
+            if (it.isBlank() || it == "error") {
+                android.widget.Toast.makeText(this, "動画を取得できませんでした。通信状態や動画の公開状態をご確認ください。", android.widget.Toast.LENGTH_LONG).show()
+                finish()
+                return@StreamingUrlNicoAccess
+            }
             nicodougaURL = it
-            println(nicodougaURL)
+            MovieLoadLog.log("game/$smNum") { "URL_CALLBACK cached=${it == "cached"} success=${it.isNotBlank() && it != "error"}" }
             //println(applicationContext.packageName)
             setExo(nicodougaURL,smNum)
         }
 
-        editText.filters = arrayOf(object : InputFilter {
-            override fun filter(source: CharSequence?,start: Int,end: Int,dest: Spanned?,dstart: Int,dend: Int): CharSequence? {
-                if( useMyKeybd ){ return null }
-                source?.let{
-
-                    if( end > 0 && source.toString() != maeSource ){
-                        if(it.dropLast(1).toString() == dest.toString()){
-                            //判定
-                            println("OK - ${it.last()} - ${it.dropLast(1)} $dest")
-                            FlickInput( it.last().toString() )
-                            maeSource = source.toString()
-                        }else {
-                            println("NG - ${it.last()} - ${it.dropLast(1)} $dest")
-                            FlickInput( "x" )
-                            maeSource = ""
-                            editText.setText("")
-                        }
-                    }
-                    if( usedSimeji && end >= 30 ) {
-                        maeSource=""
-                        editText.setText("")
-                    }
-                }
-                //println("pp $source -- $maeSource == ${source.toString()} || ${maeSource.length} > ${source?.length}, $start $end $dest, $dstart $dend ")
-                return null
-            }
-        })
         val point = Point()
         windowManager.defaultDisplay.getSize(point)
         gameviewWidth = point.x.toDouble()
         gameviewHeight = point.y.toDouble()
-        println("xy = $gameviewWidth x $gameviewHeight")
+        // println("xy = $gameviewWidth x $gameviewHeight")
         flickPointX = gameviewWidth * 50 / 375
         noteData.gameviewWidth = gameviewWidth
         noteData.flickPointX = flickPointX
@@ -245,78 +375,61 @@ class Activity_GameView : AppCompatActivity() {
 
         run = Runnable {
             if (playerView.height == 0) {
-                println("playerView.height=" + playerView.height)
+                // println("playerView.height=" + playerView.height)
                 mHandler.postDelayed(run!!, 10)
                 return@Runnable
             }
             //まずプレイヤービューのサイズを指定比率で端末に合わせる
             if( (playerView.width * 270 / 375) < (gameviewHeight * 0.4) ) {
                 playerviewOriginalHeight = playerView.width * 270 / 375
-                println("270")
+                // println("270")
             }else {
                 playerviewOriginalHeight = (gameviewHeight * 0.4).toInt()
-                println("0.4")
+                // println("0.4")
             }
             playerviewHeight = playerviewOriginalHeight * USERDATA.PlayerHeightPer / 10000
-            playerView.layoutParams.height = playerviewHeight
+            if (!USERDATA.fitsMovieToKeyboardHeight) {
+                playerView.layoutParams.height = playerviewHeight
+            }
 
             // FrameLayout のインスタンスを取得
             val layout: FrameLayout = findViewById(R.id.notesWindow)
 
             //フリックポイント
-            dotCircle.centerX = (flickPointX + textView_BarWord.width / 2).toFloat()
-            dotCircle.isVisible = true
+            binding.dotCircle.centerX = (flickPointX + binding.textViewBarWord.width / 2).toFloat()
+            binding.dotCircle.isVisible = true
             //フリックアクション
-            flickCircle.centerX = dotCircle.centerX
+            binding.flickCircle.centerX = binding.dotCircle.centerX
             //Great
-            textView_Great1.centerX = dotCircle.centerX
-            textView_Great2.centerX = dotCircle.centerX
-            textView_Great3.centerX = dotCircle.centerX
-            textView_Great4.centerX = dotCircle.centerX
-            textView_Great5.centerX = dotCircle.centerX
+            binding.textViewGreat1.centerX = binding.dotCircle.centerX
             //Good
-            textView_Good1.centerX = dotCircle.centerX
-            textView_Good2.centerX = dotCircle.centerX
-            textView_Good3.centerX = dotCircle.centerX
-            textView_Good4.centerX = dotCircle.centerX
-            textView_Good5.centerX = dotCircle.centerX
+            binding.textViewGood1.centerX = binding.dotCircle.centerX
             //Safe
-            textView_Safe1.centerX = dotCircle.centerX
-            textView_Safe2.centerX = dotCircle.centerX
-            textView_Safe3.centerX = dotCircle.centerX
-            textView_Safe4.centerX = dotCircle.centerX
-            textView_Safe5.centerX = dotCircle.centerX
+            binding.textViewSafe1.centerX = binding.dotCircle.centerX
             //Bad
-            textView_Bad1.centerX = dotCircle.centerX
-            textView_Bad2.centerX = dotCircle.centerX
-            textView_Bad3.centerX = dotCircle.centerX
-            textView_Bad4.centerX = dotCircle.centerX
-            textView_Bad5.centerX = dotCircle.centerX
+            binding.textViewBad1.centerX = binding.dotCircle.centerX
             //Miss
-            textView_Miss1.centerX = dotCircle.centerX
-            textView_Miss2.centerX = dotCircle.centerX
-            textView_Miss3.centerX = dotCircle.centerX
-            textView_Miss4.centerX = dotCircle.centerX
-            textView_Miss5.centerX = dotCircle.centerX
+            binding.textViewMiss1.centerX = binding.dotCircle.centerX
             //
-            textView_combo.centerX = dotCircle.centerX
+            binding.textViewCombo.centerX = binding.dotCircle.centerX
             //
-            animationStartYsa = ( (dotCircle.y + textView_Great1.y) / 2 ) - dotCircle.y
-            animationEndYsa = textView_Great1.y - dotCircle.y
-            comboanimeStartYsa = ( (textView_combo.y + textView_Great1.y) / 2 ) - dotCircle.y
-            comboanimeEndYsa = textView_combo.y - dotCircle.y
-            comboanimeStartYsa2 = noteBarView.height.toFloat() / 2//( (textView_combo.y + textView_Great1.y) / 2 ) - dotCircle.y
-            comboanimeEndYsa2 = noteBarView.height.toFloat()* 5 / 4
+            animationStartYsa = ( (binding.dotCircle.y + binding.textViewGreat1.y) / 2 ) - binding.dotCircle.y
+            animationEndYsa = binding.textViewGreat1.y - binding.dotCircle.y
+
+            comboanimeStartYsa = ( (binding.dotCircle.y + binding.textViewCombo.y) / 2 ) - binding.dotCircle.y
+            comboanimeEndYsa = binding.textViewCombo.y - binding.dotCircle.y
+//            comboanimeStartYsa2 = binding.noteBarView.height.toFloat() / 2//( (textView_combo.y + textView_Great1.y) / 2 ) - dotCircle.y
+//            comboanimeEndYsa2 = binding.noteBarView.height.toFloat()* 5 / 4
 
             //ノートデータを解析、生成
             noteData.noteAnalyze(selectLevel.noteData, selectLevel.speed, selectLevel.level)
             //ノートラベルも最初にすべて作ってしまう（移動だとか処理をさせるのは見えるやつだけにする）
             //「フリックしない文字」のLabel作成 -> 「フリックする文字」のLabel作成 の順にして、フリック文字が前面に出るようにする。
             val rectF = RectF(
-                textView_BarWord.x - 100, //枠外
-                textView_BarWord.y,
-                textView_BarWord.x - 100 + textView_BarWord.height,
-                textView_BarWord.y + textView_BarWord.height
+                binding.textViewBarWord.x - 100, //枠外
+                binding.textViewBarWord.y,
+                binding.textViewBarWord.x - 100 + binding.textViewBarWord.height,
+                binding.textViewBarWord.y + binding.textViewBarWord.height
             )
             // それぞれのTextView に設定を行い、FrameLayout のインスタンスに追加
             for (note in noteData.notes) {
@@ -325,7 +438,7 @@ class Activity_GameView : AppCompatActivity() {
                     val label = OutlineTextView(this, rectF)
                     label.setTextColor(Color.WHITE)
                     label.rectF = rectF
-                    label.setTextSize(DP(textView_BarWord.textSize.toInt()))
+                    label.setTextSize(DP(binding.textViewBarWord.textSize.toInt()))
                     label.alpha = 0.75f
                     label.isInvisible = true
                     label.text = note.word
@@ -343,7 +456,7 @@ class Activity_GameView : AppCompatActivity() {
                     var label = OutlineTextView(this, rectF)
                     label.setTextColor(Color.WHITE)
                     label.rectF = rectF
-                    label.setTextSize(DP(textView_BarWord.textSize.toInt()))
+                    label.setTextSize(DP(binding.textViewBarWord.textSize.toInt()))
                     label.alpha = 0.75f
                     label.isInvisible = true
                     label.text = note.word
@@ -356,7 +469,7 @@ class Activity_GameView : AppCompatActivity() {
                     label.setTextColor(Color.BLACK)
                     label.strokeWidth = 0.0f
                     label.rectF = rectF
-                    label.setTextSize(DP(textView_BarWord.textSize.toInt()))
+                    label.setTextSize(DP(binding.textViewBarWord.textSize.toInt()))
                     label.alpha = 1.0f
                     label.isInvisible = true
                     label.text = note.word
@@ -370,35 +483,35 @@ class Activity_GameView : AppCompatActivity() {
             }
             noteData.noteReset()
 
-            //タイマー発動
-            mHandler.post(timerRun)
+            // playerViewの高さ変更を含むレイアウトが確定してから画像化する。
+            binding.root.doOnPreDraw {
+                if (!isFinishing && !isDestroyed) {
+                    prepareEffectPools()
+                    notesReady = true
+                    startPlayback.run()
+                    startFrames()
+                }
+            }
         }
         mHandler.post(run!!)
 
         //保存データの取得
         // スコア読み込み
         USERDATA.Score.scores[selectLevel.sqlID]?.let {
-            textView_HighScore.setText("High Score: " + String(it[0]) + " ")
+            binding.textViewHighScore.setText("High Score: " + String(it[0]) + " ")
         }
-        textView_Score.setText("Score: 0 ")
+        binding.textViewScore.setText("Score: 0 ")
         // ジャッジオフセットの取得
         USERDATA.JudgeOffset[selectLevel.sqlID]?.let {
             judgeOffset = Double(it)
         }
-        textView_judgeOffset.setText("offset: %.2f".format(judgeOffset))
+        binding.textViewJudgeOffset.setText("offset: %.2f".format(judgeOffset))
 
         GlobalScope.launch(Dispatchers.Main){
         }
-        if( borderPosUe ){
-            textView_combo.setTextColor(Color.WHITE)
-            textView_combo.setShadowLayer(3.0f,3.0f,3.0f,Color.BLACK)
-        }else {
-            textView_combo.setTextColor(Color.BLACK)
-            textView_combo.setShadowLayer(3.0f,3.0f,3.0f,Color.WHITE)
-        }
 
         if( !useMyKeybd ) {
-            editText.requestFocus()
+            binding.editText.requestFocus()
         }
 
         //最下のボタン非表示
@@ -411,68 +524,107 @@ class Activity_GameView : AppCompatActivity() {
         //val loadControl = DefaultLoadControl.Builder().setBufferDurationsMs(DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,10*60*1000,10*60*1000,0)
         //val simpleExoPlayer = SimpleExoPlayer.Builder(applicationContext).setLoadControl()
         //    .build()
+        playbackListener?.let { cacheExoPlayer?.removeListener(it) }
+        mHandler.removeCallbacks(startPlayback)
+        initialPlaybackReady = false
+        time3secMediaTime = null
+        countdownPausedAt = null
         cacheExoPlayer = CachedMovies.access(nicodougaURL,smNum)
+        cacheExoPlayer!!.playWhenReady = false
+        // Cached players retain playback parameters from previous practice sessions.
+        cacheExoPlayer!!.setPlaybackParameters(
+            if (practiceMode) PlaybackParameters(practiceRate) else PlaybackParameters.DEFAULT
+        )
+        recordPlayConditions()
 
         playerView.apply {
             player = cacheExoPlayer
         }
-        cacheExoPlayer!!.setSeekParameters(SeekParameters.CLOSEST_SYNC)
+        cacheExoPlayer!!.setSeekParameters(SeekParameters.EXACT)
         cacheExoPlayer!!.seekTo(0)
-        Handler().postDelayed(Runnable {
-            if( !GamePlaying ){ return@Runnable }
-            cacheExoPlayer!!.playWhenReady = true
-            time3secMediaTime = if( t03 <= 0.0 ){ null }else{ System.currentTimeMillis().toDouble() / 1000 }
-        }, 1000)
-        cacheExoPlayer!!.addListener(object : Player.EventListener {
+        val playbackPlayer = cacheExoPlayer!!
+        playbackListener = object : Player.EventListener {
+            override fun onPlayerError(error: com.google.android.exoplayer2.ExoPlaybackException) {
+                if (cacheExoPlayer !== playbackPlayer || isFinishing || isDestroyed) return
+                GamePlaying = false
+                timerKill = true
+                stopFrames()
+                mHandler.removeCallbacks(startPlayback)
+                playbackPlayer.playWhenReady = false
+                android.widget.Toast.makeText(this@Activity_GameView, "動画を再生できませんでした。選曲画面に戻ります。",
+                    android.widget.Toast.LENGTH_LONG).show()
+                finish()
+            }
+
+            override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+                noteData.score.recordPlayConditions(practiceMode,
+                    playbackParameters.speed, playbackParameters.pitch)
+            }
+            override fun onSeekProcessed() {
+                pendingSeekSeconds?.let { seconds ->
+                    synchronizePracticeTimeline(seconds)
+                    pendingSeekSeconds = null
+                    updatePlaybackState()
+                }
+            }
             override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
-                println("GamePlaying = ${GamePlaying}")
+                // println("GamePlaying = ${GamePlaying}")
                 if( !GamePlaying ){ return }
-                println("playbackState=" + playbackState)
+                // println("playbackState=" + playbackState)
                 when (playbackState) {
+                    Player.STATE_READY -> startPlayback.run()
                     ExoPlayer.STATE_ENDED -> {
-                        println("終了 -> リザルト画面へ")
+                            // println("終了 -> リザルト画面へ")
                         GamePlaying = false
                         if(resultSegued==false){
                             resultSegued = true
                             val intent: Intent = Intent(applicationContext, Activity_Result::class.java)
+                            intent.putExtra("hasPassedFirstNote", hasPassedFirstNote)
+                            intent.putExtra("completedNormally", true)
                             //intent.putExtra("SelectMusicID", selectMusic.sqlID)
                             //intent.putExtra("SelectLevelID", selectLevel.sqlID)
+                            recordPlayConditions()
                             GLOBAL.CurrentNOTES = noteData
+                            GLOBAL.ResultPractice = practiceMode
                             GLOBAL.ResultFirst = true
                             startActivityForResult(intent, 1002)
                         }
                     }
                 }
             }
-        })
+        }
+        cacheExoPlayer!!.addListener(playbackListener!!)
+        // キャッシュ済みで既に READY の場合は状態変更通知を待たない。
+        startPlayback.run()
+    }
+
+    // Capture at IME receipt (or custom-key callback), before text editing and effects.
+    private fun captureFlickTime(): Double? {
+        val player = cacheExoPlayer ?: return null
+        if (waitingForKeyboard || !initialPlaybackReady || !gameViewResumed ||
+            !notesReady || !GamePlaying || timerKill || practiceSeeking || pendingSeekSeconds != null) return null
+        var time = player.currentPosition / 1000.0 - 0.05 + judgeOffset
+        if (practiceMode) time -= 0.07 * (1.0 - practiceRate)
+        return time
     }
 
     //フリック判定
-    fun FlickInput(string: String) {
-        // Test用
-        /*
-        println("string = 「${string}」")
-        if( string == "　" ){
-            GamePlaying = false
-            if(resultSegued==false){
-                resultSegued = true
-                val intent: Intent = Intent(applicationContext, Activity_Result::class.java)
-                //intent.putExtra("SelectMusicID", selectMusic.sqlID)
-                //intent.putExtra("SelectLevelID", selectLevel.sqlID)
-                GLOBAL.CurrentNOTES = noteData
-                GLOBAL.ResultFirst = true
-                startActivityForResult(intent, 1002)
-            }
-
+    fun FlickInput(string: String, inputTime: Double? = captureFlickTime()) {
+        if (waitingForKeyboard) {
+            if (!gameViewResumed || keyboardPreparationOverlay == null ||
+                string.isBlank() || string == FlickTextChange.INVALID_INPUT) return
+            keyboardPrepared = true
+            waitingForKeyboard = false
+            keyboardPreparationOverlay?.let { (it.parent as? ViewGroup)?.removeView(it) }
+            keyboardPreparationOverlay = null
+            keyboardPreparationMessage = null
+            // IME操作のコールバックを抜けてから開始し、準備用入力は採点しない。
+            mHandler.post(startPlayback)
+            return
         }
-        */
-        //
-
-        //フリックアクション
-        FlickAction()
-
-        if( cacheExoPlayer == null ){ return }
-        var flickTime = cacheExoPlayer!!.currentPosition.toDouble() / 1000 - 0.05 + judgeOffset//キー打ち定量ズレ
+        if (inputTime == null || !notesReady || !GamePlaying || timerKill ||
+            practiceSeeking || pendingSeekSeconds != null) return
+        val flickTime = inputTime
         //着目ノートを決定 _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
         var flickedNote: Note? = null
         var minDiffTime = 1.0 //フリックとノートのズレ時間
@@ -487,364 +639,361 @@ class Activity_GameView : AppCompatActivity() {
                         noteData.lastFlickedNum = i + 1
                     }
                 }
+                if (diffTime > 1.0) break
             }
         }
-        //着目noteがあったとき
-        if (flickedNote != null) {
-            //println("flickTime="+flickTime+", flickedNote="+flickedNote.time)
-            //まずフリックした文字とnoteの文字があっているか判定して次にタイミング判定
-            val judge = flickedNote.judgeWord(flickWord = string)
-            //println("judge=$judge, ${flickedNote.word} - ${string}")
-            if (judge == Note.BAD) {
-                //Bad
-                flickedNote.flickedTime = flickTime
-                flickedNote.flicked = true
-                flickedNote.judge = Note.BAD
-                noteData.score.addScore(judge = Note.BAD)
-                //print("Bad")
-                //ゲージ
-                progressBar.setProgress((noteData.score.borderScore * 10).toInt())
-                progressBar2.setProgress((noteData.score.borderScore * 10).toInt())
-                //フリック済みフォントに設定
-                flickedNote.setUnFlickableFont()
-                flickedNote.label.y = textView_BarWord.y
-                //エフェクト
-                BadAction()
-                //se
-                seAudio.badJinglePlay()
-
-            } else if (judge == Note.SAFE) {
-                //Safe
-                flickedNote.flickedTime = flickTime
-                flickedNote.flicked = true
-                flickedNote.judge = Note.SAFE
-                noteData.score.addScore(judge = Note.SAFE)
-                //print("Safe")
-                //フリック済みフォントに設定
-                flickedNote.setUnFlickableFont()
-                flickedNote.label.y = textView_BarWord.y
-                //エフェクト
-                SafeAction()
-                //se
-                seAudio.safeJinglePlay()
-
-            } else if (greatLine[0] <= minDiffTime && minDiffTime <= greatLine[1]) {
-                //Great!!
-                flickedNote.flickedTime = flickTime
-                flickedNote.flicked = true
-                flickedNote.judge = Note.GREAT
-                noteData.score.addScore(judge = Note.GREAT)
-                //print("Great!!")
-                //ゲージ
-                progressBar.setProgress((noteData.score.borderScore * 10).toInt())
-                progressBar2.setProgress((noteData.score.borderScore * 10).toInt())
-                //フリック済みフォントに設定
-                flickedNote.setUnFlickableFont()
-                flickedNote.label.y = textView_BarWord.y
-                //エフェクト
-                GreatAction()
-                //se
-                seAudio.okJinglePlay()
-
-            } else if (goodLine[0] <= minDiffTime && minDiffTime <= goodLine[1]) {
-                //Good!
-                flickedNote.flickedTime = flickTime
-                flickedNote.flicked = true
-                flickedNote.judge = Note.GOOD
-                noteData.score.addScore(judge = Note.GOOD)
-                //print("Good!")
-                //ゲージ
-                progressBar.setProgress((noteData.score.borderScore * 10).toInt())
-                progressBar2.setProgress((noteData.score.borderScore * 10).toInt())
-                //フリック済みフォントに設定
-                flickedNote.setUnFlickableFont()
-                flickedNote.label.y = textView_BarWord.y
-                //エフェクト
-                GoodAction()
-                //se
-                seAudio.okJinglePlay()
-
-            } else if (safeLine[0] <= minDiffTime && minDiffTime <= safeLine[1]) {
-                //Safe
-                flickedNote.flickedTime = flickTime
-                flickedNote.flicked = true
-                flickedNote.judge = Note.SAFE
-                noteData.score.addScore(judge = Note.SAFE)
-                //print("Safe")
-                //フリック済みフォントに設定
-                flickedNote.setUnFlickableFont()
-                flickedNote.label.y = textView_BarWord.y
-                //エフェクト
-                SafeAction()
-                //se
-                seAudio.safeJinglePlay()
-
-            } else {
-                //何かしらには入ったはずだが、一応BAD
-                flickedNote.flickedTime = flickTime
-                flickedNote.flicked = true
-                flickedNote.judge = Note.BAD
-                noteData.score.addScore(judge = Note.BAD)
-                //print("Bad")
-                //ゲージ
-                progressBar.setProgress((noteData.score.borderScore * 10).toInt())
-                progressBar2.setProgress((noteData.score.borderScore * 10).toInt())
-                //フリック済みフォントに設定
-                flickedNote.setUnFlickableFont()
-                flickedNote.label.y = textView_BarWord.y
-                //エフェクト
-                BadAction()
-                //se
-                seAudio.badJinglePlay()
-            }
-
-            //
-            //println("${flickedNote.word} - ${flickedNote.judge} : ${flickedNote.flickedTime} - ${flickedNote.time} = ${(flickedNote.flickedTime - flickedNote.time)}")
-
-        } else {
-
-            println("flickTime=" + flickTime)
-        }
-        textView_Score.setText("Score: ${noteData.score.totalScore} ")
-        ComboAction()
-
-        //着目ノートがあろうとなかろうと、フリックした時間 -> 次のフリッカブルまでの時間が1秒以上あれば TextView削除
-        if (noteData.lastFlickedNum >= noteData.notes.size) {
-            maeSource = ""
-            editText.setText("");
-            maeSourceClear = true
-        } else {
-            for (i in (noteData.lastFlickedNum until noteData.notes.size)) {
-                val note = noteData.notes[i]
-                if (note.isFlickable && note.flicked == false) {
-                    val diffTime = note.time - flickTime
-                    //println("diffTime="+diffTime)
-                    if (diffTime > 1.0) {
-                        maeSource = ""
-                        editText.setText("");
-                        maeSourceClear = true
-                    }
+        if (flickedNote != null) judgeFlick(flickedNote, string, flickTime, minDiffTime)
+        // judgeFlick already updates the score/combo once for a matched note.
+        FlickAction()
+        // Input buffering/idle cleanup belongs to FlickInputEditText, outside the judgment path.
+        if (waitingForFlickAfterSeek) {
+            waitingForFlickAfterSeek = false
+            for (note in noteData.notes) {
+                if (!note.isFlickable || note.flicked) { continue }
+                if (note.time <= flickTime) {
+                    note.flicked = true; note.setUnFlickableFont()
+                }else {
                     break
                 }
-                if (i >= noteData.notes.size) {
-                    maeSource = ""
-                    editText.setText("");
-                    maeSourceClear = true
-                }
             }
+            resetTimelineCursors()
         }
     }
-    //タイマー
+    private fun judgeFlick(note:Note, word:String, time:Double, difference:Double) {
+        recordPlayConditions()
+        val wordJudge = note.judgeWord(word)
+        val judge = when {
+            time == -1.0 -> Note.MISS
+            wordJudge == Note.BAD -> Note.BAD
+            wordJudge == Note.SAFE -> Note.SAFE
+            difference in greatLine[0]..greatLine[1] -> Note.GREAT
+            difference in goodLine[0]..goodLine[1] -> Note.GOOD
+            difference in safeLine[0]..safeLine[1] -> Note.SAFE
+            else -> Note.BAD
+        }
+        if (practiceMode) noteData.score.subScore(note.judge, note.comboCount)
+        note.flicked = true; note.flickedTime = time; note.judge = judge
+        noteData.score.addScore(judge); note.comboCount = noteData.score.comboCounter
+        hasPassedFirstNote = true
+        if (judge != Note.MISS || selectLevel.level <= 10) note.setUnFlickableFont()
+        note.label.y = binding.textViewBarWord.y
+        binding.progressBar.progress = (noteData.score.borderScore * 10).toInt()
+        binding.progressBar2.progress = binding.progressBar.progress
+        when (judge) {
+            Note.GREAT -> { GreatAction(); seAudio.okJinglePlay() }
+            Note.GOOD -> { GoodAction(); seAudio.okJinglePlay() }
+            Note.SAFE -> { SafeAction(); seAudio.safeJinglePlay() }
+            Note.BAD -> { BadAction(); seAudio.badJinglePlay() }
+            Note.MISS -> if (selectLevel.level <= 10) MissAction()
+        }
+        binding.textViewScore.text = "Score: ${noteData.score.totalScore} "
+        ComboAction()
+    }
+
+    // Draw once per display frame; judgments follow playback time and do not depend on visibility.
     val timerRun = object : Runnable {
         override fun run() {
-            if (selectLevel.level <= 10 && noteData.score.borderScore <= 0) {
-                //強制終了
-                println("失敗")
-                if( !GamePlaying ){ return }
-                if(resultSegued==false){
-                    resultSegued = true
-                    GamePlaying = false
-                    val intent: Intent = Intent(applicationContext, Activity_Result::class.java)
-                    GLOBAL.CurrentNOTES = noteData
-                    GLOBAL.ResultFirst = true
+            if (timerKill || !notesReady || !GamePlaying) return
+            if (!practiceMode && selectLevel.level <= 10 && noteData.score.borderScore <= 0) {
+                if (!resultSegued) {
+                    resultSegued = true; GamePlaying = false
+                    recordPlayConditions()
+                    GLOBAL.CurrentNOTES = noteData; GLOBAL.ResultPractice = practiceMode; GLOBAL.ResultFirst = true
+                    val intent = Intent(applicationContext, Activity_Result::class.java)
+                    intent.putExtra("hasPassedFirstNote", hasPassedFirstNote)
                     startActivityForResult(intent, 1002)
                 }
                 return
             }
-
-            if( cacheExoPlayer != null ){
-                //進捗状況
-                progressBar_Loaded.progress = cacheExoPlayer!!.bufferedPercentage
-                progressBar_Played.progress = (100000 * cacheExoPlayer!!.currentPosition / cacheExoPlayer!!.duration).toInt()
-
-                if( cacheExoPlayer!!.playWhenReady != false ){
-                    var time = cacheExoPlayer!!.currentPosition.toDouble() / 1000
-                    if( time3secMediaTime != null ){
-                        val time3sec:Double = -t03 + ( System.currentTimeMillis().toDouble()/1000 - time3secMediaTime!! )
-                        if( time3sec < -0.10 + USERDATA.Time3secExitZureTime.toDouble() ){
-                            playerView.alpha = 0.01f
-                            cacheExoPlayer?.seekTo(0)
-                            time = time3sec
-                        }else {
-                            if( time == 0.0 ){
-                                time = time3sec
-                            }else {
-                                //println( "time = [1] ${time}, ${USERDATA.Time3secExitZureTime}  - time = ${time3sec}")
-                                playerView.alpha = 1.0f
-                                saveData_time3sec = USERDATA.Time3secExitZureTime.toDouble() + ( time - time3sec ) / 2
-                                time3secMediaTime = null
-                            }
-                        }
-                    }
-
-                    //xps = (gameviewWidth-flickPointX)*Double(selectLevel.speed)/300 //ノートが一秒間に進む距離（View作成時に計算済み）
-                    // speed=300が出現してから打つまでの時間が１秒。つまりspeed=100は出現してから打つまでの時間が３秒。
-                    val offsetX: Double = time * xps
-                    //ノートをゾロ動かす
-                    for ((index, note) in noteData.notes.withIndex()) {
-                        val x = note.posX - offsetX + flickPointX
-                        //もしオフセット後の表示位置が400(375+25)以内なら動かす
-                        if (drawRange[0] < x && x < drawRange[3]) {
-                            if ( drawRange[1] < x ) {
-                                note.label.x = x.toFloat()
-                                note.label.y = textView_BarWord.y
-                                note.label.isInvisible = false
-                            }
-
-                            //過ぎ去りBad判定
-                            if (note.isFlickable && note.flicked == false) {
-                                val diffTime = note.time - (time + judgeOffset)
-                                if (diffTime < safeLine[0]) {
-                                    //Miss
-                                    note.flickedTime = -1.0
-                                    note.flicked = true
-                                    note.judge = Note.MISS
-                                    noteData.score.addScore(judge = Note.MISS)
-                                    //println("Miss")
-                                    //ゲージ
-                                    progressBar.setProgress((noteData.score.borderScore * 10).toInt())
-                                    progressBar2.setProgress((noteData.score.borderScore * 10).toInt())
-                                    if (selectLevel.level <= 10) {
-                                        //フリック済みフォントに設定
-                                        note.setUnFlickableFont()
-                                        note.label.y = textView_BarWord.y
-                                        //エフェクト
-                                        MissAction()
-                                    }//Fullバージョンのときはエフェクトしない（MISSとしてカウント。但しリザルトも表示は0にする。）
-
-                                    //次のフリックまでの時間がSafeLine+1秒以上あって、TextViewになんか入ってたら消す
-                                    if (index + 1 >= noteData.notes.size) {
-                                        maeSource = ""
-                                        editText.setText("");
-                                        maeSourceClear = true
-                                    } else {
-                                        val flickTime = note.time
-                                        for (i in (index + 1 until noteData.notes.size)) {
-                                            val note = noteData.notes[i]
-                                            if (note.isFlickable && note.flicked == false) {
-                                                val diffTime = note.time - flickTime
-                                                if (diffTime > (1.0 - safeLine[0])) {
-                                                    maeSource = ""
-                                                    editText.setText("");
-                                                    maeSourceClear = true
-                                                }
-                                                break
-                                            }
-                                            if (i >= noteData.notes.size) {
-                                                maeSource = ""
-                                                editText.setText("");
-                                                maeSourceClear = true
-                                            }
-                                        }
-                                    }
-                                    ComboAction()
-                                }
-                            }
-                            //左に消えたらビューも消す
-                            if (x <= drawRange[2]) {
-                                note.label.isInvisible = true
-                            }
-                        }/*else {
-                        if note.label.isHidden == false {
-                            note.label.isHidden = true
-                        }
-                    }*/
-                    }
+            val player = cacheExoPlayer ?: return
+            recordPlayConditions()
+            val duration = player.duration
+            binding.progressBarLoaded.progress = player.bufferedPercentage
+            if (duration > 0) binding.progressBarPlayed.progress = (100000L * player.currentPosition / duration).toInt()
+            if (!player.playWhenReady && !practiceSeeking) return
+            var time = player.currentPosition / 1000.0
+            time3secMediaTime?.let { start ->
+                val countdown = -t03 + (android.os.SystemClock.elapsedRealtime() / 1000.0 - start)
+                if (countdown < -0.10 + USERDATA.Time3secExitZureTime) {
+                    playerView.alpha = 0.01f; player.seekTo(0); time = countdown
+                } else if (time == 0.0) {
+                    time = countdown
+                } else {
+                    playerView.alpha = 1.0f
+                    saveData_time3sec = USERDATA.Time3secExitZureTime + (time - countdown) / 2
+                    time3secMediaTime = null
                 }
             }
+            if (practiceMode && duration > 0) {
+                if (practiceSeeking) time = duration / 1000.0 * binding.practiceSeekbar.progress / 10000.0
+                else binding.practiceSeekbar.progress = (10000L * player.currentPosition / duration).toInt()
+            }
+            if (!practiceSeeking && pendingSeekSeconds == null) {
+                processAutoPlay(time)
+                processMisses(time)
+            }
+            val offset = time * xps
+            for (note in noteData.notes) {
+                val x = note.posX - offset + flickPointX
+                val visible = x > drawRange[1] && x < drawRange[3]
+                if (visible) { note.label.x = x.toFloat(); note.label.y = binding.textViewBarWord.y }
+                note.label.isInvisible = !visible
+                // Notes have two Android TextViews. Always hide the inactive one too.
+                if (note.label !== note.flickableLabel) note.flickableLabel?.isInvisible = true
+                if (note.label !== note.flickedLabel) note.flickedLabel?.isInvisible = true
+            }
+        }
+    }
+    private fun processMisses(time:Double) {
+        if (waitingForFlickAfterSeek) return
+        while (nextMissCheckIndex < noteData.notes.size) {
+            val note = noteData.notes[nextMissCheckIndex]
+            if (!note.isFlickable || note.flicked) { nextMissCheckIndex++; continue }
+            val difference = note.time - (time + judgeOffset)
+            if (difference >= safeLine[0]) break
+            judgeFlick(note, note.word, -1.0, difference)
+            nextMissCheckIndex++
+            noteData.lastFlickedNum = maxOf(noteData.lastFlickedNum, nextMissCheckIndex)
+        }
+    }
+    private fun processAutoPlay(time:Double) {
+        if (!practiceMode || !binding.practiceAutoPlay.isChecked) return
+        while (nextAutoPlayIndex < noteData.notes.size) {
+            val note = noteData.notes[nextAutoPlayIndex]
+            if (!note.isFlickable || note.flicked) { nextAutoPlayIndex++; continue }
+            if (note.time > time + 0.02) break
+            waitingForFlickAfterSeek = false
+            judgeFlick(note, note.judgeWorder(note.word), note.time, 0.0)
+            nextAutoPlayIndex++
+        }
+    }
+    private fun recordPlayConditions() {
+        val parameters = cacheExoPlayer?.playbackParameters ?: PlaybackParameters.DEFAULT
+        noteData.score.recordPlayConditions(practiceMode, parameters.speed, parameters.pitch,
+            practiceSeeking || pendingSeekSeconds != null,
+            binding.practiceAutoPlay.isChecked, selectLevel.isEditing)
+    }
 
-            //繰り返し
-            if (!timerKill) {
-                mHandler.postDelayed(this, 1)
+    private fun resetTimelineCursors() {
+        val first = noteData.notes.indexOfFirst { it.isFlickable && !it.flicked }
+        nextMissCheckIndex = if (first < 0) noteData.notes.size else first
+        nextAutoPlayIndex = nextMissCheckIndex
+        noteData.lastFlickedNum = nextMissCheckIndex
+    }
+    private fun synchronizePracticeTimeline(time:Double) {
+        noteData.score.markNonStandardConditions()
+        for (note in noteData.notes) {
+            if (!note.isFlickable) continue
+            note.flickedTime = -1.0
+            note.flicked = note.time <= time
+            if (note.flicked) note.setUnFlickableFont() else note.setFlickableFont()
+        }
+        noteData.score.comboCounter = 0
+        ComboAction()
+        resetTimelineCursors()
+        waitingForFlickAfterSeek = true
+    }
+    private fun configurePracticeControls() {
+        binding.practiceSeekbar.max = 10000
+        binding.practiceSeekbar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar:SeekBar?, progress:Int, fromUser:Boolean) {}
+            override fun onStartTrackingTouch(bar:SeekBar?) {
+                if (!practiceMode) return
+                practiceSeeking = true; waitingForFlickAfterSeek = false
+                cacheExoPlayer?.playWhenReady = false
+                noteData.score.comboCounter = 0; ComboAction()
+            }
+            override fun onStopTrackingTouch(bar:SeekBar?) {
+                if (!practiceMode) return
+                noteData.score.markNonStandardConditions()
+                practiceSeeking = false
+                val player = cacheExoPlayer ?: return
+                if (player.duration <= 0) { updatePlaybackState(); return }
+                time3secMediaTime = null
+                playerView.alpha = 1.0f
+                val position = (player.duration * binding.practiceSeekbar.progress / 10000L).coerceAtMost(maxOf(0L, player.duration - 2000L))
+                binding.practiceSeekbar.progress = (10000L * position / player.duration).toInt()
+                pendingSeekSeconds = position / 1000.0
+                waitingForFlickAfterSeek = true
+                player.setSeekParameters(SeekParameters.EXACT)
+                player.seekTo(position)
+            }
+        })
+        binding.practiceRatebar.max = 10; binding.practiceRatebar.progress = 5
+        binding.practiceRatebar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar:SeekBar?, progress:Int, fromUser:Boolean) {
+                if (!practiceMode) return
+                noteData.score.markNonStandardConditions()
+                practiceRate = (progress + 5) / 10.0f
+                binding.practiceRateLabel.text = "× %.1f".format(practiceRate)
+                cacheExoPlayer?.setPlaybackParameters(PlaybackParameters(practiceRate))
+            }
+            override fun onStartTrackingTouch(bar:SeekBar?) {}
+            override fun onStopTrackingTouch(bar:SeekBar?) {}
+        })
+        binding.practiceAutoPlay.setOnCheckedChangeListener { _, checked ->
+            if (checked) noteData.score.markNonStandardConditions()
+            resetTimelineCursors()
+        }
+    }
+    private fun updateMovieLayout() {
+        if (!::binding.isInitialized) return
+        val fitsMovie = USERDATA.fitsMovieToKeyboardHeight
+        // 拡大時は縦横比を維持して領域を埋め、はみ出す左右を切り取る。
+        val resizeMode = if (fitsMovie) AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            else AspectRatioFrameLayout.RESIZE_MODE_FIT
+        if (playerView.resizeMode != resizeMode) playerView.resizeMode = resizeMode
+        val unset = ConstraintLayout.LayoutParams.UNSET
+        val laneParams = binding.noteBarView.layoutParams as ConstraintLayout.LayoutParams
+        val laneTop = if (fitsMovie) unset else R.id.playerView
+        val laneBottom = if (fitsMovie) R.id.playerView else unset
+        val laneMargin = PX(48.0f)
+        if (laneParams.topToBottom != laneTop || laneParams.bottomToBottom != laneBottom) {
+            laneParams.topToBottom = laneTop
+            laneParams.bottomToBottom = laneBottom
+            laneParams.topMargin = if (fitsMovie) 0 else laneMargin
+            laneParams.bottomMargin = if (fitsMovie) laneMargin else 0
+            binding.noteBarView.layoutParams = laneParams
+        }
+        val menuParams = binding.buttonMenu.layoutParams as ConstraintLayout.LayoutParams
+        val menuTop = if (fitsMovie) unset else R.id.playerView
+        if (menuParams.topToBottom != menuTop) {
+            menuParams.topToBottom = menuTop
+            binding.buttonMenu.layoutParams = menuParams
+        }
+        if (fitsMovie && !paused && hasWindowFocus()) {
+            // キーボードが消えたときは、直前の動画サイズを維持する。
+            val bottom = if (useMyKeybd) {
+                val keyboard = myKeybd ?: return
+                if (!keyboard.isShown || keyboard.height == 0) return
+                keyboard.keyboardTopOnScreen()
+            } else {
+                val decor = window.decorView
+                val rect = Rect(); decor.getWindowVisibleDisplayFrame(rect)
+                val decorLocation = IntArray(2); decor.getLocationOnScreen(decorLocation)
+                val hiddenHeight = decorLocation[1] + decor.height - rect.bottom
+                // システムバーによる差を除外して、IME表示中だけサイズを更新する。
+                if (hiddenHeight <= GLOBAL.NavigationBarHeight + PX(100.0f)) return
+                rect.bottom
+            }
+            USERDATA.maeKeyboardTop = bottom
+            val location = IntArray(2); playerView.getLocationOnScreen(location)
+            val progressSpace = binding.progressBarLoaded.bottom - binding.progressBarLoaded.top
+            val available = (bottom - location[1] - progressSpace).coerceAtLeast(1)
+            if (playerView.layoutParams.height != available) {
+                playerView.layoutParams.height = available; playerView.requestLayout()
             }
         }
     }
 
+    private class JudgeImageView(
+        context: Context,
+        val source: DecolationLabel,
+        val inset: Int
+    ) : ImageView(context)
+
+    private val greatPool = arrayListOf<JudgeImageView>()
+    private val goodPool = arrayListOf<JudgeImageView>()
+    private val safePool = arrayListOf<JudgeImageView>()
+    private val badPool = arrayListOf<JudgeImageView>()
+    private val missPool = arrayListOf<JudgeImageView>()
+    private var judgeZ = 0f
+    private fun prepareEffectPools() {
+        resetEffectPools()
+        fun fill(pool:ArrayList<JudgeImageView>, first:DecolationLabel) {
+            pool.forEach {
+                it.setImageDrawable(null)
+                (it.parent as? ViewGroup)?.removeView(it)
+            }
+            pool.clear()
+            val parent = first.parent as ViewGroup
+            // ストロークの半幅と影のずれに、アンチエイリアス用の余白を加える。
+            val shadowExtent = if (Color.alpha(first.strokeShadowColor) != 0)
+                maxOf(abs(first.strokeShadowX), abs(first.strokeShadowY)) else 0f
+            val inset = kotlin.math.ceil(first.strokeWidth.coerceAtLeast(0f) / 2f + shadowExtent).toInt() + 2
+            val bitmap = first.createTextBitmap(inset)
+            first.isInvisible = true
+            repeat(10) {
+                val copy = JudgeImageView(this, first, inset)
+                copy.scaleType = ImageView.ScaleType.FIT_XY
+                copy.setImageBitmap(bitmap)
+                copy.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                copy.alpha = 0.0f
+                parent.addView(copy, ViewGroup.LayoutParams(bitmap.width, bitmap.height))
+                copy.x = first.x - inset
+                copy.y = first.y - inset
+                pool.add(copy)
+            }
+        }
+        fill(greatPool, binding.textViewGreat1)
+        fill(goodPool, binding.textViewGood1)
+        fill(safePool, binding.textViewSafe1)
+        fill(badPool, binding.textViewBad1)
+        fill(missPool, binding.textViewMiss1)
+    }
+    private fun resetEffectPools() {
+        judgementAnimations.values.forEach { it.cancel() }; judgementAnimations.clear()
+        (greatPool + goodPool + safePool + badPool + missPool).forEach {
+            it.animate().cancel(); it.alpha = 0.0f; it.translationZ = 0f
+        }
+        judgeZ = 0f
+        greatActionCount = 0; goodActionCount = 0; safeActionCount = 0; badActionCount = 0; missActionCount = 0
+    }
 
     //ゲームの描写 エフェクト処理 関数 _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
     fun GreatAction() {
         //println("Great!!")
-        val view: TextView
-        when (greatActionCount) {
-            0 -> view = textView_Great1
-            1 -> view = textView_Great2
-            2 -> view = textView_Great3
-            3 -> view = textView_Great4
-            else -> view = textView_Great5
-        }
+        val view = greatPool[greatActionCount]
         val animatorSet = AnimatorSet()
         animatorSet.playSequentially(createJudgeAction(view))
+        judgementAnimations[view] = animatorSet
         animatorSet.start()
         greatActionCount += 1
-        greatActionCount = greatActionCount % 5
+        greatActionCount = greatActionCount % greatPool.size
     }
 
     fun GoodAction() {
         //println("Good!")
-        val view: TextView
-        when (goodActionCount) {
-            0 -> view = textView_Good1
-            1 -> view = textView_Good2
-            2 -> view = textView_Good3
-            3 -> view = textView_Good4
-            else -> view = textView_Good5
-        }
+        val view = goodPool[goodActionCount]
         val animatorSet = AnimatorSet()
         animatorSet.playSequentially(createJudgeAction(view))
+        judgementAnimations[view] = animatorSet
         animatorSet.start()
         goodActionCount += 1
-        goodActionCount = goodActionCount % 5
+        goodActionCount = goodActionCount % goodPool.size
     }
 
     fun SafeAction() {
         //println("safe")
-        val view: TextView
-        when (safeActionCount) {
-            0 -> view = textView_Safe1
-            1 -> view = textView_Safe2
-            2 -> view = textView_Safe3
-            3 -> view = textView_Safe4
-            else -> view = textView_Safe5
-        }
+        val view = safePool[safeActionCount]
         val animatorSet = AnimatorSet()
         animatorSet.playSequentially(createJudgeAction(view))
+        judgementAnimations[view] = animatorSet
         animatorSet.start()
         safeActionCount += 1
-        safeActionCount = safeActionCount % 5
+        safeActionCount = safeActionCount % safePool.size
     }
 
     fun BadAction() {
         //println("bad")
-        val view: TextView
-        when (badActionCount) {
-            0 -> view = textView_Bad1
-            1 -> view = textView_Bad2
-            2 -> view = textView_Bad3
-            3 -> view = textView_Bad4
-            else -> view = textView_Bad5
-        }
+        val view = badPool[badActionCount]
         val animatorSet = AnimatorSet()
         animatorSet.playSequentially(createJudgeAction(view))
+        judgementAnimations[view] = animatorSet
         animatorSet.start()
         badActionCount += 1
-        badActionCount = badActionCount % 5
+        badActionCount = badActionCount % badPool.size
     }
 
     fun MissAction() {
         //println("miss")
-        val view: TextView
-        when (missActionCount) {
-            0 -> view = textView_Miss1
-            1 -> view = textView_Miss2
-            2 -> view = textView_Miss3
-            3 -> view = textView_Miss4
-            else -> view = textView_Miss5
-        }
+        val view = missPool[missActionCount]
         val animatorSet = AnimatorSet()
         animatorSet.playSequentially(createJudgeAction(view))
+        judgementAnimations[view] = animatorSet
         animatorSet.start()
         missActionCount += 1
-        missActionCount = missActionCount % 5
+        missActionCount = missActionCount % missPool.size
     }
 
     fun FlickAction() {
@@ -855,31 +1004,40 @@ class Activity_GameView : AppCompatActivity() {
                 flickAnimatorSet.cancel()
             }
         }
-        flickCircle.alpha = 0.0f
-        val anime1 = ObjectAnimator.ofFloat(flickCircle, "scaleX", 0.5f, 1.2f)
+        binding.flickCircle.alpha = 0.0f
+        val anime1 = ObjectAnimator.ofFloat(binding.flickCircle, "scaleX", 0.5f, 1.2f)
         anime1.duration = 150
-        val anime2 = ObjectAnimator.ofFloat(flickCircle, "scaleY", 0.5f, 1.2f)
+        val anime2 = ObjectAnimator.ofFloat(binding.flickCircle, "scaleY", 0.5f, 1.2f)
         anime2.duration = 150
-        val anime3 = ObjectAnimator.ofFloat(flickCircle, "alpha", 0.0f, 1.0f)
+        val anime3 = ObjectAnimator.ofFloat(binding.flickCircle, "alpha", 0.0f, 1.0f)
         anime3.duration = 50
         val animatorSet1 = AnimatorSet()
         animatorSet1.playTogether(anime1, anime2, anime3)
-        val anime4 = ObjectAnimator.ofFloat(flickCircle, "alpha", 1.0f, 1.0f)
+        val anime4 = ObjectAnimator.ofFloat(binding.flickCircle, "alpha", 1.0f, 1.0f)
         anime4.duration = 300
-        val anime5 = ObjectAnimator.ofFloat(flickCircle, "alpha", 1.0f, 0.0f)
+        val anime5 = ObjectAnimator.ofFloat(binding.flickCircle, "alpha", 1.0f, 0.0f)
         anime5.duration = 100
         val flickAnimatorSet = AnimatorSet()
         flickAnimatorSet.playSequentially(animatorSet1, anime4, anime5)
         flickAnimatorSet.start()
     }
 
-    private fun createJudgeAction(view: TextView): ArrayList<Animator> {
+    private val judgementAnimations = mutableMapOf<JudgeImageView, AnimatorSet>()
+    private fun createJudgeAction(view: JudgeImageView): ArrayList<Animator> {
+        judgementAnimations.remove(view)?.cancel()
+        // 判定5種類で連番を共有し、最新の判定を最前面にする。
+        judgeZ += 1f
+        view.translationZ = judgeZ
         view.alpha = 1.0f
+        // 余白を補正し、レイアウト変更後もXMLラベルの位置を基準にする。
+        view.x = view.source.x - view.inset
+        val endY = view.source.y - view.inset
+        val startY = (binding.dotCircle.y + view.source.y) / 2f - view.inset
         val animatorList: ArrayList<Animator> = arrayListOf()
-        var anime = ObjectAnimator.ofFloat(view, "y", animationStartYsa+dotCircle.y, animationEndYsa+dotCircle.y)
+        var anime = ObjectAnimator.ofFloat(view, "y", startY, endY)
         anime.duration = 300
         animatorList.add(anime)
-        anime = ObjectAnimator.ofFloat(view, "y", animationEndYsa+dotCircle.y, animationEndYsa+dotCircle.y)
+        anime = ObjectAnimator.ofFloat(view, "y", endY, endY)
         anime.duration = 500
         animatorList.add(anime)
         anime = ObjectAnimator.ofFloat(view, "alpha", 1.0f, 0.0f)
@@ -891,24 +1049,20 @@ class Activity_GameView : AppCompatActivity() {
 
     fun ComboAction() {
         if (noteData.score.comboCounter == 0) {
-            textView_combo.isInvisible = true
+            binding.textViewCombo.isInvisible = true
             return
         }
         if (noteData.score.comboCounter < 5) {
             return
         }
-        textView_combo.setText("${noteData.score.comboCounter} combo ")
+        binding.textViewCombo.setText("${noteData.score.comboCounter} combo ")
         if (noteData.score.comboCounter > 5) {
             return
         }
         //5 comboのときだけアニメーション
-        textView_combo.isInvisible = false
+        binding.textViewCombo.isInvisible = false
 
-        val anime = if( borderPosUe ){
-            ObjectAnimator.ofFloat(textView_combo, "y", comboanimeStartYsa+dotCircle.y, comboanimeEndYsa+dotCircle.y)
-        }else {
-            ObjectAnimator.ofFloat(textView_combo, "y", comboanimeStartYsa2+dotCircle.y, comboanimeEndYsa2+dotCircle.y)
-        }
+        val anime = ObjectAnimator.ofFloat(binding.textViewCombo, "y", comboanimeStartYsa+binding.dotCircle.y, comboanimeEndYsa+binding.dotCircle.y)
         anime.duration = 300
         val animatorSet = AnimatorSet()
         animatorSet.playSequentially(anime)
@@ -935,61 +1089,81 @@ class Activity_GameView : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        println("back")
+        // println("back")
         //super.onBackPressed()
         OpenMenu()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        //if(editFlg!=0){ return }
-        //editFlg=1
+        if (hasFocus && ::binding.isInitialized) {
+            // 簡易キーボードへの切り替え後も、復帰して配置が確定した時点で再計算する。
+            binding.root.post {
+                if (!isFinishing && !isDestroyed) updateMovieLayout()
+            }
+        }
         if( useMyKeybd ){ return }
-        println(currentFocus)
-        if (hasFocus && editText == currentFocus) {
+        // println(currentFocus)
+        if (hasFocus && binding.editText == currentFocus) {
             Handler().postDelayed(10) {
-                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(editText, 0)
+                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(binding.editText, 0)
             }
         }
     }
 
     fun menuButton(view: View) {
-        println("push menu")
+        // println("push menu")
         OpenMenu()
     }
     fun OpenMenu() {
+        if (!notesReady || resultSegued || gameMenuOpen) return
+        gameMenuOpen = true
+        GamePlaying = false
+        stopFrames()
+        updatePlaybackState()
+        SESystemAudio.gameMenuSePlay()
         val intent: Intent = Intent(applicationContext, Activity_GameMenu::class.java)
-        println("post ${progressBar.y} ${progressBar2.y} ${progressBar.height} ${progressBar2.height}")
-        intent.putExtra("progress1", progressBar_centerY)
-        intent.putExtra("progress2", progressBar2_centerY)
+        intent.putExtra("practiceMode", practiceMode)
+        // println("post ${binding.progressBar.y} ${binding.progressBar2.y} ${binding.progressBar.height} ${binding.progressBar2.height}")
+        intent.putExtra("progress1", binding.progressBar.centerY)
+        intent.putExtra("progress2", binding.progressBar2.centerY)
 
+        binding.keyboardBackdrop.isVisible = USERDATA.fitsMovieToKeyboardHeight
         startActivityForResult(intent, 1001)
     }
     fun ShowHideBorder(ue:Boolean){
-        progressBar.isHidden = !ue
-        progressBar2.isHidden = ue
+        // 非表示のゲージも配置を維持し、メニュー遷移時に座標を取得できるようにする。
+        binding.progressBar.isInvisible = !ue || selectLevel.level > 10
+        binding.progressBar2.isInvisible = ue || selectLevel.level > 10
+    }
+
+    private val showIme = Runnable {
+        if (!useMyKeybd && !timerKill && !isFinishing && !isDestroyed && binding.editText.hasFocus()) {
+            (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(binding.editText, 0)
+        }
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
-        println("touch")
-        if( !useMyKeybd ) {
-            Handler().postDelayed(10) {
-                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(editText, 0)
-            }
+        if (!useMyKeybd && ev?.actionMasked == MotionEvent.ACTION_DOWN) {
+            mHandler.removeCallbacks(showIme)
+            mHandler.postDelayed(showIme, 10)
         }
         return super.dispatchTouchEvent(ev)
     }
 
     override fun onPause() {
         super.onPause()
-        println("onPause!!")
+        // println("onPause!!")
         paused = true
+        gameViewResumed = false
+        mHandler.removeCallbacks(showIme)
+        binding.editText.logInputDiagnostics()
+        binding.editText.clearInputWhenSafe()
         timerKill = true
+        stopFrames()
         GamePlaying = false
-        println("GamePlaying = ${GamePlaying}")
-        cacheExoPlayer?.let {
-            it.playWhenReady = false
-        }
+        // println("GamePlaying = ${GamePlaying}")
+        updatePlaybackState()
         saveData_time3sec?.let {
             USERDATA.Time3secExitZureTime = it.toFloat()
             saveData_time3sec = null
@@ -998,15 +1172,20 @@ class Activity_GameView : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        println("resume")
+        gameViewResumed = true
+        mHandler.post(startPlayback)
+        binding.keyboardBackdrop.isVisible = false
+        // println("resume")
         if (paused) {
+            paused = false
             timerKill = false
-            mHandler.post(timerRun)
             GamePlaying = true
-            println("GamePlaying = ${GamePlaying}")
+            startFrames()
+            updatePlaybackState()
+            // println("GamePlaying = ${GamePlaying}")
             //ゲージ
-            progressBar.setProgress((noteData.score.borderScore * 10).toInt())
-            progressBar2.setProgress((noteData.score.borderScore * 10).toInt())
+            binding.progressBar.setProgress((noteData.score.borderScore * 10).toInt())
+            binding.progressBar2.setProgress((noteData.score.borderScore * 10).toInt())
             val view = window.decorView
             //最下のボタン非表示
             view.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE
@@ -1014,60 +1193,88 @@ class Activity_GameView : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        movieLoadJob?.cancel()
+        movieScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        resetEffectPools()
+        (greatPool + goodPool + safePool + badPool + missPool).forEach { it.setImageDrawable(null) }
+        gameViewResumed = false
+        cacheExoPlayer?.playWhenReady = false
+        mHandler.removeCallbacks(startPlayback)
+        mHandler.removeCallbacks(showIme)
+        binding.editText.onFlickInput = null
+        binding.editText.captureInputTime = null
+        playbackListener?.let { cacheExoPlayer?.removeListener(it) }
+        playbackListener = null
+        run?.let { mHandler.removeCallbacks(it) }
         super.onDestroy()
         saveData_time3sec?.let {
             USERDATA.Time3secExitZureTime = it.toFloat()
             saveData_time3sec = null
         }
         timerKill = true
+        stopFrames()
         GamePlaying = false
-        println("GamePlaying = ${GamePlaying}")
-        GLOBAL.CurrentNOTES = null
+        // println("GamePlaying = ${GamePlaying}")
+        if (GLOBAL.CurrentNOTES === noteData && !isChangingConfigurations) {
+            GLOBAL.CurrentNOTES = null
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (isFinishing || !::selectMusic.isInitialized || !::selectLevel.isInitialized) return
         // startActivityForResult()の際に指定した識別コードとの比較
         if( useMyKeybd != USERDATA.UseNicoFlickKeyboard ){
             useMyKeybd = USERDATA.UseNicoFlickKeyboard
             myKeybd?.isHidden = !useMyKeybd
-            editText.isEnabled = !useMyKeybd
-            editText.requestFocus()
+            binding.editText.clearInputWhenSafe()
+            binding.editText.isEnabled = !useMyKeybd
+            if (!useMyKeybd) binding.editText.requestFocus()
         }
         if( borderPosUe != USERDATA.BorderPosUe ) {
             borderPosUe = USERDATA.BorderPosUe
-            if (selectLevel.level <= 10) {
-                progressBar.isVisible = borderPosUe
-                progressBar2.isVisible = !borderPosUe
-            }
-            if (borderPosUe) {
-                textView_combo.setTextColor(Color.WHITE)
-                textView_combo.setShadowLayer(3.0f,3.0f,3.0f,Color.BLACK)
-            } else {
-                textView_combo.setTextColor(Color.BLACK)
-                textView_combo.setShadowLayer(3.0f,3.0f,3.0f,Color.WHITE)
-            }
+            ShowHideBorder(borderPosUe)
         }
         when(requestCode){
             1001 -> {
+                gameMenuOpen = false
                 // 返却結果ステータスとの比較
                 when (resultCode) {
-                    10 -> finish()
+                    10 -> {
+                        if (hasPassedFirstNote) {
+                            if (!selectLevel.isEditing) USERDATA.recordLevelPlay(selectLevel.sqlID)
+                            GLOBAL.SuggestPlayerName = true
+                        }
+                        cacheExoPlayer?.let { player ->
+                            if (player.duration > 0 && player.currentPosition >= player.duration / 2) USERDATA.PlayCount.addPlayCount(selectLevel.sqlID)
+                        }
+                        ServerDataHandler().postUserCountData()
+                        finish()
+                    }
                     11 -> {
                         noteData.noteReset()
-                        textView_combo.isInvisible = true
-                        textView_Score.setText("Score: 0 ")
-                        if(cacheExoPlayer != null){
-                            cacheExoPlayer!!.seekTo(0)
-                        }
-                        cacheExoPlayer?.let {
-                            it.playWhenReady = true
-                            time3secMediaTime = if( t03 <= 0.0 ){ null }else{ System.currentTimeMillis().toDouble() / 1000 }
-                        }
+                        nextMissCheckIndex = 0; nextAutoPlayIndex = 0
+                        waitingForFlickAfterSeek = false; pendingSeekSeconds = null
+                        resetEffectPools()
+                        binding.textViewCombo.isInvisible = true
+                        binding.textViewScore.setText("Score: 0 ")
+                        initialPlaybackReady = false
+                        time3secMediaTime = null
+                        countdownPausedAt = null
+                        updatePlaybackState()
+                        cacheExoPlayer?.seekTo(0)
+                        startPlayback.run()
+                    }
+                    13 -> {
+                        practiceMode = true
+                        binding.practiceControls.isVisible = true
+                        cacheExoPlayer?.setPlaybackParameters(PlaybackParameters(practiceRate))
+                        updatePlaybackState()
+                        resetTimelineCursors()
                     }
                     12 -> {
                         cacheExoPlayer?.let {
-                            it.playWhenReady = true
+                            updatePlaybackState()
                         }
                     }
                 }
@@ -1075,14 +1282,22 @@ class Activity_GameView : AppCompatActivity() {
                 USERDATA.JudgeOffset[selectLevel.sqlID]?.let {
                     judgeOffset = Double(it)
                 }
-                textView_judgeOffset.setText("offset: %.2f".format(judgeOffset))
+                binding.textViewJudgeOffset.setText("offset: %.2f".format(judgeOffset))
+                binding.textViewJudgeOffset.isVisible = USERDATA.showOffsetLabel
+                if (practiceMode) cacheExoPlayer?.setPlaybackParameters(PlaybackParameters(practiceRate))
 
                 playerviewHeight = playerviewOriginalHeight * USERDATA.PlayerHeightPer / 10000
-                playerView.layoutParams.height = playerviewHeight
-
+                if (!USERDATA.fitsMovieToKeyboardHeight) {
+                    playerView.layoutParams.height = playerviewHeight
+                    playerView.requestLayout()
+                }
+                updateMovieLayout()
             }
             1003 -> onCreate2()
-            else -> finish()
+            else -> {
+                GLOBAL.SuggestPlayerName = true
+                finish()
+            }
         }
     }
 }

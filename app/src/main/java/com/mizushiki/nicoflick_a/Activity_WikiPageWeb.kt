@@ -1,5 +1,7 @@
 package com.mizushiki.nicoflick_a
 
+import com.mizushiki.nicoflick_a.databinding.ActivityWikipagewebBinding
+
 
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -16,10 +18,13 @@ import android.webkit.WebViewClient
 import android.widget.ArrayAdapter
 import androidx.core.text.HtmlCompat
 import androidx.core.view.isVisible
-import kotlinx.android.synthetic.main.activity_wikipageweb.*
+
 import java.net.URLDecoder
 
 class Activity_WikiPageWeb : AppCompatActivity() {
+
+    private lateinit var binding: ActivityWikipagewebBinding
+
 
     //各種データ
     val selectMusic = GLOBAL.SelectMUSIC
@@ -29,23 +34,24 @@ class Activity_WikiPageWeb : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_wikipageweb)
+        binding = ActivityWikipagewebBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        setSupportActionBar(toolbar2)
+        setSupportActionBar(binding.toolbar2)
         getSupportActionBar()!!.setTitle("NicoFlick")
         getSupportActionBar()!!.setDisplayShowHomeEnabled(true)
         getSupportActionBar()!!.setDisplayHomeAsUpEnabled(true)
 
-        webView.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        webView.settings.javaScriptEnabled = true
-        webView.loadUrl(GLOBAL.NICOWIKI_PATH)
-        webView.webViewClient = WebViewClient()
+        binding.webView.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        binding.webView.settings.javaScriptEnabled = true
+        binding.webView.loadUrl(GLOBAL.NICOWIKI_PATH)
+        binding.webView.webViewClient = WebViewClient()
 
-        webView.webViewClient = object : WebViewClient() {
+        binding.webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                 url?.let {
                     if( it.startsWith("nicoflick://") ){
-                        webView.isVisible = false
+                        binding.webView.isVisible = false
                         // インテントのインスタンス作成
                         val data = Intent()
                         // インテントに値をセット
@@ -65,7 +71,7 @@ class Activity_WikiPageWeb : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
 
-                webView.evaluateJavascript("document.body.innerHTML"){
+                binding.webView.evaluateJavascript("document.body.innerHTML"){
                     var html = Html.fromHtml(it,Html.FROM_HTML_MODE_LEGACY).toString()
                     html = html.pregReplace("\\\\u003C","<")
                     html = html.pregReplace("\\\\","")
@@ -87,7 +93,7 @@ class Activity_WikiPageWeb : AppCompatActivity() {
                     }
                 }
 
-                webView.evaluateJavascript("""
+                binding.webView.evaluateJavascript("""
                     var element = document.getElementById('${USERDATA.UserIDxxx}');
                     if( element != null ){ element.style.color = '#F00'; }
                     var elements = document.getElementsByClassName('${USERDATA.UserIDxxx}');
@@ -97,17 +103,17 @@ class Activity_WikiPageWeb : AppCompatActivity() {
                         }
                     }
                 """){
-                    println("wiki- ${it}")
+                    // println("wiki- ${it}")
 
                 }
 
                 selectMusic?.let {
                     val selectMusic = it
-                    webView.evaluateJavascript("document.getElementById('SetMusicDataBtn_NicoFlick').id"){
-                        println("it = ${it}")
+                    binding.webView.evaluateJavascript("document.getElementById('SetMusicDataBtn_NicoFlick').id"){
+                        // println("it = ${it}")
                         if( it != "\"SetMusicDataBtn_NicoFlick\"" ){ return@evaluateJavascript }
 
-                        webView.evaluateJavascript("""
+                        binding.webView.evaluateJavascript("""
                             if( document.getElementById('SettedMusicDataBtn_NicoFlick') == null ){
                                 var cre = document.createElement('input');
                                 cre.type = 'button';
@@ -131,8 +137,8 @@ class Activity_WikiPageWeb : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if(keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
-            webView.goBack()
+        if(keyCode == KeyEvent.KEYCODE_BACK && binding.webView.canGoBack()) {
+            binding.webView.goBack()
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -149,7 +155,7 @@ class Activity_WikiPageWeb : AppCompatActivity() {
     }
 
     override fun onPause() {
-        println("onPause")
+        // println("onPause")
         super.onPause()
     }
 

@@ -118,4 +118,35 @@
             android:id="@+id/View_keyboard_layout">
     </FrameLayout>
     </LinearLayout>
+    <TextView
+            android:id="@+id/textView_tapToStart"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:text="画面をタップしてください"
+            android:textSize="20sp"
+            android:textColor="#000000"
+            android:fontFamily="@font/nicokaku_v1"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
+    <TextView
+            android:id="@+id/storage_migration_message"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="24dp"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="@string/storage_migration_message"
+            android:textSize="16sp"
+            android:textColor="#333333"
+            android:accessibilityLiveRegion="polite"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/progress_circular"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 </androidx.constraintlayout.widget.ConstraintLayout>

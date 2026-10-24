@@ -1,5 +1,7 @@
 package com.mizushiki.nicoflick_a
 
+import com.mizushiki.nicoflick_a.databinding.ActivitySelectorMenuBinding
+
 import android.content.DialogInterface
 import android.content.Intent
 import android.graphics.Color
@@ -10,29 +12,38 @@ import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
-import kotlinx.android.synthetic.main.activity_selector_menu.*
+
 
 
 class Activity_SelectorMenu : AppCompatActivity() {
 
+    private lateinit var binding: ActivitySelectorMenuBinding
+    private var selectedMusic: musicData? = null
+    private var selectedLevel: levelData? = null
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_selector_menu)
+        binding = ActivitySelectorMenuBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        textView_tagWords.setText(USERDATA.SelectedMusicCondition.tags)
-        textView_sortWords.setText(USERDATA.SelectedMusicCondition.sortItem)
+        selectedMusic = GLOBAL.SelectMUSIC
+        selectedLevel = GLOBAL.SelectLEVEL
+        binding.textViewTagWords.setText(USERDATA.SelectedMusicCondition.tags)
+        binding.textViewSortWords.setText(USERDATA.SelectedMusicCondition.sortItem)
 
-        Button_goMovieSite.isVisible = (GLOBAL.SelectMUSIC != null)
-        Button_postReport.isVisible = (GLOBAL.SelectMUSIC != null)
-        if(USERDATA.RepotedMusicID.contains("${GLOBAL.SelectMUSIC?.sqlID}")){
-            Button_postReport.isEnabled = false
-            Button_postReport.setBackgroundColor(Color.LTGRAY)
+//        buttonEditor.isVisible = (selectedMusic != null)
+        binding.ButtonGoMovieSite.isVisible = (selectedMusic != null)
+        binding.ButtonPostReport.isVisible = (selectedMusic != null)
+        if(USERDATA.RepotedMusicID.contains("${selectedMusic?.sqlID}")){
+            binding.ButtonPostReport.isEnabled = false
+            binding.ButtonPostReport.setBackgroundColor(Color.LTGRAY)
         }
-        GLOBAL.SelectMUSIC?.let {
+        selectedMusic?.let {
             val music = it
-            GLOBAL.SelectLEVEL?.let {
+            selectedLevel?.let {
                 val level = it
-                text_music_level_id.text = "musicID=${music.sqlID}, gameID=${level.sqlID}"
+                binding.textMusicLevelId.text = "musicID=${music.sqlID}, gameID=${level.sqlID}"
                 /*
                 //開発者用
                 if( USERDATA.UserIDxxx == "b49b3e7f-6372-44c5-8576-************" ){
@@ -76,7 +87,7 @@ class Activity_SelectorMenu : AppCompatActivity() {
     }
     fun Button_Help(view: View) {
 
-        val strList = arrayOf("ああ 等の連続がSafe判定になる","フリックの反応が悪いとき","すべての楽曲をプレイしたい")
+        val strList = arrayOf("ああ 等の連続がSafe判定になる","すべての楽曲をプレイしたい")
 
         AlertDialog.Builder(this) // FragmentではActivityを取得して生成
             .setTitle("ヘルプ")
@@ -88,11 +99,6 @@ class Activity_SelectorMenu : AppCompatActivity() {
                         USERDATA.lookedHelp = true
                     }
                     1 -> {
-                        val intent: Intent = Intent(applicationContext, Activity_HowToGame2::class.java)
-                        startActivity(intent)
-                        USERDATA.lookedOtherIme = true
-                    }
-                    2 -> {
                         val intent: Intent = Intent(applicationContext, Activity_HowToExtend::class.java)
                         startActivity(intent)
                         USERDATA.lookedExtend = true
@@ -102,6 +108,10 @@ class Activity_SelectorMenu : AppCompatActivity() {
             .setPositiveButton("キャンセル", null)
             .show()
     }
+    fun Button_Editor(view: View) {
+        EditorLauncher.show(this, selectedMusic, selectedLevel, 2001)
+    }
+
     fun Button_Back(view: View) {
         SESystemAudio.canselSePlay()
         setResult( 10, null )
@@ -131,7 +141,8 @@ class Activity_SelectorMenu : AppCompatActivity() {
     }
 
     fun Button_GoMovieSite(view: View) {
-        val url = GLOBAL.SelectMUSIC!!.movieURL
+        val music = selectedMusic ?: return returnToStartAfterStateLoss()
+        val url = music.movieURL
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
         startActivity(Intent.createChooser(intent, "Browse with"))
 
@@ -142,15 +153,17 @@ class Activity_SelectorMenu : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 2001) { setResult(RESULT_OK); finish(); return }
         // startActivityForResult()の際に指定した識別コードとの比較
         if( requestCode == 1001 ){
-            textView_tagWords.setText(USERDATA.SelectedMusicCondition.tags)
+            binding.textViewTagWords.setText(USERDATA.SelectedMusicCondition.tags)
         }else if( requestCode == 1002 ){
-            textView_sortWords.setText(USERDATA.SelectedMusicCondition.sortItem)
+            binding.textViewSortWords.setText(USERDATA.SelectedMusicCondition.sortItem)
         }
     }
 
     fun Button_postReport(view: View) {
+        val music = selectedMusic ?: return returnToStartAfterStateLoss()
         val editText = EditText(this);
         editText.setHint("具体的な違反内容を記入");
         AlertDialog.Builder(this)
@@ -159,14 +172,15 @@ class Activity_SelectorMenu : AppCompatActivity() {
             .setView(editText)
             .setPositiveButton("OK", DialogInterface.OnClickListener() { dialogInterface: DialogInterface, i: Int ->
                 // TextViewにセットしてあげる
-                val musicID = GLOBAL.SelectMUSIC!!.sqlID
+                val musicID = music.sqlID
                 ServerDataHandler().postReport(musicID,editText.text.toString(),USERDATA.UserID){
                     if(it){
                         val rmid = USERDATA.RepotedMusicID
                         rmid.add("$musicID")
                         USERDATA.RepotedMusicID = rmid
-                        Button_postReport.isEnabled = false
-                        Button_postReport.setBackgroundColor(Color.LTGRAY)
+                        if (isFinishing || isDestroyed) return@postReport
+                        binding.ButtonPostReport.isEnabled = false
+                        binding.ButtonPostReport.setBackgroundColor(Color.LTGRAY)
                     }
                 }
             })

@@ -70,7 +70,7 @@ class Notes {
             ans = arrayListOf()
         }
         //print("noteString_")
-        println(noteString_)
+        // println(noteString_)
         //完全に [00:00:00]あ ペアにすることが出来た。
         //次は 一文字ごとの詳細データに展開する
         ans = arrayListOf()
@@ -118,6 +118,7 @@ class Notes {
             note.flicked = false
             note.flickedTime = -1.0
             note.judge = Note.NORMAL
+            note.comboCount = 0
             if( note.isFlickable ){
                 note.setFlickableFont()
             }else {
@@ -126,7 +127,9 @@ class Notes {
             note.label.x = -200.0f
             note.label.isInvisible = true
         }
+        val usedNonStandardConditions = score.usedNonStandardConditions
         score = Score()
+        if (usedNonStandardConditions) score.markNonStandardConditions()
         score.flickableNoteNum = flickableNoteNum //スコアにも渡しておく
         lastFlickedNum = 0
     }
@@ -138,7 +141,7 @@ class Notes {
                 count+=1
             }
         }
-        print(String(format: "cnt=%d, flickableNoteNum=%d", count,flickableNoteNum))
+        // print(String(format: "cnt=%d, flickableNoteNum=%d", count,flickableNoteNum))
          */
         return flickableNoteNum
     }
@@ -227,6 +230,7 @@ class Note(var word:String =""){
     var flicked = false
     var flickedTime:Double = -1.0
     var judge = Note.NORMAL
+    var comboCount = 0
 
     lateinit var label:TextView
     var flickedLabel:TextView? = null
@@ -252,128 +256,85 @@ class Note(var word:String =""){
         }
     }
 
-    fun judgeWord(flickWord:String) : Int {
-        var flickWord = flickWord
-        var noteWord = word
-        noteWord = noteWord.toHiragana()
-        //1段回目
-        when( noteWord ){
-            "ぁ" -> noteWord = "あ"
-            "ぃ" -> noteWord = "い"
-            "ぅ" -> noteWord = "う"
-            "ぇ" -> noteWord = "え"
-            "ぉ" -> noteWord = "お"
-            "が" -> noteWord = "か"
-            "ぎ" -> noteWord = "き"
-            "ぐ" -> noteWord = "く"
-            "げ" -> noteWord = "け"
-            "ご" -> noteWord = "こ"
-            "ざ" -> noteWord = "さ"
-            "じ" -> noteWord = "し"
-            "ず" -> noteWord = "す"
-            "ぜ" -> noteWord = "せ"
-            "ぞ" -> noteWord = "そ"
-            "だ" -> noteWord = "た"
-            "ぢ" -> noteWord = "ち"
-            "づ" -> noteWord = "つ"
-            "で" -> noteWord = "て"
-            "ど" -> noteWord = "と"
-            "ば" -> noteWord = "は"
-            "び" -> noteWord = "ひ"
-            "ぶ" -> noteWord = "ふ"
-            "べ" -> noteWord = "へ"
-            "ぼ" -> noteWord = "ほ"
-            "ぱ" -> noteWord = "は"
-            "ぴ" -> noteWord = "ひ"
-            "ぷ" -> noteWord = "ふ"
-            "ぺ" -> noteWord = "へ"
-            "ぽ" -> noteWord = "ほ"
-            "ゔ" -> noteWord = "う"
+    fun judgeWord(flickWord:String):Int {
+        val normalized = judgeWorder(word)
+        if (normalized == flickWord) return NORMAL
+        if (judgeWorder(normalized, 2) == judgeWorder(flickWord, 2)) return SAFE
+        return BAD
+    }
+    fun judgeWorder(noteWord:String, level:Int = 1):String {
+        val normalized = if (level == 1) noteWord.toHiragana() else noteWord
+        return if (level == 1) when (normalized) {
+            "ぁ" -> "あ"
+            "ぃ" -> "い"
+            "ぅ" -> "う"
+            "ぇ" -> "え"
+            "ぉ" -> "お"
+            "が" -> "か"
+            "ぎ" -> "き"
+            "ぐ" -> "く"
+            "げ" -> "け"
+            "ご" -> "こ"
+            "ざ" -> "さ"
+            "じ" -> "し"
+            "ず" -> "す"
+            "ぜ" -> "せ"
+            "ぞ" -> "そ"
+            "だ" -> "た"
+            "ぢ" -> "ち"
+            "づ" -> "つ"
+            "で" -> "て"
+            "ど" -> "と"
+            "ば" -> "は"
+            "び" -> "ひ"
+            "ぶ" -> "ふ"
+            "べ" -> "へ"
+            "ぼ" -> "ほ"
+            "ぱ" -> "は"
+            "ぴ" -> "ひ"
+            "ぷ" -> "ふ"
+            "ぺ" -> "へ"
+            "ぽ" -> "ほ"
+            "ゔ" -> "う"
+            else -> normalized
+        } else when (normalized) {
+            "い" -> "あ"
+            "う" -> "あ"
+            "え" -> "あ"
+            "お" -> "あ"
+            "き" -> "か"
+            "く" -> "か"
+            "け" -> "か"
+            "こ" -> "か"
+            "し" -> "さ"
+            "す" -> "さ"
+            "せ" -> "さ"
+            "そ" -> "さ"
+            "ち" -> "た"
+            "つ" -> "た"
+            "て" -> "た"
+            "と" -> "た"
+            "に" -> "な"
+            "ぬ" -> "な"
+            "ね" -> "な"
+            "の" -> "な"
+            "ひ" -> "は"
+            "ふ" -> "は"
+            "へ" -> "は"
+            "ほ" -> "は"
+            "み" -> "ま"
+            "む" -> "ま"
+            "め" -> "ま"
+            "も" -> "ま"
+            "ゆ" -> "や"
+            "よ" -> "や"
+            "り" -> "ら"
+            "る" -> "ら"
+            "れ" -> "ら"
+            "ろ" -> "ら"
+            "ん" -> "わ"
+            else -> normalized
         }
-        if( noteWord == flickWord ){
-            return Note.NORMAL
-        }
-
-        //2段回目
-        when( noteWord ){
-            "い" -> noteWord = "あ"
-            "う" -> noteWord = "あ"
-            "え" -> noteWord = "あ"
-            "お" -> noteWord = "あ"
-            "き" -> noteWord = "か"
-            "く" -> noteWord = "か"
-            "け" -> noteWord = "か"
-            "こ" -> noteWord = "か"
-            "し" -> noteWord = "さ"
-            "す" -> noteWord = "さ"
-            "せ" -> noteWord = "さ"
-            "そ" -> noteWord = "さ"
-            "ち" -> noteWord = "た"
-            "つ" -> noteWord = "た"
-            "て" -> noteWord = "た"
-            "と" -> noteWord = "た"
-            "に" -> noteWord = "な"
-            "ぬ" -> noteWord = "な"
-            "ね" -> noteWord = "な"
-            "の" -> noteWord = "な"
-            "ひ" -> noteWord = "は"
-            "ふ" -> noteWord = "は"
-            "へ" -> noteWord = "は"
-            "ほ" -> noteWord = "は"
-            "み" -> noteWord = "ま"
-            "む" -> noteWord = "ま"
-            "め" -> noteWord = "ま"
-            "も" -> noteWord = "ま"
-            "ゆ" -> noteWord = "や"
-            "よ" -> noteWord = "や"
-            "り" -> noteWord = "ら"
-            "る" -> noteWord = "ら"
-            "れ" -> noteWord = "ら"
-            "ろ" -> noteWord = "ら"
-            "ん" -> noteWord = "わ"
-        }
-        when( flickWord ){
-            "い" -> flickWord = "あ"
-            "う" -> flickWord = "あ"
-            "え" -> flickWord = "あ"
-            "お" -> flickWord = "あ"
-            "き" -> flickWord = "か"
-            "く" -> flickWord = "か"
-            "け" -> flickWord = "か"
-            "こ" -> flickWord = "か"
-            "し" -> flickWord = "さ"
-            "す" -> flickWord = "さ"
-            "せ" -> flickWord = "さ"
-            "そ" -> flickWord = "さ"
-            "ち" -> flickWord = "た"
-            "つ" -> flickWord = "た"
-            "て" -> flickWord = "た"
-            "と" -> flickWord = "た"
-            "に" -> flickWord = "な"
-            "ぬ" -> flickWord = "な"
-            "ね" -> flickWord = "な"
-            "の" -> flickWord = "な"
-            "ひ" -> flickWord = "は"
-            "ふ" -> flickWord = "は"
-            "へ" -> flickWord = "は"
-            "ほ" -> flickWord = "は"
-            "み" -> flickWord = "ま"
-            "む" -> flickWord = "ま"
-            "め" -> flickWord = "ま"
-            "も" -> flickWord = "ま"
-            "ゆ" -> flickWord = "や"
-            "よ" -> flickWord = "や"
-            "り" -> flickWord = "ら"
-            "る" -> flickWord = "ら"
-            "れ" -> flickWord = "ら"
-            "ろ" -> flickWord = "ら"
-            "ん" -> flickWord = "わ"
-        }
-        if( noteWord == flickWord ){
-            return Note.SAFE
-        }
-
-        return Note.BAD
     }
 
 }
@@ -399,6 +360,22 @@ class Score {
         val RankStr = listOf("PERFECT","S","A","B","C","D","E","False")
     }
 
+    // This belongs to the score and can only move from eligible to ineligible.
+    var usedNonStandardConditions = false
+        private set
+
+    fun markNonStandardConditions() {
+        usedNonStandardConditions = true
+    }
+
+    fun recordPlayConditions(practice: Boolean, speed: Float, pitch: Float,
+                             seeking: Boolean = false, autoPlay: Boolean = false,
+                             editing: Boolean = false) {
+        if (practice || speed != 1.0f || pitch != 1.0f || seeking || autoPlay || editing) {
+            markNonStandardConditions()
+        }
+    }
+
     var stageRank = 100
 
     var stageScore = 0
@@ -414,6 +391,18 @@ class Score {
             flickableNoteNumD = value.toDouble()
         }
     var borderScore = 50.0
+
+    fun subScore(maeJudge:Int, maeComboCount:Int) {
+        stageScore -= when (maeJudge) { Note.GREAT -> GREAT; Note.GOOD -> GOOD; Note.SAFE -> SAFE; Note.BAD -> BAD; else -> 0 }
+        comboScore -= when {
+            maeComboCount >= 95 -> 500; maeComboCount >= 85 -> 450; maeComboCount >= 75 -> 400
+            maeComboCount >= 65 -> 350; maeComboCount >= 55 -> 300; maeComboCount >= 45 -> 250
+            maeComboCount >= 35 -> 200; maeComboCount >= 25 -> 150; maeComboCount >= 15 -> 100
+            maeComboCount >= 5 -> 50; else -> 0
+        }
+        if (maeComboCount >= 100) stageScore -= 200
+        totalScore = stageScore + comboScore
+    }
 
     fun addScore(judge:Int) {
         when( judge ){
@@ -466,6 +455,7 @@ class Score {
         if( comboCounter >= 100 ){
             stageScore += 200
         }
+        borderScore = borderScore.coerceIn(0.0, 100.0)
         totalScore = stageScore + comboScore
         if( comboMax < comboCounter ){
             comboMax = comboCounter

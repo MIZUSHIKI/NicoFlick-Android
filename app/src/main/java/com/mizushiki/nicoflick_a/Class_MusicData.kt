@@ -1,8 +1,6 @@
 package com.mizushiki.nicoflick_a
 
 import android.service.autofill.UserData
-import com.eclipsesource.json.Json
-import com.eclipsesource.json.JsonArray
 import java.lang.Integer.max
 import kotlin.properties.Delegates
 
@@ -20,12 +18,17 @@ class musicData {
     var sqlUpdateTime:Int = 0
     var sqlCreateTime:Int = 0
 
+    var favoriteCount:Int = 0
+    var favoriteCountTime:Int = 0
+
     var levelIDs:MutableSet<Int> = mutableSetOf()
 }
 
 class levelData {
     var sqlID:Int  by Delegates.notNull()
     var level:Int  by Delegates.notNull()
+    // 参考難易度。0 は未提供（表示しない）。既存の level とは独立して扱う。
+    var calcLv:Int = 0
     var creator:String  by Delegates.notNull()
     var description:String  by Delegates.notNull()
     var speed:Int  by Delegates.notNull()
@@ -38,6 +41,10 @@ class levelData {
     var favoriteCountTime:Int  by Delegates.notNull()
     var commentTime:Int  by Delegates.notNull()
     var scoreTime:Int  by Delegates.notNull()
+
+    var likeCount:Int = 0
+    var dislikeCount:Int = 0
+    var likeCountTime:Int = 0
 
     fun getLevelAsString() : String {
         var star = ""
@@ -55,11 +62,12 @@ class levelData {
     }
 
     val isEditing: Boolean
-        get() = Regex("【編集中:?\\w*】").matches(description)
+        get() = Regex("【編集中:?\\w*】").containsMatchIn(description)
     val isMyEditing: Boolean
         get() {
             if(isEditing){
-                return Regex("【編集中:?(\\w*)").find(description)!!.groupValues.get(1) == USERDATA.UserID.substring(24)
+                val author = Regex("【編集中:?(\\w*)】").find(description)?.groupValues?.get(1) ?: return false
+                return author == USERDATA.UserID.take(8) || author == USERDATA.UserID.drop(24)
             }
             return false
         }
@@ -78,7 +86,7 @@ object MusicDataLists {
         levelsSqlIDtoMovieURL = mutableMapOf()
     }
 
-    fun setMusic(sqlID:Int, movieURL:String, thumbnailURL:String, title:String, artist:String, movieLength:String, tags:String, updateTime:Int, createTime:Int){
+    fun setMusic(sqlID:Int, movieURL:String, thumbnailURL:String, title:String, artist:String, movieLength:String, tags:String, updateTime:Int, createTime:Int, favoriteCount:Int = 0, favoriteCountTime:Int = 0){
         if(movieURL=="delete" || thumbnailURL == "delete"){
             //削除
             for(index in 0 until musics.size){
@@ -101,6 +109,8 @@ object MusicDataLists {
                 musics[index].tag = tags.trim().split(" ")
                 musics[index].sqlUpdateTime = updateTime
                 musics[index].sqlCreateTime = createTime
+                musics[index].favoriteCount = favoriteCount
+                musics[index].favoriteCountTime = favoriteCountTime
                 return
             }
         }
@@ -115,10 +125,12 @@ object MusicDataLists {
         musicdata.tag = tags.trim().split(" ")
         musicdata.sqlUpdateTime = updateTime
         musicdata.sqlCreateTime = createTime
+        musicdata.favoriteCount = favoriteCount
+        musicdata.favoriteCountTime = favoriteCountTime
         musics.add(musicdata)
     }
 
-    fun setLevel(sqlID:Int, movieURL:String, level:Int, creator:String, description:String, speed:Int, noteData:String, updateTime:Int, createTime:Int, playCount:Int, playCountTime:Int, favoriteCount:Int, favoriteCountTime:Int, commentTime:Int, scoreTime:Int){
+    fun setLevel(sqlID:Int, movieURL:String, level:Int, creator:String, description:String, speed:Int, noteData:String, updateTime:Int, createTime:Int, playCount:Int, playCountTime:Int, favoriteCount:Int, favoriteCountTime:Int, commentTime:Int, scoreTime:Int, likeCount:Int = 0, dislikeCount:Int = 0, likeCountTime:Int = 0, calcLv:Int = 0){
         if(level==-1){
             //削除
             //musicsの逆引き用の levelIDsから指定IDを削除する
@@ -148,6 +160,7 @@ object MusicDataLists {
             for(leveldata in levels[movieURL]!!){
                 if(leveldata.sqlID == sqlID){
                     leveldata.level = level
+                    leveldata.calcLv = calcLv
                     leveldata.creator = creator
                     leveldata.description = description
                     leveldata.speed = speed
@@ -160,6 +173,9 @@ object MusicDataLists {
                     leveldata.favoriteCountTime = favoriteCountTime
                     leveldata.commentTime = commentTime
                     leveldata.scoreTime = scoreTime
+                    leveldata.likeCount = likeCount
+                    leveldata.dislikeCount = dislikeCount
+                    leveldata.likeCountTime = likeCountTime
                     return
                 }
             }
@@ -167,6 +183,7 @@ object MusicDataLists {
         val leveldata = levelData()
         leveldata.sqlID = sqlID
         leveldata.level = level
+        leveldata.calcLv = calcLv
         leveldata.creator = creator
         leveldata.description = description
         leveldata.speed = speed
@@ -179,6 +196,9 @@ object MusicDataLists {
         leveldata.favoriteCountTime = favoriteCountTime
         leveldata.commentTime = commentTime
         leveldata.scoreTime = scoreTime
+        leveldata.likeCount = likeCount
+        leveldata.dislikeCount = dislikeCount
+        leveldata.likeCountTime = likeCountTime
         levels[movieURL] = levels[movieURL] ?: arrayListOf()
         levels[movieURL]!!.add(leveldata)
         levelsSqlIDtoMovieURL[sqlID] = movieURL
@@ -280,6 +300,7 @@ object MusicDataLists {
     fun createTaglist(){
         taglist = mutableMapOf() //初期化
         for( music in musics ){
+            if (!hasPlayableLevel(music.movieURL)) continue
             for( tag in music.tag ){
                 if( tag == "" ){ continue }
                 if( taglist[tag] != null){
@@ -306,7 +327,7 @@ object MusicDataLists {
             var timetag = ""
             for( levelData in it ){
                 timetag = levelData.noteData.pregMatche_firstString("(\\[\\d\\d\\:\\d\\d[\\:|\\.]\\d\\d\\])")
-                println(timetag)
+                // println(timetag)
                 if( timetag != "" ){
                     val time = timetag.timetagToSeconds()
                     if( time < 0.0 ){
@@ -333,7 +354,7 @@ object MusicDataLists {
         var ue = 99 * 60 + 99
         for( tagp in selectCondition.tag ){
             if( tagp.word.startsWith("@g:") ){
-                val ids = tagp.word.removePrefix("@g:").split("-").map{ Int(it) }
+                val ids = tagp.word.removePrefix("@g:").split("_", "-").mapNotNull{ it.toIntOrNull() }
                 // @mへの変換
                 for( id in ids ){
                     levelsSqlIDtoMovieURL[id]?.let {
@@ -346,8 +367,17 @@ object MusicDataLists {
                 }
                 continue
             }else if( tagp.word.startsWith("@m:") ){
-                val ids = tagp.word.removePrefix("@m:").split("-").map{ Int(it) }
+                val ids = tagp.word.removePrefix("@m:").split("_", "-").mapNotNull{ it.toIntOrNull() }
                 tagps += ids.map{ SelectConditions.tagp(word = "@m:${it}", type = tagp.type) }
+                continue
+            }else if (tagp.word.startsWith("@sm:")) {
+                val ids = tagp.word.removePrefix("@sm:").split("-").mapNotNull { it.toLongOrNull() }
+                if (ids.size >= 2) {
+                    for (music in musics) {
+                        val number = music.movieURL.pregMatche_firstString("sm(\\d+)$").toLongOrNull() ?: continue
+                        if (number in ids[0]..ids[1]) tagps.add(SelectConditions.tagp("@m:${music.sqlID}", tagp.type))
+                    }
+                }
                 continue
             }else if( tagp.word.startsWith("@t:") ){
                 var ans:ArrayList<String> = arrayListOf()
@@ -364,7 +394,7 @@ object MusicDataLists {
                     ue = sita
                     sita = swap
                 }
-                println("sita=$sita, ue=$ue")
+                // println("sita=$sita, ue=$ue")
                 continue
             }else if( tagp.word == "@初期楽曲" ){
                 //
@@ -381,8 +411,8 @@ object MusicDataLists {
         }
 
         var extractMusics:ArrayList<musicData> = arrayListOf()
-        println("selectCondition.tag.size="+tagps.size)
-        println("musics.size="+ musics.size)
+        // println("selectCondition.tag.size="+tagps.size)
+        // println("musics.size="+ musics.size)
         if( tagps.size == 0 ){
             extractMusics = musics.clone() as ArrayList<musicData>
         }else {
@@ -497,39 +527,39 @@ object MusicDataLists {
 
         var sortedMusics:ArrayList<musicData> = musics//arrayListOf()
         when( selectCondition.sortItem.pregReplace(" [★☆]{10}[■□]$","") ){
-            "曲の投稿が新しい順" -> musics.sortBy{ it.sqlCreateTime * -1 }
-            "曲の投稿が古い順" -> musics.sortBy { it.sqlCreateTime }
-            "ゲームの投稿が新しい曲順" -> {
-                val levelp:MutableMap<String,Int> = mutableMapOf() //[movieURL,sqlID]
+            "曲の投稿日時 降順" -> musics.sortBy{ it.sqlCreateTime * -1 }
+            "曲の投稿日時 昇順" -> musics.sortBy { it.sqlCreateTime }
+            "ゲームの投稿日時 降順" -> {
+                val levelp:MutableMap<String,Int> = mutableMapOf() //[movieURL,sqlCreateTime]
                 for( (key,lvInURL) in levels ){
                     for( leveldata in lvInURL ){
                         if( leveldata.isEditing && !leveldata.isMyEditing ){
                             continue
                         }
                         if( levelp[key] == null ){
-                            levelp[key] = leveldata.sqlID
+                            levelp[key] = leveldata.sqlCreateTime
                         }else {
-                            if( levelp[key]!! < leveldata.sqlID ) {
-                                levelp[key] = leveldata.sqlID
+                            if( levelp[key]!! < leveldata.sqlCreateTime ) {
+                                levelp[key] = leveldata.sqlCreateTime
                             }
                         }
                     }
                 }
                 sortedMusics = ArrayList(musics.filter{ levelp.keys.contains(it.movieURL)})
-                sortedMusics.sortBy { levelp[it.movieURL]!! * -1 }
+                sortedMusics.sortByDescending { levelp[it.movieURL]!! }
             }
-            "ゲームの投稿が古い曲順" -> {
-                val levelp:MutableMap<String,Int> = mutableMapOf() //[movieURL,sqlID]
+            "ゲームの投稿日時 昇順" -> {
+                val levelp:MutableMap<String,Int> = mutableMapOf() //[movieURL,sqlCreateTime]
                 for( (key,lvInURL) in levels ){
                     for( leveldata in lvInURL ){
                         if( leveldata.isEditing && !leveldata.isMyEditing ){
                             continue
                         }
                         if( levelp[key] == null ){
-                            levelp[key] = leveldata.sqlID
+                            levelp[key] = leveldata.sqlCreateTime
                         }else {
-                            if( levelp[key]!! > leveldata.sqlID ) {
-                                levelp[key] = leveldata.sqlID
+                            if( levelp[key]!! > leveldata.sqlCreateTime ) {
+                                levelp[key] = leveldata.sqlCreateTime
                             }
                         }
                     }
@@ -537,7 +567,7 @@ object MusicDataLists {
                 sortedMusics = ArrayList(musics.filter{ levelp.keys.contains(it.movieURL)})
                 sortedMusics.sortBy { levelp[it.movieURL]!! }
             }
-            "ゲームプレイ回数が多い曲順" -> {
+            "みんなのプレイ回数が多い曲順" -> {
                 val levelp:MutableMap<String,Int> = mutableMapOf() //[URL,allPlayCount]
                 for( (key,lvInURL) in levels ){
                     levelp[key] = lvInURL.fold(0){sum,leveldata -> sum + leveldata.playCount}
@@ -545,13 +575,31 @@ object MusicDataLists {
                 sortedMusics = ArrayList(musics.filter{ levelp.keys.contains(it.movieURL)})
                 sortedMusics.sortBy { levelp[it.movieURL]!! * -1 }
             }
-            "ゲームプレイ回数が少ない曲順" -> {
+            "みんなのプレイ回数が少ない曲順" -> {
                 val levelp:MutableMap<String,Int> = mutableMapOf() //[URL,allPlayCount]
                 for( (key,lvInURL) in levels ){
                     levelp[key] = lvInURL.fold(0){sum,leveldata -> sum + leveldata.playCount}
                 }
                 sortedMusics = ArrayList(musics.filter{ levelp.keys.contains(it.movieURL)})
                 sortedMusics.sortBy { levelp[it.movieURL]!! }
+            }
+            "最近プレイした曲順" -> {
+                val histories = USERDATA.levelPlayHistories
+                val lastPlayedByURL = levels.mapValues { (_, musicLevels) ->
+                    musicLevels.fold(0L) { latest, level ->
+                        maxOf(latest, histories[level.sqlID]?.lastPlayedAt?.time ?: 0L)
+                    }
+                }
+                sortedMusics = ArrayList(musics.sortedByDescending { lastPlayedByURL[it.movieURL] ?: 0L })
+            }
+            "あなたのプレイ回数が多い曲順" -> {
+                val histories = USERDATA.levelPlayHistories
+                val playCountByURL = levels.mapValues { (_, musicLevels) ->
+                    musicLevels.fold(0L) { count, level ->
+                        count + (histories[level.sqlID]?.playCount ?: 0).toLong()
+                    }
+                }
+                sortedMusics = ArrayList(musics.sortedByDescending { playCountByURL[it.movieURL] ?: 0L })
             }
             "最近ハイスコアが更新された曲順" -> {
                 val levelp:MutableMap<String,Int> = mutableMapOf() //[URL,allPlayCount]
@@ -570,23 +618,21 @@ object MusicDataLists {
                 sortedMusics.sortBy { levelp[it.movieURL]!! * -1 }
             }
             "お気に入り数が多い曲順" -> {
-                val levelp:MutableMap<String,Int> = mutableMapOf() //[URL,allPlayCount]
-                for( (key,lvInURL) in levels ){
-                    levelp[key] = lvInURL.fold(0){sum,leveldata -> sum + leveldata.favoriteCount}
-                }
-                sortedMusics = ArrayList(musics.filter{ levelp.keys.contains(it.movieURL)})
-                sortedMusics.sortBy { levelp[it.movieURL]!! * -1 }
+                sortedMusics = ArrayList(musics.sortedByDescending { it.favoriteCount })
             }
             "お気に入り数が少ない曲順" -> {
-                val levelp:MutableMap<String,Int> = mutableMapOf() //[URL,allPlayCount]
-                for( (key,lvInURL) in levels ){
-                    levelp[key] = lvInURL.fold(0){sum,leveldata -> sum + leveldata.favoriteCount}
-                }
-                sortedMusics = ArrayList(musics.filter{ levelp.keys.contains(it.movieURL)})
-                sortedMusics.sortBy { levelp[it.movieURL]!! }
+                sortedMusics = ArrayList(musics.sortedBy { it.favoriteCount })
             }
-            "動画IDが大きい順" -> musics.sortBy{ it.movieURL.pregReplace("[^0-9]","").toInt() * -1 }
-            "動画IDが小さい順" -> musics.sortBy { it.movieURL.pregReplace("[^0-9]","").toInt() }
+            "動画ID 降順" -> {
+                val nonDigits = Regex("[^0-9]")
+                val videoIDs = musics.associate { it.movieURL to nonDigits.replace(it.movieURL, "").toInt() }
+                musics.sortBy { videoIDs.getValue(it.movieURL) * -1 }
+            }
+            "動画ID 昇順" -> {
+                val nonDigits = Regex("[^0-9]")
+                val videoIDs = musics.associate { it.movieURL to nonDigits.replace(it.movieURL, "").toInt() }
+                musics.sortBy { videoIDs.getValue(it.movieURL) }
+            }
             "タグで選んだ順" -> {
                 sortedMusics = musics
             }
@@ -597,17 +643,8 @@ object MusicDataLists {
 
         //お気に入りを先頭に集める
         if( USERDATA.MusicSortCondition == 1 ){
-            val levelp:MutableMap<String,Boolean> = mutableMapOf() //[URL,allPlayCount]
-            for( (key,lvInURL) in levels ){
-                levelp[key] = false
-                for( level in lvInURL ){
-                    if( USERDATA.MyFavoriteAll.contains(level.sqlID) ){
-                        levelp[key] = true
-                        break
-                    }
-                }
-            }
-            sortedMusics = ArrayList(sortedMusics.filter { levelp[it.movieURL]!! } + sortedMusics.filter { !levelp[it.movieURL]!! } )
+            val favorites = USERDATA.MyFavorite3
+            sortedMusics = ArrayList(sortedMusics.filter { it.sqlID in favorites } + sortedMusics.filter { it.sqlID !in favorites })
         }
 
         callback(sortedMusics)
@@ -630,6 +667,7 @@ object MusicDataLists {
         }else {
             var a:MutableList<levelData> = mutableListOf()
             var b:MutableList<levelData> = mutableListOf()
+            val myLikes = USERDATA.MyLike // 保存済みLike一覧の解析は並べ替えごとに1回だけ。
             for( level in getSelectMusicLevels_noSort(selectMovieURL).filter {
                 if( it.level > 10 ){
                     return@filter USERDATA.SelectedMusicCondition.sortStars[10]
@@ -639,7 +677,7 @@ object MusicDataLists {
                 }
                 return@filter USERDATA.SelectedMusicCondition.sortStars[it.level-1]
             } ){
-                if( USERDATA.MyFavoriteAll.contains(level.sqlID) ){
+                if (myLikes[level.sqlID]?.let { it == -2 || it > 0 } == true) {
                     a.add(level)
                 }else {
                     b.add(level)
@@ -664,124 +702,32 @@ object MusicDataLists {
         return selectLevels
     }
 
+    fun hasPlayableLevel(selectMovieURL:String, isMe:Boolean = true):Boolean =
+        levels[selectMovieURL]?.any { !it.isEditing || (isMe && it.isMyEditing) } == true
+
+    fun setMusic_Favoritecount(sqlID:Int, favoriteCount:Int, favoriteCountTime:Int) {
+        val music = musics.firstOrNull { it.sqlID == sqlID } ?: return
+        if (favoriteCount != -1) {
+            music.favoriteCount = favoriteCount
+            music.favoriteCountTime = favoriteCountTime
+        }
+    }
+    fun getLastFavoriteCountTimeMusic():Int = musics.map { it.favoriteCountTime }.maxOrNull() ?: 0
+    fun getLastLikeCountTimeLevel():Int = levels.values.flatten().map { it.likeCountTime }.maxOrNull() ?: 0
+    fun setLevel_PlaycountLike(sqlID:Int, playCount:Int, playCountTime:Int, commentTime:Int, scoreTime:Int,
+                              likeCount:Int, dislikeCount:Int, likeCountTime:Int) {
+        val level = levels.values.asSequence()
+            .flatMap { it.asSequence() }
+            .firstOrNull { it.sqlID == sqlID } ?: return
+        if (playCount != -1) { level.playCount = playCount; level.playCountTime = playCountTime }
+        if (likeCount != -1) level.likeCount = likeCount
+        if (dislikeCount != -1) level.dislikeCount = dislikeCount
+        if (likeCount != -1 || dislikeCount != -1) level.likeCountTime = likeCountTime
+        if (commentTime != -1) level.commentTime = commentTime
+        if (scoreTime != -1) level.scoreTime = scoreTime
+    }
+
     // musics Json化。 USERDATAに保存用
-    fun toMusicsJsonString() : String{
-        val jArrary = Json.array()
-        for( musicdata in this.musics ){
-            val jObject = Json.`object`()
-                .add("id",musicdata.sqlID.toString())
-                .add("movieURL",musicdata.movieURL)
-                .add("thumbnailURL",musicdata.thumbnailURL)
-                .add("title",musicdata.title)
-                .add("artist",musicdata.artist)
-                .add("movieLength",musicdata.movieLength)
-                .add("tags",musicdata.tags)
-                .add("updateTime",musicdata.sqlUpdateTime.toString())
-                .add("createTime",musicdata.sqlCreateTime.toString())
+    // 永続化はMetadataStorageがSQLiteの行として行う。
 
-            jArrary.add(jObject)
-        }
-        println("json output")
-        println(jArrary.toString())
-
-        return jArrary.toString()
-    }
-    // 保存データから読み込み
-    fun loadMusicsJsonString(jsonStr:String){
-        if(jsonStr==""){ return }
-        val jsonArray: JsonArray
-        try {
-            jsonArray = Json.parse(jsonStr).asArray()
-        }catch (e:Exception){
-            println(e)
-            return
-        }
-        // ロードした musicデータを処理
-        for (i in 0 until jsonArray.size()) {
-            val json = jsonArray.get(i).asObject()
-            this.setMusic(
-                sqlID = json.get("id").asString().toInt(),
-                movieURL = json.get("movieURL").asString(),
-                thumbnailURL = json.get("thumbnailURL").asString(),
-                title = json.get("title").asString(),
-                artist = json.get("artist").asString(),
-                movieLength = json.get("movieLength").asString(),
-                tags = json.get("tags").asString(),
-                updateTime = json.get("updateTime").asString().toInt(),
-                createTime = json.get("createTime").asString().toInt()
-            )
-        }
-        this.createTaglist()
-    }
-
-    // levels Json化。 USERDATAに保存用
-    fun toLevelsJsonString() : String{
-        val jArrary = Json.array()
-        for( (movieURL,leveldatas) in this.levels ){
-            for( leveldata in leveldatas ){
-
-                //(sqlID:Int, movieURL:String, level:Int, creator:String, description:String, speed:Int, noteData:String, updateTime:Int, createTime:Int, playCount:Int)
-                val jObject = Json.`object`()
-                    .add("id",leveldata.sqlID.toString())
-                    .add("movieURL",movieURL)
-                    .add("level",leveldata.level.toString())
-                    .add("creator",leveldata.creator)
-                    .add("description",leveldata.description)
-                    .add("speed",leveldata.speed.toString())
-                    .add("notes",leveldata.noteData)
-                    .add("updateTime",leveldata.sqlUpdateTime.toString())
-                    .add("createTime",leveldata.sqlCreateTime.toString())
-                    .add("playCount",leveldata.playCount.toString())
-                    .add("playCountTime",leveldata.playCountTime.toString())
-                    .add("favorite",leveldata.favoriteCount.toString())
-                    .add("favoriteTime",leveldata.favoriteCountTime.toString())
-                    .add("commentTime",leveldata.commentTime.toString())
-                    .add("scoreTime",leveldata.scoreTime.toString())
-
-                jArrary.add(jObject)
-            }
-        }
-        println("json output")
-        println(jArrary.toString())
-
-        return jArrary.toString()
-    }
-    // 保存データから読み込み
-    fun loadLevelsJsonString(jsonStr:String){
-        if(jsonStr==""){ return }
-        val jsonArray: JsonArray
-        try {
-            jsonArray = Json.parse(jsonStr).asArray()
-        }catch (e:Exception){
-            println(e)
-            return
-        }
-        // ロードした levelデータを処理
-        for (i in 0 until jsonArray.size()) {
-            val json = jsonArray.get(i).asObject()
-            //下位互換
-            val playCountTime = json.get("playCountTime")?.asString()?.toInt() ?: 0
-            val favoriteCount =  json.get("favorite")?.asString()?.toInt() ?: 0
-            val favoriteCountTime = json.get("favoriteTime")?.asString()?.toInt() ?: 0
-            val commentTime = json.get("commentTime")?.asString()?.toInt() ?: 0
-            val scoreTime = json.get("scoreTime")?.asString()?.toInt() ?: 0
-            this.setLevel(
-                sqlID = json.get("id").asString().toInt(),
-                movieURL = json.get("movieURL").asString(),
-                level = json.get("level").asString().toInt(),
-                creator = json.get("creator").asString(),
-                description = json.get("description").asString(),
-                speed = json.get("speed").asString().toInt(),
-                noteData = json.get("notes").asString(),
-                updateTime = json.get("updateTime").asString().toInt(),
-                createTime = json.get("createTime").asString().toInt(),
-                playCount = json.get("playCount").asString().toInt(),
-                playCountTime = playCountTime,
-                favoriteCount = favoriteCount,
-                favoriteCountTime = favoriteCountTime,
-                commentTime = commentTime,
-                scoreTime = scoreTime
-            )
-        }
-    }
 }

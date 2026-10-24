@@ -5,12 +5,21 @@ import android.content.Intent
 import android.graphics.*
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
+import com.google.android.exoplayer2.PlayerMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import android.os.VibrationEffect
 import android.os.VibrationEffect.DEFAULT_AMPLITUDE
 import android.os.Vibrator
 import android.text.Html
 import android.view.KeyEvent.ACTION_UP
 import android.view.MotionEvent
+import android.view.Gravity
+import android.widget.ArrayAdapter
+import android.widget.Button
+import android.widget.ListView
 import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
@@ -18,19 +27,21 @@ import android.widget.AdapterView.OnItemClickListener
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.CheckBox
+import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import androidx.core.view.doOnNextLayout
+import com.mizushiki.nicoflick_a.databinding.ActivitySelectorBinding
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.SeekParameters
 import com.google.android.exoplayer2.SimpleExoPlayer
 import com.google.android.exoplayer2.ui.PlayerView
-import it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow
-import it.moondroid.coverflow.components.ui.containers.FeatureCoverFlow.OnScrollPositionListener
-import kotlinx.android.synthetic.main.activity_selector.*
-import kotlinx.android.synthetic.main.activity_selector.view.*
-import kotlinx.android.synthetic.main.activity_settings.progress_circular
+import it.moondroid.coverflow.components.ui.containers.StableFeatureCoverFlow
+import it.moondroid.coverflow.components.ui.containers.StableFeatureCoverFlow.OnScrollPositionListener
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
@@ -42,6 +53,8 @@ import kotlin.concurrent.schedule
 
 
 class Activity_Selector : AppCompatActivity() {
+
+    private lateinit var binding: ActivitySelectorBinding
 
     //各種データ
     var musicDatas: MusicDataLists = MusicDataLists
@@ -63,16 +76,37 @@ class Activity_Selector : AppCompatActivity() {
     var maeSort = ""
     var maeMusicTags = ""
     var scrollingTimer: Timer? = null
+    private var coverFlowScrolling = false
     var maeMusic:musicData? = null
     var numberRoll_index = -1
 
-    lateinit var coverflow: FeatureCoverFlow
-    var containerFirstPos = 0
+    val coverflow: StableFeatureCoverFlow get() = binding.coverflow
     var scrollerOneHeight = 100
+    private var levelPickerBitmap: Bitmap? = null
+    private var levelPickerBitmapDirty = true
 
     private var cacheExoPlayer: SimpleExoPlayer? = null
-    private lateinit var playerView: PlayerView
+    private val selectorHandler = Handler(Looper.getMainLooper())
+    private val selectorScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var thumbGeneration = 0L
+    private val thumbListeners = mutableMapOf<SimpleExoPlayer, Player.EventListener>()
+    private val thumbMessages = mutableListOf<Pair<SimpleExoPlayer, PlayerMessage>>()
+    private val thumbRequests = mutableSetOf<kotlinx.coroutines.Job>()
+    private fun clearThumbCallbacks() {
+        thumbRequests.toList().forEach { it.cancel() }
+        thumbRequests.clear()
+        thumbMessages.forEach { it.second.cancel() }
+        thumbMessages.clear()
+        thumbListeners.forEach { (player, listener) -> player.removeListener(listener) }
+        thumbListeners.clear()
+    }
 
+    private fun ownsThumbRequest(generation: Long): Boolean =
+        generation == thumbGeneration && !isFinishing && !isDestroyed
+
+    private val playerView: PlayerView get() = binding.playerView
+
+    private val navigation = DeferredNavigation()
     var segueing = false
     var leaved = false
     var flg_notHome = false
@@ -85,27 +119,50 @@ class Activity_Selector : AppCompatActivity() {
         none, play, loadOnly
     }
 
+    override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
+        if (segueing || isFinishing || isDestroyed) return true
+        return super.dispatchTouchEvent(event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         GLOBAL.Selector_instance = this
-        setContentView(R.layout.activity_selector)
+        binding = ActivitySelectorBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        USERDATA.migrateFavoritesV2000()
+        USERDATA.migrateScoreLevelsV2000()
 
-        //お気に入りソート関係
-        button_levelSort.alpha = if (USERDATA.LevelSortCondition != 0) 0.6F else 0.2F
-        button_musicSort.alpha = if (USERDATA.MusicSortCondition != 0) 0.6F else 0.2F
         //カバーフロー
-        val mHandler = Handler()
-        coverflow = findViewById<View>(R.id.coverflow) as FeatureCoverFlow
-        var curMusics = if(currentMusics.size == 1){ arrayListOf(currentMusics.first(), currentMusics.last()) }else{ currentMusics }
-        val coverFlowAdapter = CoverFlowAdapter(this, curMusics)
+        val mHandler = selectorHandler
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            // CoverFlow 内の横スワイプを、画面端の「戻る」ジェスチャーより優先する。
+            // 初回レイアウトとサイズ変更時に、View 内の座標で除外領域を更新する。
+            coverflow.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+                // 通常の高さ制限は200dp。従来の下端基準の範囲を50px上へ移動する。
+                val exclusionHeightPx = (200 * view.resources.displayMetrics.density).toInt()
+                    .coerceAtMost(view.height)
+                val offsetUpPx = 100 // 大きくすると、除外領域がさらに上へ移動する。
+                val bottom = (view.height - offsetUpPx).coerceIn(exclusionHeightPx, view.height)
+                view.systemGestureExclusionRects = listOf(
+                    Rect(0, bottom - exclusionHeightPx, view.width, bottom)
+                )
+            }
+        }
+        coverflow.setShouldRepeat(currentMusics.size > 1)
+        val coverFlowAdapter = CoverFlowAdapter(this, currentMusics)
         coverflow.adapter = coverFlowAdapter
         coverflow.setReflectionOpacity(0xFF * 40/100)
+        // false: 高速移動中も反射を更新。true: 従来どおり停止後に更新。
+        coverflow.setDeferReflectionUpdatesWhileScrolling(false)
         coverflow.setOnScrollPositionListener(object : OnScrollPositionListener {
             override fun onScrolling() {
+                coverFlowScrolling = true
                 //println("scrolling"+coverflow.scrollPosition)
                 if (scrollingTimer == null) {
                     val timerCallback1: TimerTask.() -> Unit = {
                         mHandler.post {
+                            if (isFinishing || isDestroyed) return@post
                             //println("TODO")
                             val coverflow_scrollPosition = if (currentMusics.size == 1) {
                                 0
@@ -131,6 +188,7 @@ class Activity_Selector : AppCompatActivity() {
             }
 
             override fun onScrolledToPosition(position: Int) {
+                coverFlowScrolling = false
                 if (coverflow.isVisible) {
                     //println("pos=$position")
                     indexCoverFlow = position
@@ -141,11 +199,14 @@ class Activity_Selector : AppCompatActivity() {
                     }
 
                     if (currentMusics.indices.contains(indexCoverFlow)) {
+                        // Programmatic jumps do not run the scrolling timer. Always commit
+                        // the centered music and its levels together before playing video.
+                        setCurrentLevels(indexCoverFlow)
                         if( currentMusics.size == 1 && maeMusic == currentMusics[indexCoverFlow] ){
                             return
                         }
                         maeMusic = currentMusics[indexCoverFlow]
-                        println("maeMusic=$maeMusic")
+                        // println("maeMusic=$maeMusic")
                     }
                     ThumbMoviePlay()
                 }
@@ -153,7 +214,7 @@ class Activity_Selector : AppCompatActivity() {
 
         })
         coverflow.setOnItemClickListener{ parent: AdapterView<*>?, view: View?, position: Int, id: Long -> Unit
-            println("CoverFlow Tap ${position} ${id}")
+            // println("CoverFlow Tap ${position} ${id}")
 
             if( !USERDATA.thumbMoviePlay ){ return@setOnItemClickListener }
             if( flg_thumbMovieStopping ){ return@setOnItemClickListener }
@@ -165,9 +226,9 @@ class Activity_Selector : AppCompatActivity() {
 
         }
         //レベルピッカー(スクロールビューVer)
-        scrollerOneHeight = levelScrollerView.layoutParams.height / 2
+        scrollerOneHeight = binding.levelScrollerView.layoutParams.height / 2
 
-        scrollview_levelScroller.setOnScrollChangeListener { v, scrollX, scrollY, oldScrollX, oldScrollY ->
+        binding.scrollviewLevelScroller.setOnScrollChangeListener { v, scrollX, scrollY, oldScrollX, oldScrollY ->
             //println("scID = ${ (scrollY.toFloat() / scrollerOneHeight + 0.5).toInt()}, scrollY = $scrollY")
             levelScroller_scrollY = scrollY
             // IndexPicker
@@ -192,11 +253,11 @@ class Activity_Selector : AppCompatActivity() {
                     levelScroller_index = currentLevels.count()-1
                 }
                 //LevelPickerコンテナの中身を更新
-                LevelPickerContainerRedraw()
+                LevelPickerContainerRedraw(redraw = false)
             }
             LevelPickerContainerSetScrollY(scrollY % scrollerOneHeight)
         }
-        scrollview_levelScroller.setOnTouchListener { v, event ->
+        binding.scrollviewLevelScroller.setOnTouchListener { v, event ->
             if(event.action == ACTION_UP){
                 //指を離したとき据わりの良い位置にスクロールする。ための確認ループ
                 val timerRun = object : Runnable {
@@ -216,7 +277,7 @@ class Activity_Selector : AppCompatActivity() {
                         }else {
                             //指離した後、スクロールも止まった。
                             levelScroller_maeScrollY = -100
-                            scrollview_levelScroller.smoothScrollTo(0, indexPicker * scrollerOneHeight)
+                            binding.scrollviewLevelScroller.smoothScrollTo(0, indexPicker * scrollerOneHeight)
                        }
                     }
                 }
@@ -231,118 +292,170 @@ class Activity_Selector : AppCompatActivity() {
         SetMusicToCoverFlow()
 
         //オブジェクトが生成されてから実行（値を取得する）
-        Handler().postDelayed(Runnable {
-            //コンテナの初期値を保存
-            containerFirstPos = levelpickerContainer.y.toInt()
+        selectorHandler.postDelayed(Runnable {
             RedrawLevelpickerSelection()
         }, 100)
 
-        text_Tags.setOnClickListener {
+        binding.textTags.setOnClickListener {
+            val selectedMusic = currentMusics.getOrNull(indexCoverFlow) ?: return@setOnClickListener
             if( currentMusics.size > 0 ){
-                if(segueing){ return@setOnClickListener }
+                if (segueing || coverFlowScrolling) return@setOnClickListener
                 SESystemAudio.openSePlay()
                 segueing = true
                 flg_notHome = true
                 maeTags = USERDATA.SelectedMusicCondition.tags
                 maeSort = USERDATA.SelectedMusicCondition.sortItem
-                maeMusicTags = currentMusics[indexCoverFlow].tags
-                GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
+                maeMusicTags = selectedMusic.tags
+                GLOBAL.SelectMUSIC = selectedMusic
                 val intent: Intent = Intent(applicationContext, Activity_SelectorMenuTableForTag::class.java)
                 intent.putExtra("fromSelector", true)
                 startActivityForResult(intent, 1002)
             }
         }
-        text_Title_c.setOnClickListener {
-           gotoSelectorMenuTableForSort()
-        }
-        text_Artist.setOnClickListener {
-            gotoSelectorMenuTableForSort()
-        }
-        text_Length.setOnClickListener {
-            gotoSelectorMenuTableForSort()
-        }
-        text_Speed.setOnClickListener {
-            gotoSelectorMenuTableForSort()
-        }
-        text_Num.setOnClickListener {
+        binding.buttonSortMenu.setOnClickListener { gotoSelectorMenuTableForSort() }
+        binding.textNum.setOnClickListener {
+            if (segueing || coverFlowScrolling || isFinishing || isDestroyed) return@setOnClickListener
             SESystemAudio.openSePlay()
             val a = currentMusics.indices.map { (it + 1).toString() }.toTypedArray()
-            AlertDialog.Builder(this)
-                .setTitle("曲の選択")
-                .setItems(a){ dialog, which ->
-                    numberRoll_index = which
-                    indexCoverFlow = -1 //CoverFlowリロード
-                    SetMusicToCoverFlow()
+            val listView = ListView(this).apply {
+                adapter = ArrayAdapter(this@Activity_Selector, android.R.layout.simple_list_item_1, a)
+                // 初期レイアウトで行の高さを取得し、選択中の曲を中央に配置する。
+                if (indexCoverFlow in a.indices) {
+                    val selectedPosition = indexCoverFlow
+                    setSelection(selectedPosition)
+                    doOnNextLayout {
+                        val rowHeight = getChildAt(0)?.height ?: return@doOnNextLayout
+                        val contentHeight = height - paddingTop - paddingBottom
+                        setSelectionFromTop(selectedPosition, (contentHeight - rowHeight) / 2)
+                    }
                 }
-                .setNegativeButton("Cancel", null)
-                .show()
+            }
+            val content = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+            fun addScrollButton(label: String, description: String, position: Int) {
+                val row = LinearLayout(this).apply {
+                    gravity = Gravity.END
+                }
+                row.addView(Button(this).apply {
+                    text = label
+                    contentDescription = description
+                    isEnabled = a.isNotEmpty()
+                    setOnClickListener {
+                        val currentPosition = listView.firstVisiblePosition
+                        val threshold = 10
+                        if (kotlin.math.abs(position - currentPosition) > threshold) {
+                            val nearbyPosition = if (position > currentPosition) {
+                                position - threshold*2
+                            } else {
+                                position + threshold
+                            }
+                            // ジャンプ後の行配置が確定してから短いアニメーションを開始する。
+                            listView.doOnNextLayout {
+                                listView.smoothScrollToPositionFromTop(position, 0, 300)
+                            }
+                            listView.setSelection(nearbyPosition.coerceIn(a.indices))
+                        } else {
+                            listView.smoothScrollToPositionFromTop(position, 0, 300)
+                        }
+                    }
+                    post {
+                        layoutParams = layoutParams.apply {
+                            width = (measuredWidth * 0.8f).toInt()
+                        }
+                    }
+                }, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ))
+                content.addView(row)
+            }
+            addScrollButton("▲", "一覧の先頭へスクロール", 0)
+            content.addView(listView, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                (resources.displayMetrics.heightPixels * 0.5f).toInt()
+            ))
+            addScrollButton("▼", "一覧の末尾へスクロール", a.lastIndex)
+            val dialog = AlertDialog.Builder(this)
+                .setTitle("曲の選択")
+                .setView(content)
+                .setPositiveButton("キャンセル", null)
+                .create()
+            listView.setOnItemClickListener { _, _, which, _ ->
+                numberRoll_index = which
+                indexCoverFlow = -1 //CoverFlowリロード
+                SetMusicToCoverFlow()
+                dialog.dismiss()
+            }
+            dialog.show()
         }
         //
-        scrollview_levelScroller.isHorizontalFadingEdgeEnabled = true
-        //showChangeFavoSpecView() //もういいか
-        playerView = findViewById(R.id.playerView)
+        binding.scrollviewLevelScroller.isHorizontalFadingEdgeEnabled = true
+
         // FrameLayout のインスタンスを取得
         val slashShadeLayout: FrameLayout = findViewById(R.id.playerView_SlashShade_layout)
         val slashShadeView = SlashShadeView(this)
         slashShadeLayout.addView(slashShadeView)
         if( USERDATA.thumbMoviePlay ){
-            button_thumbMoviePlay.alpha = 1.0F
-            button_thumbMoviePlay.background.colorFilter = PorterDuffColorFilter(
-                0xFFFF2D71.toInt(),
-                PorterDuff.Mode.SRC_IN
-            )
+            binding.buttonThumbMoviePlay.alpha = 1.0F
+            binding.buttonThumbMoviePlay.setBackgroundResource(R.drawable.video_on)
         }
     }
     private fun setThumbMovieMaeUsiro(usiro:Boolean){
         if( !usiro ) {
-            playerView_onCoverFlow.player = cacheExoPlayer
+            binding.playerViewOnCoverFlow.player = cacheExoPlayer
             playerView.isVisible = false
-            coverflow_Huta.isVisible = true
-            playerView_onCoverFlow.isVisible = true
+            binding.coverflowHuta.isVisible = true
+            binding.playerViewOnCoverFlow.isVisible = true
             cacheExoPlayer?.volume = 0.18f * USERDATA.SoundVolumeMovie * volumeForceInResult
         }else {
             playerView.player = cacheExoPlayer
             playerView.isVisible = true
-            coverflow_Huta.isVisible = false
-            playerView_onCoverFlow.isVisible = false
+            binding.coverflowHuta.isVisible = false
+            binding.playerViewOnCoverFlow.isVisible = false
             cacheExoPlayer?.volume = 0.10f * USERDATA.SoundVolumeMovie * volumeForceInResult
         }
     }
     fun gotoSelectorMenuTableForSort() {
-        if( currentMusics.size <= 0 ){
-            return
-        }
-        if(segueing){ return }
+        val selectedMusic = currentMusics.getOrNull(indexCoverFlow) ?: return
+        if (segueing || coverFlowScrolling) return
         SESystemAudio.openSePlay()
         segueing = true
         flg_notHome = true
         maeTags = USERDATA.SelectedMusicCondition.tags
         maeSort = USERDATA.SelectedMusicCondition.sortItem
-        maeMusicTags = currentMusics[indexCoverFlow].tags
-        GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
+        maeMusicTags = selectedMusic.tags
+        GLOBAL.SelectMUSIC = selectedMusic
         val intent: Intent = Intent(applicationContext, Activity_SelectorMenuTableForSort::class.java)
         intent.putExtra("fromSelector", true)
         startActivityForResult(intent, 1004)
     }
 
     fun SetMusicToCoverFlow() {
-        progress_circular.isVisible = true
+        SelectorDiagnostics.event { "SELECTOR_RELOAD instance=${System.identityHashCode(this)} index=$indexCoverFlow previousMusic=${maeMusic?.sqlID}" }
+        val icons = listOf(R.drawable.music_new, R.drawable.music_old, R.drawable.flick_new, R.drawable.flick_old,
+            R.drawable.plays_new, R.drawable.plays_old, R.drawable.favorites_many, R.drawable.favorites_few,
+            R.drawable.video_id_large, R.drawable.video_id_small, R.drawable.highscore_recent, R.drawable.comment_recent,
+            R.drawable.plays_recent, R.drawable.plays_user)
+        val sort = USERDATA.SelectedMusicCondition.sortItem.pregReplace(" [★☆]{10}[■□]$", "")
+        val position = USERDATA.SelectedMusicCondition.SortItem.indexOf(sort)
+        binding.buttonSortMenu.setBackgroundResource(icons.getOrNull(position) ?: R.drawable.cursor_lr)
+        binding.progressCircular.isVisible = true
 
         musicDatas.getSelectMusics {
 
             currentMusics = it
-            //println("tags="+USERDATA.SelectedMusicCondition.tags)
-            //println("currentMusics.size="+currentMusics.size)
 
-            coverflow = findViewById<View>(R.id.coverflow) as FeatureCoverFlow
-            if(indexCoverFlow == -1){
+            if(indexCoverFlow !in currentMusics.indices){
                 var scrollPos = 0
                 if( currentMusics.size > 0 ){
+                    coverflow.isVisible = true
                     coverflow.clearCache()
-                    var curMusics = if(it.size == 1){ arrayListOf(it.first(), it.last()) }else{ it }
-                    val coverFlowAdapter = CoverFlowAdapter(this, curMusics)
+                    // Set before attaching: adapter initialization decides whether
+                    // short lists can scroll. A single music needs no duplicate.
+                    coverflow.setShouldRepeat(it.size > 1)
+                    val coverFlowAdapter = CoverFlowAdapter(this, it)
                     coverflow.adapter = coverFlowAdapter
-                    coverflow.setShouldRepeat(false)
                     //前回選択していた曲に飛べれば飛ぶ
                     if( numberRoll_index == -1 ){
                         maeMusic?.let {
@@ -353,20 +466,24 @@ class Activity_Selector : AppCompatActivity() {
                             }
                         }
                     }else {
-                        scrollPos = numberRoll_index
+                        scrollPos = numberRoll_index.takeIf { it in currentMusics.indices } ?: 0
                         numberRoll_index = -1
                     }
-                    println("scrollPos=${scrollPos}")
+                    // println("scrollPos=${scrollPos}")
+                    SelectorDiagnostics.event { "SELECTOR_CENTER index=$scrollPos music=${currentMusics.getOrNull(scrollPos)?.sqlID} count=${currentMusics.size}" }
                     indexCoverFlow = scrollPos
                 }else{
+                    indexCoverFlow = -1
                     coverflow.isVisible = false
+                    ThumbMovieStop() // 曲がゼロになったら背景動画を停止
                 }
-                Handler().postDelayed(Runnable {
-                    //coverflowセット後、遅延させて選択
+                // Establish the requested center before the adapter's temporary default
+                // position can be drawn/notified. CoverFlow defers internally if unlaid out.
+                if (scrollPos in currentMusics.indices) {
                     coverflow.scrollToPosition(scrollPos)
-                }, 200)
+                }
             }
-            progress_circular.isVisible = false
+            binding.progressCircular.isVisible = false
 
             setCurrentLevels(indexCoverFlow)
         }
@@ -374,24 +491,32 @@ class Activity_Selector : AppCompatActivity() {
     }
 
     fun setCurrentLevels(index: Int) {
-        if (index == -1) {
+        val selectedMusic = currentMusics.getOrNull(index)
+        if (selectedMusic == null) {
             //曲が一つもないとき
-            text_Title_c.setText("")
-            text_Artist.setText("")
-            text_Length.setText("")
-            text_Tags.setText("")
-            text_Speed.setText("")
-            text_Num.setText("")
+            binding.textTitleC.setText("")
+            binding.textArtist.setText("")
+            binding.textLength.setText("")
+            binding.textTags.setText("")
+            binding.textSpeed.setText("")
+            binding.textNum.setText("")
+            binding.star.isHidden = true
+            binding.textFavoriteNum.isHidden = true
+            binding.heartColor.isHidden = true
+            binding.heartBlack.isHidden = true
+            binding.heartMono.isHidden = true
+            binding.textLikeNum.isHidden = true
             currentLevels = arrayListOf()
             indexPicker = -1
+            levelScroller_index = -1
             LevelPickerContainerRedraw()
             return
         }
-        text_Title_c.setText(HtmlNicokakuMixFixText( currentMusics[index].title ))
-        text_Artist.setText(HtmlNicokakuMixFixText( currentMusics[index].artist ))
-        text_Length.setText(currentMusics[index].movieLength)
-        text_Tags.setText(currentMusics[index].tags)
-        var htmlText = currentMusics[index].tags
+        binding.textTitleC.setText(HtmlNicokakuMixFixText( selectedMusic.title ))
+        binding.textArtist.setText(HtmlNicokakuMixFixText( selectedMusic.artist ))
+        binding.textLength.setText(selectedMusic.movieLength)
+        binding.textTags.setText(selectedMusic.tags)
+        var htmlText = selectedMusic.tags
         for( tagp in USERDATA.SelectedMusicCondition.tag ){
             val tag = tagp.word
             htmlText = htmlText.pregReplace(
@@ -400,142 +525,133 @@ class Activity_Selector : AppCompatActivity() {
             )
 
         }
-        text_Tags.setText(Html.fromHtml(htmlText, Html.FROM_HTML_MODE_COMPACT))
+        binding.textTags.setText(Html.fromHtml(htmlText, Html.FROM_HTML_MODE_COMPACT))
 
-        text_Num.setText("${index + 1} / ${currentMusics.size}")
+        binding.textNum.setText("${index + 1} / ${currentMusics.size}")
 
 
-        if(musicDatas.levels[currentMusics[index].movieURL]==null){
+        if(musicDatas.levels[selectedMusic.movieURL]==null){
             currentLevels = arrayListOf()
         }else {
-            currentLevels = musicDatas.getSelectMusicLevels(currentMusics[index].movieURL)
+            currentLevels = musicDatas.getSelectMusicLevels(selectedMusic.movieURL)
         }
 
-        if(indexPicker >= currentLevels.size - 1){
-            indexPicker = currentLevels.size - 1
-        }
+        indexPicker = if (currentLevels.isEmpty()) -1 else indexPicker.coerceIn(currentLevels.indices)
+        levelScroller_index = if (currentLevels.isEmpty()) -1 else levelScroller_index.coerceIn(currentLevels.indices)
         // LinearLayout(levelScrollerContainer)内の Viewを新しく作り直してAddする（height変更がうまくできなかった）
-        levelScrollerContainer.removeAllViews()
-        levelScrollerContainer.addView(
+        binding.levelScrollerContainer.removeAllViews()
+        binding.levelScrollerContainer.addView(
             View(applicationContext), LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 scrollerOneHeight * (currentLevels.size + 1)
             )
         )
-
+        binding.starColor.isVisible = selectedMusic.sqlID in USERDATA.MyFavorite3
+        binding.starBlack.isVisible = false
+        val count = (selectedMusic.favoriteCount / 5) * 5
+        binding.textFavoriteNum.text = count.toString()
+        binding.textFavoriteNum.isHidden = count == 0
         LevelPickerContainerRedraw()
     }
 
     fun ShowHowToExtendView():Boolean{
 
         if(USERDATA.lookedExtend == false){
-            var musicIDSet:MutableSet<Int> = mutableSetOf()
-            for((sKey, _) in USERDATA.Score.scores){
+            val musicIDSet:MutableSet<Int> = mutableSetOf()
+            for(levelID in USERDATA.levelPlayHistories.keys){
                 for( ms in musicDatas.musics ){
-                    if( ms.levelIDs.contains(sKey) ){
+                    if( ms.levelIDs.contains(levelID) ){
                         musicIDSet.add(ms.sqlID)
                     }
                 }
             }
-            println("$musicIDSet ; ${musicIDSet.size}")
+            // println("$musicIDSet ; ${musicIDSet.size}")
             if( musicIDSet.size >= 3 ){
                 USERDATA.lookedExtend = true
                 segueing = true
-                Handler().postDelayed(Runnable {
-                    segueing = false
-                    val intent: Intent = Intent(applicationContext, Activity_HowToExtend::class.java)
-                    startActivity(intent)
+                selectorHandler.postDelayed(Runnable {
+                    navigation.submit {
+                        if (!isFinishing && !isDestroyed) {
+                            val intent = Intent(this, Activity_HowToExtend::class.java)
+                            startActivityForResult(intent, 1006)
+                        }
+                    }
                 }, 750)
                 return true
             }
-            if( USERDATA.lookedOtherIme ){ return false }
-            USERDATA.lookedOtherIme = true
-            segueing = true
-            Handler().postDelayed(Runnable {
-                segueing = false
-                val intent: Intent = Intent(applicationContext, Activity_HowToGame2::class.java)
-                startActivity(intent)
-            }, 750)
-            return true
         }
         return false
-    }
-    fun showChangeFavoSpecView() {
-        if(USERDATA.lookedChangeFavoSpec_v1500){
-            return
-        }
-        USERDATA.lookedChangeFavoSpec_v1500 = true
-
-        Handler().postDelayed(Runnable {
-            segueing = false
-            val intent: Intent = Intent(applicationContext, Activity_AboutVerUp1500::class.java)
-            startActivity(intent)
-        }, 750)
     }
 
     fun Button_Go(view: View) {
         if( currentMusics.size < 1 || currentLevels.size < 1 ){ return }
 
-        if(segueing) {
+        if (segueing || coverFlowScrolling) {
             return
         }
+        val selectedMusic = currentMusics.getOrNull(indexCoverFlow) ?: return
+        val selectedLevel = currentLevels.getOrNull(indexPicker) ?: return
         SESystemAudio.goSePlay()
         segueing = true
         flg_notHome = true
-        println(currentLevels[indexPicker].noteData)
-        println("c == ${currentLevels[indexPicker].noteData}")
+        // println(selectedLevel.noteData)
+        // println("c == ${selectedLevel.noteData}")
         ThumbMovieStop()
         CachedThumbMovies.allRelease()
         //すでにゲームデータを持っている場合
-        if(currentLevels[indexPicker].noteData.count() >= 20){
+        if(selectedLevel.noteData.count() >= 20){
             val intent: Intent = Intent(applicationContext, Activity_GameView::class.java)
-            GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
-            GLOBAL.SelectLEVEL = currentLevels[indexPicker]
+            GLOBAL.SelectMUSIC = selectedMusic
+            GLOBAL.SelectLEVEL = selectedLevel
             startActivityForResult(intent, 1001)
-            segueing = false
             return
         }
         //まだゲームデータがない場合ダウンロードしてから遷移する
-        progress_circular.isVisible = true
-        ServerDataHandler().DownloadTimetag(currentLevels[indexPicker]) {
-            //if(it!=null) {
-            //return@DownloadMusicDataAndUserNameData
-            //}
-            progress_circular.isVisible = false
+        binding.progressCircular.isVisible = true
+        var completed = false
+        ServerDataHandler().DownloadTimetag(selectedLevel) { error ->
+            if (completed || isFinishing || isDestroyed) return@DownloadTimetag
+            completed = true
+            navigation.submit {
+            if (isFinishing || isDestroyed) return@submit
+            binding.progressCircular.isVisible = false
+
+            if (error != null || selectedLevel.noteData.count() < 20) {
+                flg_notHome = false
+                AlertDialog.Builder(this)
+                    .setTitle("ゲームデータ取得エラー")
+                    .setMessage("ゲームデータを取得できませんでした。時間をおいて、もう一度お試しください。")
+                    .setPositiveButton("OK", null)
+                    .setOnDismissListener {
+                        if (!isFinishing && !isDestroyed) {
+                            segueing = false
+                            ThumbMoviePlay()
+                        }
+                    }
+                    .show()
+                return@submit
+            }
 
             val intent: Intent = Intent(applicationContext, Activity_GameView::class.java)
-            GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
-            GLOBAL.SelectLEVEL = currentLevels[indexPicker]
+            GLOBAL.SelectMUSIC = selectedMusic
+            GLOBAL.SelectLEVEL = selectedLevel
             startActivityForResult(intent, 1001)
-            segueing = false
+            }
         }
     }
     fun Button_Menu(view: View) {
-        if(segueing) {
+        if (segueing || coverFlowScrolling) {
             return
         }
         SESystemAudio.openSelectorMenuSePlay()
         segueing = true
         flg_notHome = true
         val intent: Intent = Intent(applicationContext, Activity_SelectorMenu::class.java)
-        if( currentMusics.size > 0 ) {
-            GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
-        }else {
-            GLOBAL.SelectMUSIC = null
-        }
-
-        if( currentLevels.size > 0 ){
-            GLOBAL.SelectLEVEL = currentLevels[indexPicker]
-        }else {
-            GLOBAL.SelectLEVEL = null
-        }
+        GLOBAL.SelectMUSIC = currentMusics.getOrNull(indexCoverFlow)
+        GLOBAL.SelectLEVEL = if (GLOBAL.SelectMUSIC != null) currentLevels.getOrNull(indexPicker) else null
         maeTags = USERDATA.SelectedMusicCondition.tags
         maeSort = USERDATA.SelectedMusicCondition.sortItem
-        if(currentMusics.size > 0 && currentMusics.size > indexCoverFlow){
-            maeMusicTags = currentMusics[indexCoverFlow].tags
-        }else {
-            maeMusicTags = ""
-        }
+        maeMusicTags = GLOBAL.SelectMUSIC?.tags.orEmpty()
         startActivityForResult(intent, 1002)
     }
     fun Button_Back(view: View) {
@@ -554,149 +670,298 @@ class Activity_Selector : AppCompatActivity() {
         finish()
     }
     fun Button_RankingComment(view: View) {
-        if(indexPicker==-1){ return }
-        if(segueing) {
+        val selectedMusic = currentMusics.getOrNull(indexCoverFlow) ?: return
+        val selectedLevel = currentLevels.getOrNull(indexPicker) ?: return
+        if (segueing || coverFlowScrolling) {
             return
         }
         SESystemAudio.openSePlay()
         segueing = true
         flg_notHome = true
         val intent: Intent = Intent(applicationContext, Activity_RankingComment::class.java)
-        GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
-        println("selector title =" + GLOBAL.SelectMUSIC!!.title)
-        GLOBAL.SelectLEVEL = currentLevels[indexPicker]
+        GLOBAL.SelectMUSIC = selectedMusic
+        // println("selector title =" + selectedMusic.title)
+        GLOBAL.SelectLEVEL = selectedLevel
         startActivityForResult(intent, 1003)
     }
     fun Button_StartPage(view: View) {
-        println("gotoStartPage")
+        if (segueing || coverFlowScrolling || isFinishing || isDestroyed) return
+        segueing = true
+        flg_notHome = true
+        // println("gotoStartPage")
         ThumbMovieStop()
         SESystemAudio.openSePlay()
         val intent: Intent = Intent(applicationContext, Activity_WikiPageWeb::class.java)
-        if( currentMusics.size > 0 ) {
-            GLOBAL.SelectMUSIC = currentMusics[indexCoverFlow]
-        }else {
-            GLOBAL.SelectMUSIC = null
-        }
+        GLOBAL.SelectMUSIC = currentMusics.getOrNull(indexCoverFlow)
         startActivityForResult(intent, 1005)
     }
-    fun Button_favorite(view: View) {
-        println("favorite")
-        if( currentMusics.indices.contains(indexCoverFlow) == false ){
-            return
-        }
-        val selectMovieURL:String = currentMusics[indexCoverFlow].movieURL
-        if( musicDatas.levels.size > 0 && musicDatas.levels[selectMovieURL] == null ){
-            return
-        }
-        val currentLevel = currentLevels[indexPicker]
-        if( USERDATA.MyFavorite2.contains(currentLevel.sqlID) ) {
-            SESystemAudio.openSubSePlay()
-            val myFavorite = USERDATA.MyFavorite2
-            myFavorite.remove(currentLevel.sqlID)
-            USERDATA.MyFavorite2 = myFavorite //ここでDataStoreに保存される
-            USERDATA.FavoriteCount.subFavoriteCount(levelID = currentLevel.sqlID)
-        }else {
-            if( USERDATA.MyFavorite.contains(currentLevel.sqlID) ){
-                //Ver.1.5未満の互換
-                val myFavorite = USERDATA.MyFavorite
-                myFavorite.remove(currentLevel.sqlID)
-                USERDATA.MyFavorite = myFavorite //ここでDataStoreに保存される
-                //プレイしたことのあるレベルだけお気に入りできるようにする
-                if( USERDATA.Score.scores.keys.contains(currentLevel.sqlID) ){
-                    val myFavo = USERDATA.MyFavorite2
-                    myFavo.add(currentLevel.sqlID)
-                    USERDATA.MyFavorite2 = myFavo //ここでDataStoreに保存される
-                    USERDATA.FavoriteCount.addFavoriteCount(levelID = currentLevel.sqlID)
-                }
-            }else {
-                //プレイしたことのあるレベルだけお気に入りできるようにする
-                if( USERDATA.Score.scores.keys.contains(currentLevel.sqlID) ){
-                    SESystemAudio.openSePlay()
-                    val myFavo = USERDATA.MyFavorite2
-                    myFavo.add(currentLevel.sqlID)
-                    USERDATA.MyFavorite2 = myFavo //ここでDataStoreに保存される
-                    USERDATA.FavoriteCount.addFavoriteCount(levelID = currentLevel.sqlID)
-                }else {
-
-                    val strList = arrayOf("譜面が良かったらお気に入りしよう！")
-                    AlertDialog.Builder(this) // FragmentではActivityを取得して生成
-                        .setTitle("ゲームをプレイしたらお気に入りできるようになります。")
-                        .setItems(strList, null)
-                        .setPositiveButton("OK", null)
-                        .show()
-                }
+    fun Button_like(view:View) {
+        if (segueing || coverFlowScrolling || !view.isEnabled) return
+        val level = currentLevels.getOrNull(levelScroller_index) ?: return
+        val previous = USERDATA.MyLike[level.sqlID] ?: -3
+        var selected = previous
+        val previousSort = USERDATA.LevelSortCondition
+        val started = level.sqlID in USERDATA.levelPlayHistories.keys
+        val hasScore = level.sqlID in USERDATA.Score.scores
+        fun dp(value: Int) = (value * resources.displayMetrics.density + 0.5f).toInt()
+        val dialog = android.app.Dialog(this)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            setPadding(dp(16), dp(32), dp(16), dp(32))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = dp(24).toFloat()
             }
         }
-        star_black.isVisible = USERDATA.MyFavorite.contains(currentLevel.sqlID)
-        star_color.isVisible = USERDATA.MyFavorite2.contains(currentLevel.sqlID)
-
-    }
-    fun Button_LevelSort(view: View) {
-        println("levelSort")
-        SESystemAudio.openSubSePlay()
-
-        val strList = arrayOf("なし", "お気に入りを上に集める")
-        AlertDialog.Builder(this) // FragmentではActivityを取得して生成
-            .setTitle("お気に入りソート")
-            .setItems(strList, { dialog, which ->
-                when (which) {
-                    0 -> {
-                        USERDATA.LevelSortCondition = 0
-                        SetMusicToCoverFlow()
-                        button_levelSort.alpha = if (USERDATA.LevelSortCondition != 0) 0.6F else 0.2F
-                    }
-                    1 -> {
-                        USERDATA.LevelSortCondition = 1
-                        SetMusicToCoverFlow()
-                        button_levelSort.alpha = if (USERDATA.LevelSortCondition != 0) 0.6F else 0.2F
-                    }
-                }
+        val nicoKaku = androidx.core.content.res.ResourcesCompat.getFont(this, R.font.nicokaku_v1)
+        for (title in listOf(level.getLevelAsString(), level.creator)) {
+            panel.addView(TextView(this).apply {
+                text = title
+                setTextColor(Color.BLACK)
+                textSize = 16f
+                typeface = nicoKaku
+                gravity = android.view.Gravity.CENTER
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(12)
             })
-            .setPositiveButton("キャンセル", null)
-            .show()
-    }
-    fun Button_MusicSort(view: View) {
-        SESystemAudio.openSubSePlay()
-        val strList = arrayOf("なし", "お気に入りを含む曲を先頭に集める")
-        AlertDialog.Builder(this) // FragmentではActivityを取得して生成
-            .setTitle("お気に入りソート")
-            .setItems(strList, { dialog, which ->
-                when (which) {
-                    0 -> {
-                        USERDATA.MusicSortCondition = 0
-                        indexCoverFlow = -1 //CoverFlowリロード
-                        SetMusicToCoverFlow()
-                        button_musicSort.alpha = if (USERDATA.MusicSortCondition != 0) 0.6F else 0.2F
-                    }
-                    1 -> {
-                        USERDATA.MusicSortCondition = 1
-                        indexCoverFlow = -1 //CoverFlowリロード
-                        SetMusicToCoverFlow()
-                        button_musicSort.alpha = if (USERDATA.MusicSortCondition != 0) 0.6F else 0.2F
-                    }
+        }
+        val hearts = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val buttons = mutableMapOf<Int, android.widget.ImageButton>()
+        val labels = mapOf(
+            -1 to R.string.level_like_dislike,
+            1 to R.string.level_like_heart1,
+            2 to R.string.level_like_heart2
+        )
+        fun updateHearts() {
+            for ((rating, button) in buttons) {
+                val lit = if (rating == 1) selected > 0 else selected == rating
+                button.isSelected = lit
+                button.setImageResource(
+                    if (rating == -1) R.drawable.heart_break
+                    else if (lit) R.drawable.heart_color else R.drawable.heart
+                )
+                button.imageAlpha = if (rating == -1 || lit) 255 else 130
+                if (rating == -1) {
+                    button.setColorFilter(if (lit) Color.rgb(40, 40, 40) else Color.rgb(225, 225, 225))
+                } else {
+                    button.clearColorFilter()
                 }
+                val action = if (selected == rating) R.string.level_like_clear else R.string.level_like_choose
+                button.contentDescription = getString(action, getString(labels.getValue(rating)))
+            }
+        }
+        for (rating in listOf(-1, 1, 2)) {
+            val column = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+            }
+            val button = android.widget.ImageButton(this).apply {
+                setBackgroundColor(Color.TRANSPARENT)
+                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                setPadding(dp(6), dp(6), dp(6), dp(6))
+            }
+            buttons[rating] = button
+            column.addView(button, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(96)))
+            column.addView(TextView(this).apply {
+                text = getString(labels.getValue(rating))
+                setTextColor(Color.BLACK)
+                textSize = 9f
+                gravity = android.view.Gravity.CENTER
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = dp(0)
             })
-            .setPositiveButton("キャンセル", null)
-            .show()
+            button.setOnClickListener {
+                // heart2 点灯中の中央タップは解除ではなく heart1 への切り替え。
+                val next = if (selected == rating) 0 else rating
+                if (next != 0 && ((rating == 2 && !hasScore) || (rating != 2 && !started))) {
+                    AlertDialog.Builder(this)
+                        .setMessage(if (rating == 2) R.string.level_like_requires_score else R.string.level_like_requires_play)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                } else {
+                    selected = next
+                    updateHearts()
+                }
+            }
+            hearts.addView(column, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        updateHearts()
+        panel.addView(hearts, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(20)
+            bottomMargin = dp(28)
+        })
+        val sort = androidx.appcompat.widget.SwitchCompat(this).apply {
+            text = getString(R.string.level_like_sort)
+            setTextColor(Color.BLACK)
+            textSize = 15f
+            minHeight = dp(48)
+            switchPadding = dp(12)
+            isChecked = previousSort != 0
+        }
+        panel.addView(sort, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val scroll = android.widget.ScrollView(this).apply {
+            isFillViewport = true
+            background = panel.background
+            addView(panel)
+        }
+        dialog.setContentView(scroll)
+        dialog.setCanceledOnTouchOutside(true)
+        view.isEnabled = false
+        dialog.setOnDismissListener {
+            view.isEnabled = true
+            val ratingChanged = previous != selected
+            val newSort = if (sort.isChecked) 1 else 0
+            if (ratingChanged) {
+                val likes = USERDATA.MyLike
+                likes[level.sqlID] = selected
+                USERDATA.MyLike = likes
+                USERDATA.LikeCount.changeLikeCount(level.sqlID, maxOf(selected, 0) - maxOf(previous, 0))
+                val dislikeDelta = (if (selected == -1) 1 else 0) - (if (previous == -1) 1 else 0)
+                USERDATA.DislikeCount.changeLikeCount(level.sqlID, dislikeDelta)
+            }
+            USERDATA.LevelSortCondition = newSort
+            if (ratingChanged || previousSort != newSort) SetMusicToCoverFlow()
+            if (ratingChanged) ServerDataHandler().postUserCountData()
+        }
+        dialog.show()
+        dialog.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            attributes = attributes.apply { dimAmount = 0.3f }
+            val availableWidth = binding.root.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+            val availableHeight = binding.root.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+            setLayout(
+                minOf(dp(360), (availableWidth * 0.8f).toInt()),
+                minOf(dp(360), (availableHeight * 0.85f).toInt())
+            )
+            setGravity(android.view.Gravity.CENTER)
+            // 中央から、利用可能な画面の高さの15%だけ上へ移動
+            attributes = attributes.apply {
+                y = -(availableHeight * 0.05f).toInt()
+            }
+        }
+    }
+
+    fun Button_MusicFavorite(view:View) {
+        if (segueing || coverFlowScrolling || !view.isEnabled) return
+        val music = currentMusics.getOrNull(indexCoverFlow) ?: return
+        fun dp(value: Int) = (value * resources.displayMetrics.density + 0.5f).toInt()
+        val dialog = android.app.Dialog(this)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        var changed = false
+        var favoriteChanged = false
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            setPadding(dp(20), dp(40), dp(20), dp(40))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = dp(24).toFloat()
+            }
+        }
+        panel.addView(TextView(this).apply {
+            text = getString(R.string.music_favorite_title)
+            setTextColor(Color.BLACK)
+            textSize = 20f
+            typeface = androidx.core.content.res.ResourcesCompat.getFont(this@Activity_Selector, R.font.nicokaku_v1)
+            gravity = android.view.Gravity.CENTER
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        val favorite = android.widget.ImageButton(this).apply {
+            setBackgroundColor(Color.TRANSPARENT)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }
+        fun updateFavorite() {
+            val selected = music.sqlID in USERDATA.MyFavorite3
+            favorite.setImageResource(if (selected) R.drawable.star_color else R.drawable.star)
+            favorite.imageAlpha = if (selected) 255 else 130
+            favorite.isSelected = selected
+            favorite.contentDescription = getString(
+                if (selected) R.string.music_favorite_remove else R.string.music_favorite_add
+            )
+        }
+        updateFavorite()
+        panel.addView(favorite, LinearLayout.LayoutParams(dp(120), dp(120)).apply {
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            topMargin = dp(28)
+            bottomMargin = dp(40)
+        })
+        favorite.setOnClickListener {
+            val ids = USERDATA.MyFavorite3
+            val selected = music.sqlID !in ids
+            if (selected) ids.add(music.sqlID) else ids.remove(music.sqlID)
+            USERDATA.MyFavorite3 = ids
+            USERDATA.MusicFavoriteCount.changeLikeCount(music.sqlID, if (selected) 1 else -1)
+            changed = true
+            favoriteChanged = true
+            updateFavorite()
+        }
+        panel.addView(androidx.appcompat.widget.SwitchCompat(this).apply {
+            text = getString(R.string.music_favorite_sort)
+            setTextColor(Color.BLACK)
+            textSize = 15f
+            minHeight = dp(48)
+            switchPadding = dp(12)
+            isChecked = USERDATA.MusicSortCondition != 0
+            setOnCheckedChangeListener { _, checked ->
+                USERDATA.MusicSortCondition = if (checked) 1 else 0
+                changed = true
+            }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        // 小さい画面や横向きでも、パネル全体をスクロールして操作できるようにする。
+        val scroll = android.widget.ScrollView(this).apply {
+            isFillViewport = true
+            background = panel.background
+            addView(panel)
+        }
+        dialog.setContentView(scroll)
+        dialog.setCanceledOnTouchOutside(true)
+        view.isEnabled = false
+        dialog.setOnDismissListener {
+            view.isEnabled = true
+            if (changed) {
+                maeMusic = music
+                indexCoverFlow = -1
+                SetMusicToCoverFlow()
+            }
+            if (favoriteChanged) ServerDataHandler().postUserCountData()
+        }
+        dialog.show()
+        dialog.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            attributes = attributes.apply { dimAmount = 0.3f }
+            val availableWidth = binding.root.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+            val availableHeight = binding.root.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+            setLayout(
+                minOf(dp(360), (availableWidth * 0.8f).toInt()),
+                minOf(dp(360), (availableHeight * 0.85f).toInt())
+            )
+            setGravity(android.view.Gravity.CENTER)
+            // 中央から、利用可能な画面の高さの15%だけ上へ移動
+            attributes = attributes.apply {
+                y = -(availableHeight * 0.05f).toInt()
+            }
+        }
     }
 
     fun Button_thumbMoviePlay(view: View) {
         USERDATA.thumbMoviePlay = !USERDATA.thumbMoviePlay
-        println(USERDATA.thumbMoviePlay)
+        // println(USERDATA.thumbMoviePlay)
         if( USERDATA.thumbMoviePlay ){
             ThumbMovieStart(indexCoverFlow)
-            button_thumbMoviePlay.alpha = 1.0F
-            button_thumbMoviePlay.background.colorFilter = PorterDuffColorFilter(
-                0xFFFF2D71.toInt(),
-                PorterDuff.Mode.SRC_IN
-            )
+            binding.buttonThumbMoviePlay.alpha = 1.0F
+            binding.buttonThumbMoviePlay.setBackgroundResource(R.drawable.video_on)
         }else {
-            button_thumbMoviePlay.alpha = 0.2F
-            button_thumbMoviePlay.background.colorFilter = null
+            binding.buttonThumbMoviePlay.alpha = 0.2F
+            binding.buttonThumbMoviePlay.setBackgroundResource(R.drawable.video_off)
             ThumbMovieStop()
         }
     }
     fun ThumbMoviePlay(forceType : ForceInResultType = ForceInResultType.none){
+        SelectorDiagnostics.event { "THUMB_PLAY instance=${System.identityHashCode(this)} force=$forceType index=$indexCoverFlow music=${currentMusics.getOrNull(indexCoverFlow)?.sqlID}" }
         if( forceType == ForceInResultType.none && !USERDATA.thumbMoviePlay ){
             return
         }
@@ -716,206 +981,167 @@ class Activity_Selector : AppCompatActivity() {
         ThumbMovieStart(indexCoverFlow, typeLoadOnly)
     }
     fun ThumbMovieStop(){
+        SelectorDiagnostics.event { "THUMB_STOP instance=${System.identityHashCode(this)} index=$indexCoverFlow caller=${Throwable().stackTrace.drop(1).take(3).joinToString()}" }
+        thumbGeneration++
+        clearThumbCallbacks()
         //前に出していたらひっこめる
         setThumbMovieMaeUsiro(usiro = true)
         flg_thumbMovieStopping = true
         //一度すべて止める
         for( avPlayerVC in CachedThumbMovies.cachedMovies ){
             avPlayerVC.simpleExoPlayer.playWhenReady = false
-            playerView_Alpha.alpha = 1.0f
+            binding.playerViewAlpha.alpha = 1.0f
         }
     }
-    fun ThumbMovieStart(index: Int, loadOnly: Boolean = false){
-        flg_thumbMovieStopping = false
-        flg_thumbMovieTopMost = false
-        if( currentMusics.indices.contains(index) == false ){
+    fun ThumbMovieStart(index: Int, loadOnly: Boolean = false) {
+        if (isFinishing || isDestroyed) return
+        val selectedMusic = currentMusics.getOrNull(index) ?: return
+        val smNum = MediaInput.watchId(selectedMusic.movieURL)
+        if (smNum == null) {
+            if (!loadOnly) ThumbMovieStop()
             return
         }
-        val smNum = currentMusics[index].movieURL.pregMatche_firstString("watch/(.+)$")
-        if( smNum == "" ){
-            return
+        if (!loadOnly) {
+            ThumbMovieStop()
+            flg_thumbMovieStopping = false
+            flg_thumbMovieTopMost = false
         }
-        //val index = indexCoverFlow
-        Handler().postDelayed(Runnable { //0.3秒後
-            if (!USERDATA.thumbMoviePlay && volumeForceInResult == 1.0f ) {
-                return@Runnable
-            }
-            if (index == indexCoverFlow || loadOnly == true) {
-                //Movie呼び込み
-                var nicodougaURL = ""
-                println("thumbMovie ${smNum}")
-                MovieAccess().StreamingUrlNicoAccessForThumbMovie(smNum) { url ->
-                    if(url == "error"){
-                        return@StreamingUrlNicoAccessForThumbMovie
+        val generation = thumbGeneration
+        selectorHandler.postDelayed({
+            if (!ownsThumbRequest(generation)) return@postDelayed
+            if (!USERDATA.thumbMoviePlay && volumeForceInResult == 1.0f) return@postDelayed
+            if (!loadOnly && index != indexCoverFlow) return@postDelayed
+            var completed = false
+            val request = MovieAccess().StreamingUrlNicoAccessForThumbMovie(smNum, selectorScope) { url ->
+                selectorHandler.post callback@{
+                    if (completed) return@callback
+                    completed = true
+                    if (!ownsThumbRequest(generation) ||
+                        (loadOnly && url == "cached") ||
+                        currentMusics.getOrNull(index) !== selectedMusic) return@callback
+                    if (url.isBlank() || url == "error") {
+                        if (!loadOnly && index == indexCoverFlow) ThumbMovieStop()
+                        return@callback
                     }
-                    // 動画
-                    nicodougaURL = url
-                    println("smNum=$smNum, loadOnly=$loadOnly, nicodougaURL=$nicodougaURL")
-                    if (flg_thumbMovieStopping == true) {
-                        println("thumbMovieStopping")
-                        return@StreamingUrlNicoAccessForThumbMovie
+                    if (!loadOnly && (flg_thumbMovieStopping || index != indexCoverFlow)) return@callback
+                    val player = CachedThumbMovies.access(url, smNum)
+                    player.setSeekParameters(SeekParameters.CLOSEST_SYNC)
+                    val firstNote = musicDatas.getNotesFirstTime(selectedMusic.movieURL)
+                    val start = if (firstNote < 0.0) 30.0 else (firstNote - 3.0).coerceAtLeast(0.0)
+                    fun current(): Boolean = ownsThumbRequest(generation) &&
+                        cacheExoPlayer === player && !flg_thumbMovieStopping
+                    fun message(seconds: Double, repeat: Boolean, action: () -> Unit) {
+                        val msg = player.createMessage { _, _ ->
+                            if (ownsThumbRequest(generation)) action()
+                        }.setHandler(selectorHandler)
+                            .setPosition((seconds * 1000).toLong())
+                            .setDeleteAfterDelivery(!repeat)
+                        thumbMessages.add(player to msg)
+                        msg.send()
                     }
-                    if (loadOnly == true && nicodougaURL == "cached") {
-                        return@StreamingUrlNicoAccessForThumbMovie
-                    }
-                    if (index != indexCoverFlow && loadOnly == false) {
-                        return@StreamingUrlNicoAccessForThumbMovie
-                    }
-                    //println(applicationContext.packageName)
-                    val loadCacheExoPlayer = CachedThumbMovies.access(nicodougaURL, smNum)
-                    if (loadOnly == false) {
-                        ThumbMovieStop()
-                        flg_thumbMovieStopping = false
-                        flg_thumbMovieTopMost = false
-
-                        cacheExoPlayer = loadCacheExoPlayer
-                        playerView_Alpha.alpha = 1.0f
-                        playerView.player = cacheExoPlayer
-                    }
-                    loadCacheExoPlayer.setSeekParameters(SeekParameters.CLOSEST_SYNC)
-                    var t30 = musicDatas.getNotesFirstTime(currentMusics[index].movieURL)
-                    if (t30 < 0.0) {
-                        t30 = 30.0
-                    } else {
-                        t30 -= 3.0
-                        if (t30 < 0.0) {
-                            t30 = 0.0
-                        }
-                    }
-                    println("t30 = ${t30}")
-                    if (loadOnly == false) {
-                        cacheExoPlayer!!.addListener(object : Player.EventListener {
-                            override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
-                                println("playbackState=" + playbackState)
-                                when (playbackState) {
-                                    ExoPlayer.STATE_ENDED -> {
-                                        println("終了でループ")
-                                        GlobalScope.launch(Dispatchers.Main) {
-                                            if( !flg_thumbMovieTopMost ) {
-                                                cacheExoPlayer?.seekTo((t30 * 1000).toLong())
-                                            }else {
-                                                cacheExoPlayer?.seekTo( 0 )
-                                            }
-                                            cacheExoPlayer?.let{
-                                                it.playWhenReady = true
-                                            }
-                                        }
-                                    }
-                                }
+                    if (loadOnly) {
+                        if (cacheExoPlayer === player && !flg_thumbMovieStopping) return@callback
+                        message(start, false) {
+                            if (cacheExoPlayer !== player || flg_thumbMovieStopping) {
+                                CachedThumbMovies.cachedMovies.firstOrNull { it.simpleExoPlayer === player }?.just = true
+                                player.playWhenReady = false
                             }
-                        })
-                        var firstRun = true
-                        for (i in 1..10) {
-                            cacheExoPlayer!!
-                                .createMessage({ messageType, payload ->
-                                    if( flg_thumbMovieTopMost ){ return@createMessage }
-                                    if( volumeForceInResult > ReducedVolumeForceInResult ){
-                                        volumeForceInResult = 1.0f
-                                    }
-                                    if( volumeForceInResult >= ReducedVolumeForceInResult ){
-                                        println("フェードイン$i")
-                                        GlobalScope.launch(Dispatchers.Main) {
-                                            cacheExoPlayer?.volume = 0.10f * i / 10 * USERDATA.SoundVolumeMovie * volumeForceInResult
-                                        }
-                                        playerView_Alpha.alpha = 1.0f - 0.25f * i / 10
-                                    }
-                                    if (i == 1 && firstRun == true) {
-                                        firstRun = false
-                                        //前後の曲を読み込んでおく
-                                        val a = if (index + 1 >= currentMusics.size) 0 else index + 1
-                                        val b = if (index - 1 < 0) currentMusics.size - 1 else index - 1
-                                        println("inab = $index, $a, $b")
-                                        ThumbMovieStart(a, true)
-                                        ThumbMovieStart(b, true)
-                                    }
-                                })
-                                .setPosition(((t30 + 0.05 * i) * 1000).toLong())
-                                .setDeleteAfterDelivery(false)
-                                .send()
-                            cacheExoPlayer!!
-                                .createMessage({ messageType, payload ->
-                                    if( flg_thumbMovieTopMost ){ return@createMessage }
-                                    if( volumeForceInResult > ReducedVolumeForceInResult ){
-                                        volumeForceInResult = 1.0f
-                                    }
-                                    if( volumeForceInResult >= ReducedVolumeForceInResult ){
-                                        println("フェードアウト$i")
-                                        GlobalScope.launch(Dispatchers.Main) {
-                                            cacheExoPlayer?.volume = 0.10f * (10 - i) / 10 * USERDATA.SoundVolumeMovie * volumeForceInResult
-                                        }
-                                        playerView_Alpha.alpha = 1.0f - 0.25f * (10 - i) / 10
-                                    }
-                                })
-                                .setPosition(((t30 + 29.0 + 0.1 * i) * 1000).toLong())
-                                .setDeleteAfterDelivery(false)
-                                .send()
                         }
-                        cacheExoPlayer!!
-                            .createMessage({ messageType, payload ->
-                                if( flg_thumbMovieTopMost ){ return@createMessage }
-                                println("30秒でループ")
-                                GlobalScope.launch(Dispatchers.Main) {
-                                    cacheExoPlayer?.seekTo((t30 * 1000).toLong())
-                                    //playerView.player?.seekTo((t30 * 1000).toLong())
-                                }
-                            })
-                            .setPosition(((t30 + 30.0 + 0.1) * 1000).toLong())
-                            .setDeleteAfterDelivery(false)
-                            .send()
+                        player.seekTo(((start - 0.5).coerceAtLeast(0.0) * 1000).toLong())
+                        player.volume = 0.001f
+                        player.playWhenReady = true
+                        return@callback
+                    }
+                    cacheExoPlayer = player
+                    binding.playerViewAlpha.alpha = 1.0f
+                    playerView.player = player
+                    val listener = object : Player.EventListener {
+                        override fun onPlayerError(error: com.google.android.exoplayer2.ExoPlaybackException) {
+                            SelectorDiagnostics.event { "THUMB_ERROR type=${error.type} cause=${error.cause?.javaClass?.name} current=${current()}" }
+                            if (!current()) return
+                            ThumbMovieStop()
+                            playerView.player = null
+                            cacheExoPlayer = null
+                        }
 
-                        var nonSeek = false
-                        CachedThumbMovies.cachedMovies.firstOrNull { it.smNum == smNum }?.let {
-                            println("smNum=$smNum|it=${it.smNum} cacheing just=${it.just}")
-                            if (it.just) {
-                                nonSeek = true
+                        override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
+                            SelectorDiagnostics.event { "THUMB_STATE ready=$playWhenReady state=$playbackState current=${current()}" }
+                            if (current() && playbackState == ExoPlayer.STATE_ENDED) {
+                                player.seekTo(if (flg_thumbMovieTopMost) 0 else (start * 1000).toLong())
+                                player.playWhenReady = true
                             }
-                            it.just = false
-                        }
-                        println("nonSeek=$nonSeek")
-                        GlobalScope.launch(Dispatchers.Main) {
-                            if (!nonSeek) {
-                                cacheExoPlayer!!.seekTo((t30 * 1000).toLong())
-                            }
-                            cacheExoPlayer!!.volume = 0.001f
-                            cacheExoPlayer!!.playWhenReady = true
-                        }
-
-                    } else {
-                        //読み込みのみ
-                        loadCacheExoPlayer!!
-                            .createMessage({ messageType, payload ->
-                                if (currentMusics[indexCoverFlow].movieURL.pregMatche_firstString("watch/(.+)$") != smNum) {
-                                    println("再生された形跡見つけたらムービーを止める")
-                                    CachedThumbMovies.cachedMovies.firstOrNull { it.smNum == smNum }?.let {
-                                        println("smNum=$smNum|it=${it.smNum} cacheing just=${it.just}")
-                                        it.just = true
-                                    }
-                                    GlobalScope.launch(Dispatchers.Main) {
-                                        loadCacheExoPlayer!!.playWhenReady = false
-                                        //cacheExoPlayer!!.seekTo( (t30*1000).toLong() )
-                                    }
-                                }
-                            })
-                            .setPosition(((t30) * 1000).toLong())
-                            .setDeleteAfterDelivery(true)
-                            .send()
-
-                        val t30_ = if (t30 - 0.5 >= 0) (t30 - 0.5) else 0.0
-                        GlobalScope.launch(Dispatchers.Main) {
-                            loadCacheExoPlayer!!.seekTo((t30_ * 1000).toLong())
-                            loadCacheExoPlayer!!.volume = 0.001f
-                            loadCacheExoPlayer!!.playWhenReady = true
                         }
                     }
-
+                    thumbListeners[player] = listener
+                    player.addListener(listener)
+                    var prefetched = false
+                    fun fade(amount: Int) {
+                        if (!current() || flg_thumbMovieTopMost) return
+                        if (volumeForceInResult > ReducedVolumeForceInResult) volumeForceInResult = 1.0f
+                        if (volumeForceInResult >= ReducedVolumeForceInResult) {
+                            player.volume = 0.10f * amount / 10 * USERDATA.SoundVolumeMovie * volumeForceInResult
+                            binding.playerViewAlpha.alpha = 1.0f - 0.25f * amount / 10
+                        }
+                    }
+                    for (i in 1..10) {
+                        message(start + 0.05 * i, true) {
+                            fade(i)
+                            if (current() && !flg_thumbMovieTopMost && i == 1 && !prefetched) {
+                                prefetched = true
+                                val next = if (index + 1 >= currentMusics.size) 0 else index + 1
+                                val previous = if (index == 0) currentMusics.lastIndex else index - 1
+                                if (next != index) ThumbMovieStart(next, true)
+                                if (previous != index && previous != next) ThumbMovieStart(previous, true)
+                            }
+                        }
+                        message(start + 29.0 + 0.1 * i, true) { fade(10 - i) }
+                    }
+                    message(start + 30.1, true) {
+                        if (current() && !flg_thumbMovieTopMost) player.seekTo((start * 1000).toLong())
+                    }
+                    val cached = CachedThumbMovies.cachedMovies.firstOrNull { it.simpleExoPlayer === player }
+                    val nonSeek = cached?.just == true
+                    cached?.just = false
+                    if (!nonSeek) player.seekTo((start * 1000).toLong())
+                    player.volume = 0.001f
+                    player.playWhenReady = true
                 }
+            }
+            thumbRequests.add(request)
+            request.invokeOnCompletion {
+                selectorHandler.post { thumbRequests.remove(request) }
             }
         }, 300)
     }
 
 
+    private fun showNameRegistrationPromptIfNoName() {
+        if (USERDATA.lookedNameRegistrationIfNoName_v2000) return
+        if (USERDATA.Score.scores.count() < 10) return
+        USERDATA.lookedNameRegistrationIfNoName_v2000 = true
+        if (USERDATA.UserName != "NO_NAME") return
+        val input = EditText(this).apply { setText(USERDATA.UserName); hint = "プレイヤー名"; setSingleLine(true) }
+        AlertDialog.Builder(this).setTitle("プレイヤー名を付けてみませんか？")
+            .setMessage("名前はあとから設定でも変更できます").setView(input)
+            .setPositiveButton("OK") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotEmpty() && name != USERDATA.UserName) {
+                    reminderNameRequestPending = true
+                    registerUserNameBlocking(name) { success ->
+                        reminderNameRequestPending = false
+                        if (!isFinishing) AlertDialog.Builder(this).setMessage(if (success) "名前を登録しました" else "登録に失敗しました。設定から再度お試しください").setPositiveButton("OK", null).show()
+                    }
+                }
+            }.setNegativeButton("キャンセル", null).show()
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (isFinishing || isDestroyed) return
+        if (GLOBAL.SuggestPlayerName) {
+            GLOBAL.SuggestPlayerName = false
+            window.decorView.post { if (!isFinishing) showNameRegistrationPromptIfNoName() }
+        }
         segueing = false
         // startActivityForResult()の際に指定した識別コードとの比較
         when( requestCode ){
@@ -925,10 +1151,11 @@ class Activity_Selector : AppCompatActivity() {
                 if (!ShowHowToExtendView()) {
                     //ユーザーネームデータをロードするため遷移させないようにする
                     segueing = true
-                    progress_circular.isVisible = true
+                    binding.progressCircular.isVisible = true
                     ServerDataHandler().Chance_DownloadUserNameData_FirstData {
+                        if (isFinishing || isDestroyed) return@Chance_DownloadUserNameData_FirstData
                         segueing = false
-                        progress_circular.isVisible = false
+                        binding.progressCircular.isVisible = false
                     }
                 }
                 if( USERDATA.thumbMoviePlay ){
@@ -939,15 +1166,17 @@ class Activity_Selector : AppCompatActivity() {
                     }
                     if( volumeForceInResult != 1.0f ){
                         //ResultViewでThumbMovieをForcePlayして戻ってきたとき（ 0.51f になっている ）[徐々上げ指示]
-                        GlobalScope.launch(Dispatchers.Main){
-                            while (true) {
+                        val fadeGeneration = thumbGeneration
+                        val fadePlayer = cacheExoPlayer
+                        selectorScope.launch {
+                            while (ownsThumbRequest(fadeGeneration) && cacheExoPlayer === fadePlayer) {
                                 if (volumeForceInResult >= 1.0f) {
                                     volumeForceInResult = 1.0f
                                     break
                                 }
                                 volumeForceInResult += (1.0f - ReducedVolumeForceInResult) / 15 //1.5秒で戻す
                                 if(volumeForceInResult > 1.0f){ volumeForceInResult = 1.0f }
-                                cacheExoPlayer?.volume = 0.10f * USERDATA.SoundVolumeMovie * volumeForceInResult
+                                fadePlayer?.volume = 0.10f * USERDATA.SoundVolumeMovie * volumeForceInResult
                                 delay(100)
                             }
                         }
@@ -963,9 +1192,11 @@ class Activity_Selector : AppCompatActivity() {
                         volumeForceInResult = 1.0f
                     }else {
                         //ResultViewでThumbMovieをForcePlayして戻ってきたとき（ 0.49f になっている ）[徐々下げ指示]
-                        playerView_Alpha.alpha = 1.0f //音を小さくしていくだけなので動画は隠しておく
-                        GlobalScope.launch(Dispatchers.Main){
-                            while (true) {
+                        binding.playerViewAlpha.alpha = 1.0f //音を小さくしていくだけなので動画は隠しておく
+                        val fadeGeneration = thumbGeneration
+                        val fadePlayer = cacheExoPlayer
+                        selectorScope.launch {
+                            while (ownsThumbRequest(fadeGeneration) && cacheExoPlayer === fadePlayer) {
                                 if (volumeForceInResult <= 0.0f) {
                                     ThumbMovieStop()
                                     volumeForceInResult = 1.0f
@@ -973,7 +1204,7 @@ class Activity_Selector : AppCompatActivity() {
                                 }
                                 volumeForceInResult -= ReducedVolumeForceInResult / 10 //1.0秒で戻す
                                 if(volumeForceInResult < 0.0f){ volumeForceInResult = 0.0f }
-                                cacheExoPlayer?.volume = 0.10f * USERDATA.SoundVolumeMovie * volumeForceInResult
+                                fadePlayer?.volume = 0.10f * USERDATA.SoundVolumeMovie * volumeForceInResult
                                 delay(100)
                             }
                         }
@@ -981,7 +1212,8 @@ class Activity_Selector : AppCompatActivity() {
                 }
             }
             1002 -> {
-                val currentMusicTags = if(currentMusics.size > 0 && currentMusics.size > indexCoverFlow) currentMusics[indexCoverFlow].tags else ""
+                if (resultCode == RESULT_OK) { indexCoverFlow = -1; SetMusicToCoverFlow(); return }
+                val currentMusicTags = currentMusics.getOrNull(indexCoverFlow)?.tags.orEmpty()
                 if (maeTags != USERDATA.SelectedMusicCondition.tags || maeMusicTags != currentMusicTags || maeSort != USERDATA.SelectedMusicCondition.sortItem) {
                     indexCoverFlow = -1 //CoverFlowリロード
                     SetMusicToCoverFlow()
@@ -996,18 +1228,19 @@ class Activity_Selector : AppCompatActivity() {
             1003 -> {
                 //ユーザーネームデータをロードするため遷移させないようにする
                 segueing = true
-                progress_circular.isVisible = true
+                binding.progressCircular.isVisible = true
                 ServerDataHandler().Chance_DownloadUserNameData_FirstData {
+                        if (isFinishing || isDestroyed) return@Chance_DownloadUserNameData_FirstData
                     segueing = false
-                    progress_circular.isVisible = false
+                    binding.progressCircular.isVisible = false
                 }
             }
             1005 -> {
                 val modoriStr = data?.getStringExtra("modori") ?: ""
-                println("url = $modoriStr")
+                // println("url = $modoriStr")
                 if (modoriStr != "") {
                     val retStr = URLDecoder.decode(modoriStr, "UTF-8")
-                    println(retStr)
+                    // println(retStr)
                     var retTag = retStr.pregMatche_firstString("tag=(.*?)(&sort=|$)")
                     val retSort = retStr.pregMatche_firstString("sort=(.*?)(&tag=|$)")
 
@@ -1045,75 +1278,79 @@ class Activity_Selector : AppCompatActivity() {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // LevelPicker処理 //
-    fun LevelPickerContainerRedraw() {
-        if( (levelScroller_index-1) >= 0 &&  (levelScroller_index-1) < currentLevels.count()) {
+    fun LevelPickerContainerRedraw(redraw: Boolean = true) {
+        levelPickerBitmapDirty = true
+        if ((levelScroller_index - 1) in currentLevels.indices) {
             setLevelPickerContainer(
                 currentLevels[levelScroller_index - 1],
-                star_m1,
-                creator_m1,
-                score_m1,
-                rank_m1,
-                date_m1
+                binding.starM1,
+                binding.creatorM1,
+                binding.scoreM1,
+                binding.rankM1,
+                binding.dateM1, binding.calcLevelM1
             )
         }else {
-            setLevelPickerContainer(null, star_m1, creator_m1, score_m1, rank_m1, date_m1)
+            setLevelPickerContainer(null, binding.starM1, binding.creatorM1, binding.scoreM1, binding.rankM1, binding.dateM1, binding.calcLevelM1)
         }
-        if( levelScroller_index != -1 &&  (levelScroller_index) < currentLevels.count() ){
-            setLevelPickerContainer(currentLevels[levelScroller_index], star, creator, score, rank, date)
+        if (levelScroller_index in currentLevels.indices){
+            setLevelPickerContainer(currentLevels[levelScroller_index], binding.star, binding.creator, binding.score, binding.rank, binding.date, binding.calcLevel)
             UpdateObject_Level(currentLevels[levelScroller_index])
         }else {
-            setLevelPickerContainer(null, star, creator, score, rank, date)
+            setLevelPickerContainer(null, binding.star, binding.creator, binding.score, binding.rank, binding.date, binding.calcLevel)
             UpdateObject_Level(null)
         }
-        if( levelScroller_index+1 <= currentLevels.size-1  &&  (levelScroller_index+1) < currentLevels.count()){
+        if ((levelScroller_index + 1) in currentLevels.indices){
             setLevelPickerContainer(
                 currentLevels[levelScroller_index + 1],
-                star_p1,
-                creator_p1,
-                score_p1,
-                rank_p1,
-                date_p1
+                binding.starP1,
+                binding.creatorP1,
+                binding.scoreP1,
+                binding.rankP1,
+                binding.dateP1, binding.calcLevelP1
             )
         }else {
-            setLevelPickerContainer(null, star_p1, creator_p1, score_p1, rank_p1, date_p1)
+            setLevelPickerContainer(null, binding.starP1, binding.creatorP1, binding.scoreP1, binding.rankP1, binding.dateP1, binding.calcLevelP1)
         }
-        RedrawLevelpickerSelection()
+        setLevelPickerContainer(currentLevels.getOrNull(levelScroller_index + 2),
+            binding.starP2, binding.creatorP2, binding.scoreP2, binding.rankP2, binding.dateP2, binding.calcLevelP2)
+        if (redraw) RedrawLevelpickerSelection()
     }
     fun UpdateObject_Level(currentLevel: levelData?){
+        // Restore the base heart as well as rating overlays after an empty selection.
+        binding.heartMono.isVisible = currentLevel != null
         if( currentLevel == null ){
-            text_Speed.setText("")
-            star_color.isVisible = false
+            binding.textSpeed.setText("")
+            binding.heartColor.isVisible = false
+            binding.heartBlack.isVisible = false
+            binding.textLikeNum.isVisible = false
             return
         }
         currentLevel.let {
             val currentLevel = it
             //スピード反映
-            text_Speed.setText("speed: " + currentLevel.speed)
-            //favorite反映
-            star_color.isVisible = USERDATA.MyFavorite2.contains(currentLevel.sqlID)
-            star_black.isVisible = USERDATA.MyFavorite.contains(currentLevel.sqlID)
-            println(USERDATA.MyFavorite)
-            println(USERDATA.MyFavorite.contains(currentLevel.sqlID))
-            val fc = Int(currentLevel.favoriteCount / 5) * 5
-            text_FavoriteNum.text = String(fc)
-            text_FavoriteNum2.text = String(fc)
-            text_FavoriteNum3.text = String(fc)
-            text_FavoriteNum.isVisible = ( fc > 0)
-            text_FavoriteNum2.isVisible = ( fc > 0)
-            text_FavoriteNum3.isVisible = ( fc > 0)
+            binding.textSpeed.setText("speed: " + currentLevel.speed)
+            //like反映
+            val rating = USERDATA.MyLike[currentLevel.sqlID] ?: 0
+            binding.heartColor.setImageResource(if (rating == -2) R.drawable.heart_edge else R.drawable.heart_color)
+            binding.heartColor.isVisible = rating > 0 || rating == -2
+            binding.heartBlack.isVisible = rating == -1
+            val fc = ((currentLevel.likeCount - currentLevel.dislikeCount) / 5) * 5
+            binding.textLikeNum.text = fc.toString()
+            binding.textLikeNum.setTextColor(if (fc < 0) Color.RED else Color.BLACK)
+            binding.textLikeNum.isVisible = fc != 0
             val nowTime = (Date().time / 1000).toInt()
             val sDateFormat = SimpleDateFormat("yyy.MM.dd")
             if( (USERDATA.SelectedMusicCondition.sortItem == "最近ハイスコアが更新された曲順" || (nowTime - currentLevel.scoreTime)<2592000 ) && currentLevel.scoreTime > 0 ){
-                text_RankingTime.text = sDateFormat.format(Date(currentLevel.scoreTime * 1000L))
-                text_RankingTime.isVisible = true
+                binding.textRankingTime.text = sDateFormat.format(Date(currentLevel.scoreTime * 1000L))
+                binding.textRankingTime.isVisible = true
             }else{
-                text_RankingTime.isVisible = false
+                binding.textRankingTime.isVisible = false
             }
             if( (USERDATA.SelectedMusicCondition.sortItem == "最近コメントされた曲順" || (nowTime - currentLevel.commentTime)<2592000 ) && currentLevel.commentTime > 0 ){
-                text_CommentTime.text = sDateFormat.format(Date(currentLevel.commentTime * 1000L))
-                text_CommentTime.isVisible = true
+                binding.textCommentTime.text = sDateFormat.format(Date(currentLevel.commentTime * 1000L))
+                binding.textCommentTime.isVisible = true
             }else{
-                text_CommentTime.isVisible = false
+                binding.textCommentTime.isVisible = false
             }
 
         }
@@ -1124,8 +1361,20 @@ class Activity_Selector : AppCompatActivity() {
         _creator: TextView,
         _score: TextView,
         _rank: TextView,
-        _date: TextView
+        _date: TextView,
+        _calcLevel: TextView
     ){
+        // ★10個の右端を基準にし、FULLでも同じ横位置に表示する。
+        val showCalculatedLevel = USERDATA.UseNewLevelCalculationKey &&
+            leveldata != null && leveldata.calcLv > 0
+        _calcLevel.isVisible = showCalculatedLevel
+        _calcLevel.text = if (showCalculatedLevel) "★${leveldata!!.calcLv}" else ""
+        if (showCalculatedLevel) {
+            _calcLevel.translationX = (_star.paint.measureText("★★★★★★★★★★") +
+                _calcLevel.paint.measureText(_calcLevel.text.toString())) / 2f +
+                4f * resources.displayMetrics.density
+        }
+        _star.isVisible = leveldata != null
         if( leveldata == null ){
             _star.setText("")
             _creator.setText("")
@@ -1139,7 +1388,7 @@ class Activity_Selector : AppCompatActivity() {
         if( !leveldata.isEditing ){
             if( userScore.scores[leveldata.sqlID] != null ){
                 val scoredata = userScore.scores[leveldata.sqlID]!!
-                println(scoredata)
+                // println(scoredata)
                 _score.setText("HighScore: " + scoredata[UserScore.SCORE])
                 var rankStr = Score.RankStr[scoredata[UserScore.RANK]]
                 if( rankStr == "False" ){ rankStr = "" }
@@ -1161,46 +1410,132 @@ class Activity_Selector : AppCompatActivity() {
 
     }
     fun LevelPickerContainerSetScrollY(scrollY: Int) {
-        val realScrollY = levelpickerContainer.height * (scrollY) / (scrollerOneHeight) / 3
-        levelpickerContainer.layout(
-            0,
-            containerFirstPos - realScrollY,
-            levelpickerContainer.width,
-            containerFirstPos - realScrollY + levelpickerContainer.height
-        )
+        val view = binding.levelpickerContainer
+        // GONEから戻した星を測定し、通常の配置のまま子のレイアウトを更新する。
+        if (view.isLayoutRequested && view.width > 0 && view.height > 0) {
+            levelPickerBitmapDirty = true
+            view.measure(View.MeasureSpec.makeMeasureSpec(view.width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(view.height, View.MeasureSpec.EXACTLY))
+            view.layout(view.left, view.top, view.right, view.bottom)
+        }
+        val realScrollY = binding.pickerRowCenter.height * scrollY / scrollerOneHeight
+        // 親の再レイアウトでも移動量を維持し、文字更新時の一瞬の位置戻りを防ぐ。
+        view.translationY = -realScrollY.toFloat()
         RedrawLevelpickerSelection()
     }
     fun RedrawLevelpickerSelection(){
-        val view = levelpickerContainer
-        if( view.width <=0 || view.height <= 0 ){
+        val view = binding.levelpickerContainer
+        val output = binding.outputImageViewLevelScroller
+        if (view.width <= 0 || view.height <= 0 || output.width <= 0 || output.height <= 0) {
             return
         }
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        canvas.translate(0F, levelpickerContainer.y)
-        view.draw(canvas)
-        // ? アルファ値グラデーションのフィルタが作れるかと思ったら無理(?)だった。
-        //val paint = Paint()
-        //val shader = LinearGradient(0F,0F,0F,50F,0xff000000,0x00000000,Shader.TileMode.CLAMP)
-        //paint.shader = shader
-        //paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
-        //canvas.drawRect(0f, 0f, view.width.toFloat(), view.height.toFloat(), paint)
-        val redrawBitmap = Bitmap.createBitmap(bitmap,0,outputImageView_levelScroller.height * 3/4,outputImageView_levelScroller.width,outputImageView_levelScroller.height)
-        outputImageView_levelScroller.setImageBitmap(redrawBitmap)
+        // 内容変更直後のTextViewも、最新のレイアウトで描画する。
+        if (view.isLayoutRequested) {
+            levelPickerBitmapDirty = true
+            view.measure(View.MeasureSpec.makeMeasureSpec(view.width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(view.height, View.MeasureSpec.EXACTLY))
+            view.layout(view.left, view.top, view.right, view.bottom)
+        }
+        // TextViewを狭いCanvasで描画すると、そのクリップ範囲が文字描画にも影響する。
+        // 全体を描いた画像を再利用し、スクロール中は画像だけを移動・切り取りする。
+        val source = levelPickerBitmap?.takeIf {
+            it.width == view.width && it.height == view.height
+        } ?: Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also {
+            levelPickerBitmap?.recycle()
+            levelPickerBitmap = it
+            levelPickerBitmapDirty = true
+        }
+        if (levelPickerBitmapDirty) {
+            source.eraseColor(Color.TRANSPARENT)
+            view.draw(Canvas(source))
+            levelPickerBitmapDirty = false
+        }
+        val cropTop = output.height * 3 / 4
+        val bitmap = Bitmap.createBitmap(output.width, output.height, Bitmap.Config.ARGB_8888)
+        Canvas(bitmap).drawBitmap(source, 0F, view.y - cropTop, null)
+        output.setImageBitmap(bitmap)
     }
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         if(flg_notHome == false) {
-            println("Leave!")
+            // println("Leave!")
             leaved = true
             //Thumb止め
             ThumbMovieStop()
         }
     }
+    private var reminderNameRequestPending = false
+    private var reminderResumed = false
+    private var reminderIdleSince = 0L
+    private var flickReminderDialog: android.app.Dialog? = null
+    private val flickReminderCheck = object : Runnable {
+        override fun run() {
+            if (!reminderResumed || isFinishing || isDestroyed) return
+            if (FlickOnlyReminder.pending && flickReminderDialog == null) {
+                val idle = !segueing && !coverFlowScrolling && !reminderNameRequestPending &&
+                    !binding.progressCircular.isVisible && window.decorView.hasWindowFocus()
+                val now = android.os.SystemClock.uptimeMillis()
+                if (!idle) reminderIdleSince = 0L
+                else if (reminderIdleSince == 0L) reminderIdleSince = now
+                else if (now - reminderIdleSince >= 1000L) showFlickOnlyReminder()
+            } else reminderIdleSince = 0L
+            if (FlickOnlyReminder.pending) selectorHandler.postDelayed(this, 500)
+        }
+    }
+
+    private fun showFlickOnlyReminder() {
+        val dialog = android.app.Dialog(this)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        fun dp(value: Int) = (value * resources.displayMetrics.density + 0.5f).toInt()
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(20), dp(20), dp(20), dp(12))
+            setBackgroundColor(Color.argb(220, 0, 0, 0))
+        }
+        panel.addView(TextView(this).apply {
+            text = "キーボード設定を確認してみませんか？\n\n同じ文字を続けて入力したときの結果から、「フリックのみ」がOFFになっている可能性があります。\nすでにONの場合は、そのまま閉じてください。"
+            setTextColor(Color.WHITE)
+            textSize = 16f
+        }, LinearLayout.LayoutParams(-1, -2))
+        panel.addView(android.widget.ImageView(this).apply {
+            setImageResource(R.drawable.howto2a)
+            adjustViewBounds = true
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            contentDescription = "キーボードを「フリックのみ」に設定する手順"
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
+        panel.addView(TextView(this).apply {
+            text = "閉じる"
+            setTextColor(Color.rgb(220, 235, 255))
+            textSize = 17f
+            gravity = Gravity.CENTER
+            minHeight = dp(48)
+            setOnClickListener { dialog.dismiss() }
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+        dialog.setContentView(android.widget.ScrollView(this).apply { addView(panel) })
+        dialog.setCanceledOnTouchOutside(false)
+        dialog.setOnDismissListener { flickReminderDialog = null; reminderIdleSince = 0L }
+        flickReminderDialog = dialog
+        dialog.show()
+        dialog.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            attributes = attributes.apply { dimAmount = 0.55f }
+            setLayout((resources.displayMetrics.widthPixels * 0.94f).toInt(),
+                (resources.displayMetrics.heightPixels * 0.9f).toInt())
+        }
+        FlickOnlyReminder.markShown()
+    }
+
     override fun onResume() {
         super.onResume()
-        println("Resume!")
+        navigation.resume()
+        reminderResumed = true
+        reminderIdleSince = 0L
+        selectorHandler.post(flickReminderCheck)
+        LevelPickerContainerRedraw()
+        // println("Resume!")
         if( leaved && USERDATA.thumbMoviePlay ){
             //Thumb開始
             //ThumbMoviePlay()
@@ -1209,8 +1544,37 @@ class Activity_Selector : AppCompatActivity() {
         flg_notHome = false
     }
 
+    override fun onPause() {
+        reminderResumed = false
+        reminderIdleSince = 0L
+        selectorHandler.removeCallbacks(flickReminderCheck)
+        navigation.pause()
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        flickReminderDialog?.dismiss()
+        flickReminderDialog = null
+        thumbGeneration++
+        clearThumbCallbacks()
+        selectorHandler.removeCallbacksAndMessages(null)
+        selectorScope.cancel()
+        scrollingTimer?.cancel()
+        scrollingTimer = null
+        cacheExoPlayer?.playWhenReady = false
+        binding.playerView.player = null
+        binding.playerViewOnCoverFlow.player = null
+        cacheExoPlayer = null
+        if (GLOBAL.Selector_instance === this) {
+            GLOBAL.Selector_instance = null
+            CachedThumbMovies.allRelease()
+        }
+        navigation.destroy()
+        super.onDestroy()
+    }
+
     fun PlayerView_Alpha_Huta(){
-        playerView_Alpha.alpha = 1.0f
+        binding.playerViewAlpha.alpha = 1.0f
     }
 
 }

@@ -1,5 +1,7 @@
 package com.mizushiki.nicoflick_a
 
+import com.mizushiki.nicoflick_a.databinding.ActivitySelectorMenuTagEditorBinding
+
 
 import android.app.AlertDialog
 import android.content.Intent
@@ -10,16 +12,16 @@ import android.view.MenuItem
 import android.view.View
 import androidx.core.view.isVisible
 import com.eclipsesource.json.Json
-import kotlinx.android.synthetic.main.activity_selector_menu_tag_editor.*
-import kotlinx.android.synthetic.main.activity_selector_menu_tag_editor.toolbar2
-import kotlinx.android.synthetic.main.activity_settings.*
-import kotlinx.android.synthetic.main.activity_settings.progress_circular
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 class Activity_SelectorMenuTagEditor : AppCompatActivity() {
+
+    private lateinit var binding: ActivitySelectorMenuTagEditorBinding
+
 
     //各種データ
     var musicDatas: MusicDataLists = MusicDataLists
@@ -34,16 +36,17 @@ class Activity_SelectorMenuTagEditor : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_selector_menu_tag_editor)
+        binding = ActivitySelectorMenuTagEditorBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         maeText = getIntent().getStringExtra("tagstr") ?: ""
         smNum = getIntent().getStringExtra("smNum") ?: ""
         sqlID = getIntent().getIntExtra("sqlID",-1)
 
-        editText_hensyu.setText( maeText )
+        binding.editTextHensyu.setText( maeText )
 
-        setSupportActionBar(toolbar2)
-        getSupportActionBar()!!.setTitle("tag")
+        setSupportActionBar(binding.toolbar2)
+        getSupportActionBar()!!.setTitle("tag (music)")
         getSupportActionBar()!!.setDisplayShowHomeEnabled(true)
         getSupportActionBar()!!.setDisplayHomeAsUpEnabled(true)
 
@@ -79,18 +82,18 @@ class Activity_SelectorMenuTagEditor : AppCompatActivity() {
         if( sqlID == -1 ){
             return
         }
-        postText = editText_hensyu.text.toString().trim().replace("\n", " ").pregReplace("\\s+", " ")
+        postText = binding.editTextHensyu.text.toString().trim().replace("\n", " ").pregReplace("\\s+", " ")
         if (postText == "" || postText == maeText) {
             return
         }
 
         val id = sqlID
         segueing = true
-        progress_circular.isVisible = true
+        binding.progressCircular.isVisible = true
 
         ServerDataHandler().postMusicTagUpdate(id, postText, USERDATA.UserID) {
             if (!it) {
-                progress_circular.isVisible = false
+                binding.progressCircular.isVisible = false
                 postText = ""
                 segueing = false
                 AlertDialog.Builder(this)
@@ -103,7 +106,7 @@ class Activity_SelectorMenuTagEditor : AppCompatActivity() {
                 if (it != null) {
                     println("music-load error")
                 }
-                progress_circular.isVisible = false
+                binding.progressCircular.isVisible = false
                 segueing = false
                 //onPauseでGLOBAL.retString = postText
                 finish()
@@ -112,16 +115,16 @@ class Activity_SelectorMenuTagEditor : AppCompatActivity() {
     }
     fun Button_GetNicoTag(view: View) {
 
-        progress_circular.isVisible = true
+        binding.progressCircular.isVisible = true
 
         GetNicoTags(smNum) {
-            progress_circular.isVisible = false
+            binding.progressCircular.isVisible = false
             if(it=="error"){
                 //ダメだった
                 return@GetNicoTags
             }
-            editText_nicoTag.setText(Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY))
-            editText_nicoTag.isVisible = true
+            binding.editTextNicoTag.setText(Html.fromHtml(it, Html.FROM_HTML_MODE_LEGACY))
+            binding.editTextNicoTag.isVisible = true
         }
     }
 

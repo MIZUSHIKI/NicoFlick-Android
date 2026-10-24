@@ -2,17 +2,19 @@ apply plugin: 'com.android.application'
 
 apply plugin: 'kotlin-android'
 
-apply plugin: 'kotlin-android-extensions'
-
 android {
-    compileSdkVersion 33
+    compileSdk = 36
     defaultConfig {
         applicationId "com.mizushiki.nicoflick_a"
-        minSdkVersion 24
-        targetSdkVersion 33
-        versionCode 28
-        versionName "1.11.a1"
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        minSdk = 24
+        targetSdk = 36
+        versionCode = 33
+        versionName = "2.0.a1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    packagingOptions {
+        pickFirst 'META-INF/LICENSE.md'
+        pickFirst 'META-INF/CONTRIBUTORS.md'
     }
     buildTypes {
         release {
@@ -27,13 +29,18 @@ android {
     }
     repositories {
         google()
-        jcenter()
+        mavenCentral()
+
     }
     productFlavors {
     }
     viewBinding {
         enabled = true
     }
+    testOptions {
+        unitTests.includeAndroidResources = true
+    }
+    namespace 'com.mizushiki.nicoflick_a'
 }
 
 dependencies {
@@ -46,11 +53,14 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-extensions:2.0.0'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     testImplementation 'junit:junit:4.12'
+    testImplementation 'org.robolectric:robolectric:4.10.3'
     androidTestImplementation 'androidx.test:runner:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.1.1'
     //http通信ライブラリ
     implementation 'com.squareup.okhttp3:okhttp:4.3.1'
     implementation 'com.squareup.okhttp3:okhttp-urlconnection:4.3.1'
+    // Editor: offline kanji readings (Apache-2.0 / IPADIC dictionary notice bundled)
+    implementation 'com.atilika.kuromoji:kuromoji-ipadic:0.9.0'
     //jsonパースライブラリ
     implementation 'com.eclipsesource.minimal-json:minimal-json:0.9.5'
     //Kotlin coroutines用ライブラリ(async, await)

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_beta_features">β機能</string>
+    <string name="settings_new_level_title">新しい難易度表示 (テスト中)</string>
+    <string name="settings_new_level_description">曲選択画面で難易度の隣に★1～★20を追加表示します</string>
+    <string name="settings_new_level_notice">・★1〜7は従来式、★8〜20は新しい計算式で算出します。\n・FULLにも難易度が表示されます。\n・計算式は調整中のため、表示が変わる場合があります。\n\n難易度表示の傾向が体感と合わない場合は、調整案をGitHubまたはメールでお寄せください。計算式のPHPはGitHubで公開しています。</string>
+</resources>

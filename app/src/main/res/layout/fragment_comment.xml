@@ -72,7 +72,9 @@ tools:context=".CommentFragment">
     <EditText
             android:layout_width="0dp"
             android:layout_height="70dp"
-            android:inputType="textMultiLine"
+            android:inputType="text"
+            android:singleLine="true"
+            android:imeOptions="actionDone"
             android:gravity="start|top"
             android:ems="10"
             android:id="@+id/editText_comment"

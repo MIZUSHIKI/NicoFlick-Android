@@ -38,26 +38,6 @@ class CoverFlowAdapter(context: Context, musics:ArrayList<musicData>) : BaseAdap
             rowView.setTag(viewHolder)
         }
 
-        var url = mData[position].thumbnailURL
-        var sz:Size = Size(130,74)
-        if(url.substring(url.length-1) != "?"){
-            Regex("/thumbnails/(\\d+)/").find(url)?.groupValues?.get(1)?.let {
-                if(it.toInt() >= 16371845){
-                    url += ".L"
-                    sz = Size(360,200)
-                }
-            }
-            Regex("\\?i=(\\d+)").find(url)?.groupValues?.get(1)?.let {
-                if(it.toInt() >= 16371845){
-                    url += ".L"
-                    sz = Size(360,200)
-                }
-            }
-        }else {
-            url = url.substring(0 until url.length-1)
-        }
-
-
         val holder = rowView!!.getTag() as ViewHolder
         PicassoLoadImage_NicoThumb(holder.imageView, mData[position].thumbnailURL)
         //Picasso.get().load(url).resize(sz.width,sz.height).centerCrop().into(holder.imageView)

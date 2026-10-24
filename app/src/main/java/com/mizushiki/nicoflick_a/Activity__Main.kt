@@ -1,5 +1,7 @@
 package com.mizushiki.nicoflick_a
 
+import com.mizushiki.nicoflick_a.databinding.ActivityMainBinding
+
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.content.Context
@@ -13,6 +15,7 @@ import android.view.ViewGroup
 import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.TextView
+import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
@@ -22,7 +25,7 @@ import de.psdev.licensesdialog.licenses.ApacheSoftwareLicense20
 import de.psdev.licensesdialog.licenses.MITLicense
 import de.psdev.licensesdialog.model.Notice
 import de.psdev.licensesdialog.model.Notices
-import kotlinx.android.synthetic.main.activity_main.*
+
 import kotlinx.coroutines.*
 import java.net.CookieHandler
 import java.net.CookieManager
@@ -34,11 +37,15 @@ import javax.microedition.khronos.opengles.GL
 object GLOBAL {
     lateinit var APPLICATIONCONTEXT:Context
     lateinit var COOKIE_MANAGER: CookieManager
-    val PHP_URL = "https://main-timetag.ssl-lolipop.jp/nicoflick/nicoflick.php"
-    //val PHP_URL = "http://192.168.11.6/nicoflick_20201103/nicoflick.php" //windows xampp
-    val NICOWIKI_PATH = "https://main-timetag.ssl-lolipop.jp/nicoflick/wiki/index.php"
+    val PHP_URL = "https://timetag.main.jp/nicoflick/nicoflick.php"
+    //val PHP_URL = "http://192.168.11.6/nicoflick_20260921/nicoflick.php" //windows xampp
+    // - ローカルIPを変更したときは res/xml/network_security_config.xml も更新すること
+    val NICOWIKI_PATH = "https://timetag.main.jp/nicoflick/wiki/index.php"
+    //val NICOWIKI_PATH = "http://192.168.11.6/nicoflick_20260921/wiki/index.php"
     val NicoApiURL_GetThumbInfo = "https://ext.nicovideo.jp/api/getthumbinfo/"
-    val Version:Int = 1909
+    val Version:Int = 2000
+    var SuggestPlayerName = false
+    var ResultPractice = false
     //Activity間 オブジェクト受け渡し用
     var SelectMUSIC:musicData? = null
     var SelectLEVEL:levelData? = null
@@ -46,6 +53,7 @@ object GLOBAL {
     var ResultFirst = false
     var retString:String? = null //遷移間返り値が上手くいかないところがある
     var ServerErrorMessage = ""
+    var ServerErrorTitle = "サーバーエラー"
 
     var Selector_instance:Activity_Selector? = null //SelectorMenuでThumbMovieStopとかするため(もう面倒くさくなって・・・)
     var NavigationBarHeight:Int = 0
@@ -53,33 +61,89 @@ object GLOBAL {
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var binding: ActivityMainBinding
+    private var firstLaunchPending = false
+    private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+
+    private val navigation = DeferredNavigation()
+    private var childLaunched = false
+    private var childWasPaused = false
     var segueing = false //遷移中フラグ
     var slashShadeRepeatCanceled = false
 
     lateinit var seSystemAudio:SESystemAudio
 
+    override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
+        if (segueing || isFinishing || isDestroyed) return true
+        return super.dispatchTouchEvent(event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         //アプリケーション最初期実行 処理
         GLOBAL.APPLICATIONCONTEXT = applicationContext //onCreate後に作られる
-        val uuid = USERDATA.UserID // ここで Userdata object = シングルトン 初期化 （内部で GLOBAL_APPLICATIONCONTEXTを使用）
+        initializeStorage()
+    }
 
-        println("log:" + USERDATA.UserID)
-        println("log:" + USERDATA.UserIDxxx)
-
-        GLOBAL.COOKIE_MANAGER = CookieManager()
-        GLOBAL.COOKIE_MANAGER.setCookiePolicy(CookiePolicy.ACCEPT_ORIGINAL_SERVER)
-        if (CookieHandler.getDefault() != GLOBAL.COOKIE_MANAGER) {
-            CookieHandler.setDefault(GLOBAL.COOKIE_MANAGER)
+    private fun initializeStorage() {
+        segueing = true
+        binding.progressCircular.isVisible = true
+        binding.storageMigrationMessage.isVisible = false
+        startupScope.launch {
+            try {
+                // 音声・動画や一覧を展開する前に、旧保存データを一度だけ移行する。
+                withContext(Dispatchers.IO) {
+                    LocalStorage.database {
+                        runOnUiThread {
+                            if (!isFinishing && !isDestroyed) binding.storageMigrationMessage.isVisible = true
+                        }
+                    }
+                }
+                if (isFinishing || isDestroyed) return@launch
+                finishInitialization()
+                binding.progressCircular.isVisible = false
+                binding.storageMigrationMessage.isVisible = false
+                segueing = false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (isFinishing || isDestroyed) return@launch
+                binding.progressCircular.isVisible = false
+                binding.storageMigrationMessage.isVisible = false
+                // 移行失敗時に初期値で起動しない。旧ファイルは保持され、再試行できる。
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("保存データを読み込めませんでした")
+                    .setMessage("以前の保存データは残っています。空き容量などを確認して再試行してください。")
+                    .setPositiveButton("再試行") { _, _ -> initializeStorage() }
+                    .setNegativeButton("終了") { _, _ -> finish() }
+                    .setCancelable(false)
+                    .show()
+                android.util.Log.e("StorageMigration", "Unable to initialize storage", e)
+            }
         }
+    }
+
+    private fun finishInitialization() {
+        val uuid = USERDATA.UserID
+
+        // println("log:" + USERDATA.UserID)
+        // println("log:" + USERDATA.UserIDxxx)
+
+        firstLaunchPending = USERDATA.MyVersion == 0
         //バージョンアップ時に必要な処理があれば実行
         migration()
-        USERDATA.MyVersion = GLOBAL.Version
+        if (!firstLaunchPending) USERDATA.MyVersion = GLOBAL.Version
 
-        //「デザイン募集中」が気になる人は消せるように
-        textView_designCoop.isVisible = !USERDATA.lookedDesignCoop_v1900
+        updateFirstLaunchViews()
+        binding.textViewTapToStart.setOnClickListener {
+            //連続タップでダイアログが重複しないように、案内を先に消す
+            binding.textViewTapToStart.isVisible = false
+            showFirstLaunchNameDialog()
+        }
 
         // FrameLayout のインスタンスを取得
         val slashShadeLayout: FrameLayout = findViewById(R.id.title_SlashShade_layout)
@@ -97,42 +161,161 @@ class MainActivity : AppCompatActivity() {
 
         GLOBAL.NavigationBarHeight = getNavigationBarHeight()
     }
-    fun Button_Start(view: View) {
-        if(segueing) {
-            return
-        }
-        segueing = true
+    private fun updateFirstLaunchViews() {
+        binding.button.isVisible = !firstLaunchPending
+        binding.button2.isVisible = !firstLaunchPending
+        binding.button3.isVisible = !firstLaunchPending
+        binding.textViewDesignCoop.isVisible = !firstLaunchPending && !USERDATA.lookedDesignCoop_v1900
+        binding.textViewTapToStart.isVisible = firstLaunchPending
+    }
 
+    private fun finishFirstLaunch() {
+        firstLaunchPending = false
+        USERDATA.MyVersion = GLOBAL.Version
+        updateFirstLaunchViews()
+    }
+
+    private fun showFirstLaunchNameDialog() {
+        val input = EditText(this).apply {
+            setText(USERDATA.UserName)
+            hint = "プレイヤー名"
+            setSingleLine(true)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("NicoFlickへようこそ！")
+            .setMessage("プレイヤー名を入力してください")
+            .setView(input)
+            .setPositiveButton("OK") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotEmpty() && name != USERDATA.UserName) {
+                    registerUserNameBlocking(name) { success ->
+                        if (success) {
+                            finishFirstLaunch()
+                        } else {
+                            AlertDialog.Builder(this)
+                                .setMessage("登録に失敗しました。名前はあとから設定でも変更できます")
+                                .setPositiveButton("OK", null)
+                                .setOnDismissListener { finishFirstLaunch() }
+                                .show()
+                        }
+                    }
+                } else {
+                    finishFirstLaunch()
+                }
+            }
+            .setOnCancelListener { finishFirstLaunch() }
+            .show()
+    }
+
+    fun Button_Start(view: View) {
+        if (segueing || isFinishing || isDestroyed) return
+        segueing = true
         SESystemAudio.start2SePlay()
-        progress_circular.isVisible = true
-        ServerDataHandler().DownloadMusicDataAndUserNameData {
-            //if(it!=null) {
-                //return@DownloadMusicDataAndUserNameData
-            //}
-            progress_circular.isVisible = false
-            if( GLOBAL.ServerErrorMessage != "" ){
-                android.app.AlertDialog.Builder(this)
-                    .setTitle("サーバエラー")
-                    .setMessage("・${GLOBAL.ServerErrorMessage}")
-                    .setPositiveButton("OK", { dialog, which ->
-                        GLOBAL.ServerErrorMessage = ""
-                        //エラーメッセージ確認後、遷移
-                        val intent: Intent = Intent(applicationContext, Activity_Selector::class.java)
-                        startActivity(intent)
-                        segueing = false
-                    })
-                    .show()
-            }else {
-                //特にエラーなし遷移
-                val intent: Intent = Intent(applicationContext, Activity_Selector::class.java)
-                startActivity(intent)
-                segueing = false
-                slashShadeRepeatCanceled = true
+        binding.progressCircular.isVisible = true
+        startupScope.launch {
+            val maintenance = async(Dispatchers.IO) { checkNiconicoMaintenance() }
+            val dataReady = CompletableDeferred<Unit>()
+            ServerDataHandler().DownloadMusicDataAndUserNameData {
+                dataReady.complete(Unit)
+            }
+            dataReady.await()
+            val isMaintenance = maintenance.await()
+            if (isFinishing || isDestroyed) return@launch
+            navigation.submit {
+                if (!isFinishing && !isDestroyed) {
+                    binding.progressCircular.isVisible = false
+                    confirmMaintenanceAndOpenSelector(isMaintenance)
+                }
             }
         }
     }
 
+    private fun checkNiconicoMaintenance(): Boolean {
+        val client = okhttp3.OkHttpClient.Builder()
+            .callTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        val request = okhttp3.Request.Builder()
+            .url(GLOBAL.NicoApiURL_GetThumbInfo + "sm9")
+            .build()
+        return try {
+            client.newCall(request).execute().use { response ->
+                // HTTPエラーの本文にもメンテナンス案内が含まれる場合がある。
+                response.body?.string()?.contains("Maintenance", ignoreCase = true) == true
+            }
+        } catch (_: java.io.IOException) {
+            // タイムアウト・通信エラーはメンテナンスと判定しない。
+            false
+        }
+    }
+
+    private fun confirmMaintenanceAndOpenSelector(isMaintenance: Boolean) {
+        if (isFinishing || isDestroyed) return
+        if (!isMaintenance) {
+            confirmServerWarningAndOpenSelector()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("ニコニコ動画 メンテナンス")
+            .setMessage("ニコニコ動画がメンテナンス中です。動画を再生できない可能性があります。")
+            .setPositiveButton("そのまま進む") { _, _ ->
+                navigation.submit { confirmServerWarningAndOpenSelector() }
+            }
+            .setNegativeButton("キャンセル") { _, _ -> segueing = false }
+            .setOnCancelListener { segueing = false }
+            .show()
+    }
+
+    private fun confirmServerWarningAndOpenSelector() {
+        if (isFinishing || isDestroyed) return
+        if (GLOBAL.ServerErrorMessage.isEmpty()) {
+            openSelector()
+            return
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle(GLOBAL.ServerErrorTitle)
+            .setMessage("・${GLOBAL.ServerErrorMessage}")
+            .setPositiveButton("そのまま進む") { _, _ ->
+                GLOBAL.ServerErrorMessage = ""
+                navigation.submit { openSelector() }
+            }
+            .setNegativeButton("キャンセル") { _, _ -> segueing = false }
+            .setOnCancelListener { segueing = false }
+            .show()
+    }
+
+    private fun openSelector() {
+        if (isFinishing || isDestroyed) return
+        childLaunched = true
+        startActivity(Intent(this, Activity_Selector::class.java))
+        slashShadeRepeatCanceled = true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (childLaunched && childWasPaused) {
+            childLaunched = false
+            childWasPaused = false
+            segueing = false
+        }
+        navigation.resume()
+    }
+
+    override fun onPause() {
+        navigation.pause()
+        if (childLaunched) childWasPaused = true
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        startupScope.cancel()
+        navigation.destroy()
+        super.onDestroy()
+    }
+
     fun Button_settings(view: View) {
+        if (segueing || isFinishing || isDestroyed) return
+        segueing = true
+        childLaunched = true
         SESystemAudio.startSePlay()
         val intent: Intent = Intent(applicationContext, Activity_Settings::class.java)
         startActivity(intent)
@@ -140,10 +323,11 @@ class MainActivity : AppCompatActivity() {
 
     fun Label_designCoop(view: View) {
         USERDATA.lookedDesignCoop_v1900 = true
-        textView_designCoop.isVisible = false
+        binding.textViewDesignCoop.isVisible = false
     }
 
     fun Button_Info(view: View) {
+        if (segueing || isFinishing || isDestroyed) return
 
         val strList = arrayOf("🔗 Google Playで見る", "🔗 デザイン協力募集中(GitHub)", "ライブラリ クレジット")
 
@@ -187,7 +371,7 @@ iOS11リリース(32bitアプリなので両方起動できなくなる)"""
             .show()
 
         USERDATA.lookedDesignCoop_v1900 = false
-        textView_designCoop.isVisible = true
+        binding.textViewDesignCoop.isVisible = true
     }
 
     fun ShowLicensesDialog(){
@@ -467,32 +651,69 @@ Copyright(c) 2014 M+ FONTS PROJECT
 
     //マイグレーション
     fun migration(){
-        println("migration")
+        if( USERDATA.MyVersion == 0 ){ return }
+        // println("migration")
         if( USERDATA.MyVersion < 1430 ){
             //データベースの初期データが上手く記録できていない時期があったため music, level を初期化して再取得
             MusicDataLists.reset()
-            USERDATA.MusicsJson = ""
-            USERDATA.LevelsJson = ""
-            println("music,level Reset")
+            MetadataStorage.clearMusicsAndLevels()
+            // println("music,level Reset")
         }
         if( USERDATA.MyVersion < 1500 ){
             if( USERDATA.MyFavorite.size > 0 ){
-                println("お気に入り仕様変更を見せる")
+                // println("お気に入り仕様変更を見せる")
                 USERDATA.lookedChangeFavoSpec_v1500 = false
             }
         }
         if( USERDATA.MyVersion < 1800 ){
             //notesの頭16文字だけ拾ってthumbMovieに使用するため music, level を初期化して再取得
             MusicDataLists.reset()
-            USERDATA.MusicsJson = ""
-            USERDATA.LevelsJson = ""
-            println("music,level Reset")
-            //exoPlayerの保持しておける数が少ないのでキャッシュ(CachedMovie)は 1曲のみ（デコーダ数の関係らしい）。[CachedThumbMovie_Num=3]
-            USERDATA.cachedMovieNum = 1
+            MetadataStorage.clearMusicsAndLevels()
+            // println("music,level Reset")
         }
         if( USERDATA.MyVersion < 1901 ){
             //DataStore分割
             USERDATA.Migration__Version1_9_0_0to1_10_0_0()
+        }
+        if (USERDATA.MyVersion < 1911) {
+            val condition = USERDATA.SelectedMusicCondition
+            if (condition.tags.startsWith("@sm:") || condition.tags.startsWith("人類には早すぎる動画") || condition.tags.startsWith("才能の無駄遣い")) {
+                condition.tags = if (USERDATA.lookedExtend) "" else "@初期楽曲"
+                condition.sortItem = "曲の投稿日時 降順"
+            }
+        }
+        if (USERDATA.MyVersion < 2000) {
+            // music, level のロードデータだけを初期化して再取得する。
+            MusicDataLists.reset()
+            MetadataStorage.clearMusicsAndLevels()
+
+            val condition = USERDATA.SelectedMusicCondition
+            val stars = condition.getSortStarsString()
+            val sort = condition.sortItem.removeSuffix(stars)
+            val renamedSort = when (sort) {
+                "曲の投稿が新しい順" -> "曲の投稿日時 降順"
+                "曲の投稿が古い順" -> "曲の投稿日時 昇順"
+                "ゲームの投稿が新しい曲順" -> "ゲームの投稿日時 降順"
+                "ゲームの投稿が古い曲順" -> "ゲームの投稿日時 昇順"
+                "動画IDが大きい順" -> "動画ID 降順"
+                "動画IDが小さい順" -> "動画ID 昇順"
+                "ゲームプレイ回数が多い曲順" -> "みんなのプレイ回数が多い曲順"
+                "ゲームプレイ回数が少ない曲順" -> "みんなのプレイ回数が少ない曲順"
+                else -> sort
+            }
+            if (renamedSort != sort) condition.sortItem = renamedSort + stars
+
+            if (USERDATA.MyFavoriteAll.isNotEmpty()) USERDATA.doneFavoriteUpdate_v2000 = false
+            val histories = USERDATA.levelPlayHistories
+            for (levelID in USERDATA.Score.scores.keys) {
+                // 既存の履歴は保持し、日時不明のスコアは1回プレイ済みとして移行する。
+                if (!histories.containsKey(levelID)) {
+                    histories[levelID] = LevelPlayHistory(1, java.util.Date(0L))
+                }
+            }
+            USERDATA.levelPlayHistories = histories
+            USERDATA.lookedNameRegistrationIfNoName_v2000 = false
+            USERDATA.doneScoreLevelUpdate_v2000 = false
         }
     }
 

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="false">
+        <layer-list>
+            <!-- 影 -->
+<!--            <item android:top="10dp" android:left="10dp">-->
+<!--                <shape android:shape="rectangle">-->
+<!--                    <solid android:color="#18666666"/>-->
+<!--                    <corners android:radius="100dp"/>-->
+<!--                </shape>-->
+<!--            </item>-->
+            <!-- 本体 -->
+            <item android:bottom="6dp" android:right="6dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="#F2F2F7"/>
+                    <corners android:radius="12dp"/>
+                    <padding android:left="0dp" android:top="0dp"
+                            android:right="0dp" android:bottom="12dp"/>
+                    <stroke android:color="#C7C7CC" android:width="2dp"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item android:state_pressed="true">
+        <layer-list>
+            <!-- 影 -->
+<!--            <item android:top="10dp" android:left="10dp">-->
+<!--                <shape android:shape="rectangle">-->
+<!--                    <solid android:color="#18666666"/>-->
+<!--                    <corners android:radius="100dp"/>-->
+<!--                </shape>-->
+<!--            </item>-->
+            <!-- 本体 -->
+            <item android:bottom="6dp" android:right="6dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="#ADADAD"/>
+                    <corners android:radius="12dp"/>
+                    <padding android:left="0dp" android:top="0dp"
+                            android:right="0dp" android:bottom="12dp"/>
+                    <stroke android:color="#808080" android:width="2dp"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

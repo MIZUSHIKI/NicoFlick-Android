@@ -1,5 +1,7 @@
 package com.mizushiki.nicoflick_a
 
+import com.mizushiki.nicoflick_a.databinding.ActivitySelectorMenuTableForSortBinding
+
 
 import android.content.DialogInterface
 import android.content.DialogInterface.OnMultiChoiceClickListener
@@ -7,14 +9,18 @@ import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
 import android.widget.ArrayAdapter
+import android.widget.TextView
+import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import kotlinx.android.synthetic.main.activity_selector.*
-import kotlinx.android.synthetic.main.activity_selector_menu_table_for_sort.*
+
 import java.util.*
 
 
 class Activity_SelectorMenuTableForSort : AppCompatActivity() {
+
+    private lateinit var binding: ActivitySelectorMenuTableForSortBinding
+
 
     //各種データ
     var musicDatas: MusicDataLists = MusicDataLists
@@ -22,27 +28,42 @@ class Activity_SelectorMenuTableForSort : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_selector_menu_table_for_sort)
+        binding = ActivitySelectorMenuTableForSortBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        editText_sort.setText(USERDATA.SelectedMusicCondition.sortItem)
+        binding.editTextSort.setText(USERDATA.SelectedMusicCondition.sortItem)
 
-        setSupportActionBar(toolbar2)
+        setSupportActionBar(binding.toolbar2)
         getSupportActionBar()!!.setTitle("sort")
         getSupportActionBar()!!.setDisplayShowHomeEnabled(true)
         getSupportActionBar()!!.setDisplayHomeAsUpEnabled(true)
 
         texts.addAll(USERDATA.SelectedMusicCondition.SortItem)
         // simple_list_item_1 は、 もともと用意されている定義済みのレイアウトファイルのID
-        val arrayAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, texts)
-        listView.setAdapter(arrayAdapter)
+        val icons = listOf(R.drawable.music_new, R.drawable.music_old, R.drawable.flick_new, R.drawable.flick_old,
+            R.drawable.plays_new, R.drawable.plays_old, R.drawable.favorites_many, R.drawable.favorites_few,
+            R.drawable.video_id_large, R.drawable.video_id_small, R.drawable.highscore_recent, R.drawable.comment_recent,
+            R.drawable.plays_recent, R.drawable.plays_user)
+        val iconSize = (32 * resources.displayMetrics.density).toInt()
+        val arrayAdapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, texts) {
+            override fun getView(position:Int, convertView:View?, parent:ViewGroup):View {
+                val row = super.getView(position, convertView, parent) as TextView
+                val icon = androidx.core.content.ContextCompat.getDrawable(context, icons[position])
+                icon?.setBounds(0, 0, iconSize, iconSize)
+                row.setCompoundDrawables(icon, null, null, null)
+                row.compoundDrawablePadding = (12 * resources.displayMetrics.density).toInt()
+                return row
+            }
+        }
+        binding.listView.setAdapter(arrayAdapter)
 
         // 項目をタップしたときの処理
-        listView.setOnItemClickListener { parent, view, position, id ->
-            if( editText_sort.text.contains(texts[position]) ){
+        binding.listView.setOnItemClickListener { parent, view, position, id ->
+            if( binding.editTextSort.text.contains(texts[position]) ){
                 return@setOnItemClickListener
             }
-            val hosi = editText_sort.text.toString().pregMatche_firstString("( [★☆]{10}[■□])$")
-            editText_sort.setText(texts[position] + hosi)
+            val hosi = binding.editTextSort.text.toString().pregMatche_firstString("( [★☆]{10}[■□])$")
+            binding.editTextSort.setText(texts[position] + hosi)
         }
     }
 
@@ -57,17 +78,17 @@ class Activity_SelectorMenuTableForSort : AppCompatActivity() {
     }
 
     fun Button_Delete(view: View) {
-        editText_sort.setText("")
+        binding.editTextSort.setText("")
     }
 
     override fun onPause() {
-        println(editText_sort.text.toString())
-        USERDATA.SelectedMusicCondition.sortItem = editText_sort.text.toString()
+        // println(binding.editTextSort.text.toString())
+        USERDATA.SelectedMusicCondition.sortItem = binding.editTextSort.text.toString()
         super.onPause()
     }
 
     fun Button_StarFilter(view: View) {
-        val sortStars = SelectConditions().getSortStars(editText_sort.text.toString())
+        val sortStars = SelectConditions().getSortStars(binding.editTextSort.text.toString())
 
         val items = arrayOf("★1", "★2", "★3", "★4", "★5", "★6", "★7", "★8", "★9", "★10", "FULL")
         val checkedItems = sortStars.mapIndexed { index, star -> if(star) index else (index - 100) }.filter { it >= 0 }.toMutableList()
@@ -85,7 +106,7 @@ class Activity_SelectorMenuTableForSort : AppCompatActivity() {
                     // item_i checked
                     stars[i] = true
                 }
-                var sortitem = editText_sort.text.toString().pregReplace(" [★☆]{10}[■□]$","")
+                var sortitem = binding.editTextSort.text.toString().pregReplace(" [★☆]{10}[■□]$","")
                 if( stars.contains(false) ){
                     sortitem += " "
                     stars.forEachIndexed { index, star ->
@@ -96,7 +117,7 @@ class Activity_SelectorMenuTableForSort : AppCompatActivity() {
                         }
                     }
                 }
-                editText_sort.setText(sortitem)
+                binding.editTextSort.setText(sortitem)
             })
             .show()
 

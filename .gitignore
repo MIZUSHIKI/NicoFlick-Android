@@ -12,3 +12,7 @@
 /captures
 .externalNativeBuild
 .cxx
+
+# JVM crash diagnostic logs
+hs_err_pid*.log
+replay_pid*.log

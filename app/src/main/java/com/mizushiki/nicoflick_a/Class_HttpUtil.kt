@@ -9,8 +9,18 @@ import java.net.URI
 
 object HttpUtil {
     val client = OkHttpClient.Builder().cookieJar(JavaNetCookieJar(GLOBAL.COOKIE_MANAGER)).build()
+    // Preserve the movie request timeout even when diagnostic listeners are disabled.
+    private val movieClient by lazy {
+        client.newBuilder().callTimeout(30, java.util.concurrent.TimeUnit.SECONDS).build()
+    }
+    private fun requestClient(diagnosticId: String?): OkHttpClient {
+        if (diagnosticId == null) return client
+        return if (DiagnosticSettings.enabled)
+            movieClient.newBuilder().eventListener(MovieLoadLog.httpEvents(diagnosticId)).build()
+        else movieClient
+    }
     //叩きたいREST APIのURLを引数とします
-    fun httpGET(url : String, noCache : Boolean = false, headers : Map<String,String> = mapOf()): String? {
+    fun httpGET(url : String, noCache : Boolean = false, headers : Map<String,String> = mapOf(), diagnosticId: String? = null): String? {
         val request : Request
         if( !noCache ){
             request= Request.Builder().apply {
@@ -28,19 +38,26 @@ object HttpUtil {
                 }
             }.build()
         }
+        val started = if (DiagnosticSettings.enabled) android.os.SystemClock.elapsedRealtime() else 0L
+        diagnosticId?.let { MovieLoadLog.log(it) { "HTTP_START method=${request.method} host=${request.url.host}" } }
         try {
-            val response = client.newCall(request).execute()
+            val requestClient = requestClient(diagnosticId)
+            val response = requestClient.newCall(request).execute()
             if(!response.isSuccessful){
+                diagnosticId?.let { MovieLoadLog.log(it) { "HTTP_FAILED status=${response.code} elapsed=${android.os.SystemClock.elapsedRealtime() - started}ms" } }
+                response.close()
                 return null
             }
-            return response.body?.string()
+            val body = response.use { it.body?.string() }
+            diagnosticId?.let { MovieLoadLog.log(it) { "HTTP_BODY_END bytes=${body?.length} elapsed=${android.os.SystemClock.elapsedRealtime() - started}ms" } }
+            return body
         }catch(e: Exception) {
-            println(e)
+            diagnosticId?.let { MovieLoadLog.failure(it, e) }
             return null
         }
     }
 
-    fun httpPOST(url : String, postString : String, noCache: Boolean = false, headers : Map<String,String> = mapOf(), eatCookie : Boolean = false) : String? {
+    fun httpPOST(url : String, postString : String, noCache: Boolean = false, headers : Map<String,String> = mapOf(), eatCookie : Boolean = false, diagnosticId: String? = null) : String? {
         val MIMEType = "application/x-www-form-urlencoded; charset=utf-8".toMediaTypeOrNull()
         val requestBody = RequestBody.create(MIMEType,postString)
 
@@ -65,32 +82,34 @@ object HttpUtil {
                 post(requestBody)
             }.build()
         }
+        val started = if (DiagnosticSettings.enabled) android.os.SystemClock.elapsedRealtime() else 0L
+        diagnosticId?.let { MovieLoadLog.log(it) { "HTTP_START method=${request.method} host=${request.url.host}" } }
         try {
-            val response = client.newCall(request).execute()
+            val requestClient = requestClient(diagnosticId)
+            val response = requestClient.newCall(request).execute()
             if(!response.isSuccessful){
-                println("response.message="+response.message)
+                diagnosticId?.let { MovieLoadLog.log(it) { "HTTP_FAILED status=${response.code} elapsed=${android.os.SystemClock.elapsedRealtime() - started}ms" } }
+                response.close()
                 return null
             }
-            val bod = response.body?.string()
+            val bod = response.use { it.body?.string() }
+            diagnosticId?.let { MovieLoadLog.log(it) { "HTTP_BODY_END bytes=${bod?.length} elapsed=${android.os.SystemClock.elapsedRealtime() - started}ms" } }
             if (eatCookie) {
                 for( (key, value) in response.headers ){
-                    println("response.headers - key,value = $key, $value")
+                    // Cookie values are not logged.
                     if (key != "set-cookie"){ continue }
                     val domand_bid = value.pregMatche_firstString("domand_bid=([0-9a-f]+?);")
                     //GLOBAL.COOKIE_MANAGER.cookieStore.add( URI(url), HttpCookie("domand_bid", domand_bid))
                     //println("set_cookie - key,value = \"domand_bid\", $domand_bid")
                     break
                 }
-                // 確認
-                for( a in GLOBAL.COOKIE_MANAGER.cookieStore.cookies){
-                    println("name=${a.name}, value= ${a.value}")
-                }
+                // Cookie values are not logged.
             }
-            println("response.body="+bod)
+            // Response bodies may contain signed media URLs.
             return bod//response.body?.string()
         }catch(e: Exception) {
-            println("error->")
-            println(e)
+            // println("error->")
+            diagnosticId?.let { MovieLoadLog.failure(it, e) }
             return null
         }
     }

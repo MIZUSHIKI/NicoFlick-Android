@@ -1,45 +1,62 @@
 package com.mizushiki.nicoflick_a
 
+import com.mizushiki.nicoflick_a.databinding.ActivityRankingCommentBinding
+
 import android.graphics.Color
 import android.os.Bundle
 import android.view.MenuItem
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomnavigation.BottomNavigationView
-import kotlinx.android.synthetic.main.activity_ranking_comment.*
-import kotlinx.android.synthetic.main.activity_result.*
+
 
 class Activity_RankingComment : AppCompatActivity(),BottomNavigationView.OnNavigationItemSelectedListener {
 
-    val rankingFragment = RankingFragment()
-    val commentFragment = CommentFragment()
+    private lateinit var binding: ActivityRankingCommentBinding
+
+
+    private lateinit var rankingFragment: RankingFragment
+    private lateinit var commentFragment: CommentFragment
     var added:Boolean = false //・・・
     var maeItemId = -1
 
-    val selectMusic = GLOBAL.SelectMUSIC!!
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_ranking_comment)
+        binding = ActivityRankingCommentBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        btm_navigation.setOnNavigationItemSelectedListener(this)
+        val selectMusic = GLOBAL.SelectMUSIC ?: return returnToStartAfterStateLoss()
+        if (GLOBAL.SelectLEVEL == null) return returnToStartAfterStateLoss()
+
+        // FragmentManagerが復元したインスタンスを表示切替にも使用する。
+        rankingFragment = supportFragmentManager.findFragmentByTag("ranking") as? RankingFragment
+            ?: supportFragmentManager.fragments.filterIsInstance<RankingFragment>().firstOrNull()
+            ?: RankingFragment()
+        commentFragment = supportFragmentManager.findFragmentByTag("comment") as? CommentFragment
+            ?: supportFragmentManager.fragments.filterIsInstance<CommentFragment>().firstOrNull()
+            ?: CommentFragment()
+        added = commentFragment.isAdded
+        binding.btmNavigation.setOnNavigationItemSelectedListener(this)
 
         // FrameLayout のインスタンスを取得
         val slashShadeLayout: FrameLayout = findViewById(R.id.RankingCommentView_SlashShade_layout)
         val slashShadeView = SlashShadeView(this,slashColor=Color.argb(255,204,255,102) )
         slashShadeLayout.addView(slashShadeView)
-        PicassoLoadImage_NicoThumb(RankingCommentView_imageAlpha, selectMusic.thumbnailURL)
+        PicassoLoadImage_NicoThumb(binding.RankingCommentViewImageAlpha, selectMusic.thumbnailURL)
 
         if( savedInstanceState == null ){
             supportFragmentManager.beginTransaction()
-                .add(R.id.frameLayout, rankingFragment)
+                .add(R.id.frameLayout, rankingFragment, "ranking")
                 .commit()
         }
     }
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
-        println("rankingFragment.loading= ${rankingFragment.loading}")
-        println("commentFragment.loading= ${commentFragment.loading}")
+        if (isFinishing || !::rankingFragment.isInitialized || !::commentFragment.isInitialized) return false
+        // println("rankingFragment.loading= ${rankingFragment.loading}")
+        // println("commentFragment.loading= ${commentFragment.loading}")
         if( rankingFragment.loading == true || commentFragment.loading == true ){
             return false
         }
@@ -51,7 +68,7 @@ class Activity_RankingComment : AppCompatActivity(),BottomNavigationView.OnNavig
             R.id.item1 -> {
                 val sfmbt = supportFragmentManager.beginTransaction()
                 sfmbt.show(rankingFragment)
-                sfmbt.hide(commentFragment)
+                if (commentFragment.isAdded) sfmbt.hide(commentFragment)
                 sfmbt.commit()
                 return true
             }
@@ -59,7 +76,7 @@ class Activity_RankingComment : AppCompatActivity(),BottomNavigationView.OnNavig
                 val sfmbt = supportFragmentManager.beginTransaction()
                 if(!commentFragment.isAdded && !added){
                     added = true
-                    sfmbt.add(R.id.frameLayout, commentFragment)
+                    sfmbt.add(R.id.frameLayout, commentFragment, "comment")
                 }
                 sfmbt.hide(rankingFragment)
                 sfmbt.show(commentFragment)

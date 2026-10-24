@@ -1,7 +1,5 @@
 package com.mizushiki.nicoflick_a
 
-import android.content.Context
-import android.content.SharedPreferences
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.abs
@@ -13,23 +11,16 @@ import kotlin.properties.Delegates
 
 object USERDATA {
 
-    // 必ず GLOBAL.APPLICATIONCONTEXTが入力されてからシングルトンを作る
-    // １つで管理してたらやたら重くなったので分割。本当はでかいのはファイル保存とかが望ましい。
-    // nameでファイル単位とかになるのかと思いきや全てを纏めたxmlらしい。(ということはJsonのエンコード・デコードが延々と繰り返されていることに・・・)
-    val dataStore: SharedPreferences = GLOBAL.APPLICATIONCONTEXT.getSharedPreferences("DataStore", Context.MODE_PRIVATE)
-    val dataStore_Util: SharedPreferences = GLOBAL.APPLICATIONCONTEXT.getSharedPreferences("DataStore_Util", Context.MODE_PRIVATE)
-    val dataStore_UserScore: SharedPreferences = GLOBAL.APPLICATIONCONTEXT.getSharedPreferences("DataStore_UserScore", Context.MODE_PRIVATE)
-    val dataStore_MusicsJson: SharedPreferences = GLOBAL.APPLICATIONCONTEXT.getSharedPreferences("DataStore_MusicsJson", Context.MODE_PRIVATE)
-    val dataStore_LevelsJson: SharedPreferences = GLOBAL.APPLICATIONCONTEXT.getSharedPreferences("DataStore_LevelsJson", Context.MODE_PRIVATE)
-    val dataStore_UserNamesJson: SharedPreferences = GLOBAL.APPLICATIONCONTEXT.getSharedPreferences("DataStore_UserNamesJson", Context.MODE_PRIVATE)
-    val dataStore_ScoresJson: SharedPreferences = GLOBAL.APPLICATIONCONTEXT.getSharedPreferences("DataStore_ScoresJson", Context.MODE_PRIVATE)
-    val dataStore_CommentsJson: SharedPreferences = GLOBAL.APPLICATIONCONTEXT.getSharedPreferences("DataStore_CommentsJson", Context.MODE_PRIVATE)
+    // 旧SharedPreferencesはLocalStorageの初回接続時にSQLiteへ移行する。
+    val dataStore = SQLitePreferences(LocalStorage.database(), "DataStore")
+    val dataStore_Util = SQLitePreferences(LocalStorage.database(), "DataStore_Util")
+    val dataStore_UserScore = SQLitePreferences(LocalStorage.database(), "DataStore_UserScore")
 
 //DataStore_Original
     //MyVersion
     //  バージョンアップ時に必要な処理があれば実行するため
     var MyVersion:Int = 0
-        get() = dataStore.getInt("MyVersion", GLOBAL.Version)
+        get() = dataStore.getInt("MyVersion", 0)
         set(value) {
             dataStore.edit().putInt("MyVersion",value).commit()
             field = value
@@ -80,11 +71,11 @@ object USERDATA {
             dataStore.edit().putString("NicoPass",value).commit()
             field = value
         }
-    //cachedMoviesNum
-    var cachedMovieNum:Int = 3
-        get() = dataStore.getInt("cachedMovieNum",3)
+    //ゲーム画面での前回のキーボード高さ
+    var maeKeyboardTop:Int = 0
+        get() = dataStore.getInt("maeKeyboardTop",0)
         set(value) {
-            dataStore.edit().putInt("cachedMovieNum",value).commit()
+            dataStore.edit().putInt("maeKeyboardTop",value).commit()
             field = value
         }
     //volume movie
@@ -109,8 +100,8 @@ object USERDATA {
             field = value
         }
     //曲セレクト画面で30秒プレビューを見るかどうか
-    var thumbMoviePlay:Boolean = false
-        get() = dataStore.getBoolean("thumbMoviePlay",false)
+    var thumbMoviePlay:Boolean = true
+        get() = dataStore.getBoolean("thumbMoviePlay",true)
         set(value) {
             dataStore.edit().putBoolean("thumbMoviePlay",value).commit()
             field = value
@@ -141,9 +132,9 @@ object USERDATA {
             dataStore.edit().putBoolean("LookedExtend",value).commit()
             field = value
         }
-    //ヘルプを見たかどうか
-    var lookedOtherIme:Boolean = false
-        get() = dataStore.getBoolean("LookedOtherIme",false)
+    //ヘルプを見たかどうか ()
+    var lookedOtherIme:Boolean = true
+        get() = dataStore.getBoolean("LookedOtherIme",true)
         set(value) {
             dataStore.edit().putBoolean("LookedOtherIme",value).commit()
             field = value
@@ -157,7 +148,7 @@ object USERDATA {
         }
     //デザイン協力募集中
     var lookedDesignCoop_v1900:Boolean = false
-        get() = dataStore.getBoolean("lookedDesignCoop_v1900",false)
+        get() = dataStore.getBoolean("lookedDesignCoop_v1900",true)
         set(value) {
             dataStore.edit().putBoolean("lookedDesignCoop_v1900",value).commit()
             field = value
@@ -202,11 +193,10 @@ object USERDATA {
         get() {
             val usString = dataStore_UserScore.getString("UserScore","")!!
             val userScore = UserScore()
-            for( data in usString.split("|") ){
-                val sp = data.split(",")
-                if( sp.size != 4 ){ break }
-                userScore.scores[sp[0].toInt()] = arrayListOf(sp[1].toInt(),sp[2].toInt(),sp[3].toInt())
-                // userScore.scores[levelID] = arrayListOf(score,rank,flg)
+            userScore.scores = readSavedScoreRecords(usString) {
+                if (!dataStore_UserScore.contains("UserScoreRecoveryBackup")) {
+                    dataStore_UserScore.edit().putString("UserScoreRecoveryBackup", usString).commit()
+                }
             }
             return userScore
         }
@@ -218,17 +208,44 @@ object USERDATA {
             dataStore_UserScore.edit().putString("UserScore",usString).commit()
         }
 
+    // Key: levelID、Value: 保存スコアを記録したときの難易度。
+    // getterはコピーを返すため、変更後はsetterへ代入する。
+    var ScoreLevel:MutableMap<Int,Int>
+        get() = readCountMap("ScoreLevel")
+        set(value) = writeCountMap("ScoreLevel", value)
+    var JustPlayedScoreLevel:MutableMap<Int,Int>
+        get() = readCountMap("JustPlayedScoreLevel")
+        set(value) = writeCountMap("JustPlayedScoreLevel", value)
+
+    // 新規ユーザーは移行不要。旧バージョンからの更新時にMainでfalseにする。
+    var doneScoreLevelUpdate_v2000:Boolean
+        get() = dataStore_Util.getBoolean("doneScoreLevelUpdate_v2000", true)
+        set(value) { dataStore_Util.edit().putBoolean("doneScoreLevelUpdate_v2000", value).commit() }
+
+    // selectorで譜面データ読み込み後に一度だけ移行する。
+    fun migrateScoreLevelsV2000() {
+        if (doneScoreLevelUpdate_v2000 || MusicDataLists.levels.isEmpty()) return
+        val currentLevels = MusicDataLists.levels.values.flatten().associate { it.sqlID to it.level }
+        val scoreLevels = migratedScoreLevels(Score.scores.keys, ScoreLevel, currentLevels)
+        val justPlayedLevels = migratedScoreLevels(JustPlayedScore.scores.keys, JustPlayedScoreLevel, currentLevels)
+        // 両方の難易度と完了フラグを同時に保存する。
+        dataStore_Util.edit()
+            .putString("ScoreLevel", scoreLevels.entries.joinToString("|") { "${it.key},${it.value}" })
+            .putString("JustPlayedScoreLevel", justPlayedLevels.entries.joinToString("|") { "${it.key},${it.value}" })
+            .putBoolean("doneScoreLevelUpdate_v2000", true)
+            .commit()
+    }
+
 //DataStore_Util
     //JustPlayedScore
     var JustPlayedScore:UserJustPlayedScore
         get() {
             val usString = dataStore_Util.getString("JustPlayedScore","")!!
             val userScore = UserJustPlayedScore()
-            for( data in usString.split("|") ){
-                val sp = data.split(",")
-                if( sp.size != 4 ){ break }
-                userScore.scores[sp[0].toInt()] = arrayListOf(sp[1].toInt(),sp[2].toInt(),sp[3].toInt())
-                // userScore.scores[levelID] = arrayListOf(score,rank,flg)
+            userScore.scores = readSavedScoreRecords(usString) {
+                if (!dataStore_Util.contains("JustPlayedScoreRecoveryBackup")) {
+                    dataStore_Util.edit().putString("JustPlayedScoreRecoveryBackup", usString).commit()
+                }
             }
             return userScore
         }
@@ -238,7 +255,7 @@ object USERDATA {
                 usString += "$id,${scoreData[0]},${scoreData[1]},${scoreData[2]}|"
             }
             dataStore_Util.edit().putString("JustPlayedScore",usString).commit()
-            println("saved JustPlayUserScore")
+            // println("saved JustPlayUserScore")
         }
     //MyFavorite
     var MyFavorite:MutableSet<Int>
@@ -253,7 +270,7 @@ object USERDATA {
         }
         set(value) {
             val s = value.map { String(it) }.joinToString(separator = ",")
-            println("MyFavo保存 $s")
+            // println("MyFavo保存 $s")
             dataStore_Util.edit().putString("MyFavorite",s).commit()
         }
     //MyFavorite2
@@ -269,7 +286,7 @@ object USERDATA {
         }
         set(value) {
             val s = value.map { String(it) }.joinToString(separator = ",")
-            println("MyFavo2保存 $s")
+            // println("MyFavo2保存 $s")
             dataStore_Util.edit().putString("MyFavorite2",s).commit()
         }
     val MyFavoriteAll:Set<Int>
@@ -315,15 +332,113 @@ object USERDATA {
             }
             dataStore_Util.edit().putString("FavoriteCount",usString).commit()
         }
+    // v2: music favorites, level ratings, and play history use independent keys.
+    private fun readIDs(key:String):MutableSet<Int> =
+        dataStore_Util.getString(key, "")!!.split(",").mapNotNull { it.toIntOrNull() }.toMutableSet()
+    private fun writeIDs(key:String, value:Set<Int>) {
+        dataStore_Util.edit().putString(key, value.sorted().joinToString(",")).commit()
+    }
+    var MyFavorite3:MutableSet<Int>
+        get() = readIDs("MyFavorite3")
+        set(value) = writeIDs("MyFavorite3", value)
+    // Key: levelID。日時はUnix epochからのミリ秒で保存する。
+    // getterはコピーを返すため、変更したMapはsetterへ代入して保存する。
+    var levelPlayHistories:MutableMap<Int,LevelPlayHistory>
+        get() {
+            val histories = mutableMapOf<Int,LevelPlayHistory>()
+            dataStore_Util.getString("levelPlayHistories", "")!!.split("|").forEach {
+                val parts = it.split(",")
+                if (parts.size == 3) {
+                    val levelID = parts[0].toIntOrNull()
+                    val playCount = parts[1].toIntOrNull()
+                    val lastPlayedAt = parts[2].toLongOrNull()
+                    if (levelID != null && playCount != null && playCount >= 0 && lastPlayedAt != null) {
+                        histories[levelID] = LevelPlayHistory(playCount, Date(lastPlayedAt))
+                    }
+                }
+            }
+            return histories
+        }
+        set(value) {
+            val saved = value.entries.joinToString("|") {
+                "${it.key},${it.value.playCount},${it.value.lastPlayedAt.time}"
+            }
+            dataStore_Util.edit().putString("levelPlayHistories", saved).commit()
+        }
+
+    // 1プレイにつき1回呼び出す。初回は1、以降は回数を加算し最終日時を更新する。
+    @Synchronized
+    fun recordLevelPlay(levelID:Int, playedAt:Date = Date()) {
+        val histories = levelPlayHistories
+        val playCount = (histories[levelID]?.playCount ?: 0) + 1
+        histories[levelID] = LevelPlayHistory(playCount, Date(playedAt.time))
+        levelPlayHistories = histories
+    }
+
+    fun readCountMap(key:String):MutableMap<Int,Int> {
+        val result = mutableMapOf<Int,Int>()
+        dataStore_Util.getString(key, "")!!.split("|").forEach {
+            val parts = it.split(",")
+            if (parts.size == 2) {
+                val id = parts[0].toIntOrNull(); val value = parts[1].toIntOrNull()
+                if (id != null && value != null) result[id] = value
+            }
+        }
+        return result
+    }
+    fun writeCountMap(key:String, values:Map<Int,Int>) {
+        dataStore_Util.edit().putString(key, values.entries.joinToString("|") { "${it.key},${it.value}" }).commit()
+    }
+    var MyLike:MutableMap<Int,Int>
+        get() = readCountMap("MyLike")
+        set(value) = writeCountMap("MyLike", value)
+    val MusicFavoriteCount get() = PendingCounter("MusicFavoriteCount")
+    val LikeCount get() = PendingCounter("LikeCount")
+    val DislikeCount get() = PendingCounter("DislikeCount")
+    var doneFavoriteUpdate_v2000:Boolean
+        get() = dataStore_Util.getBoolean("doneFavoriteUpdate_v2000", false)
+        set(value) { dataStore_Util.edit().putBoolean("doneFavoriteUpdate_v2000", value).commit() }
+    var lookedNameRegistrationIfNoName_v2000:Boolean
+        get() = dataStore_Util.getBoolean("lookedNameRegistrationIfNoName_v2000", false)
+        set(value) { dataStore_Util.edit().putBoolean("lookedNameRegistrationIfNoName_v2000", value).commit() }
+    var fitsMovieToKeyboardHeight:Boolean
+        get() = dataStore_Util.getBoolean("fitsMovieToKeyboardHeight", true)
+        set(value) { dataStore_Util.edit().putBoolean("fitsMovieToKeyboardHeight", value).commit() }
+    var showOffsetLabel:Boolean
+        get() = dataStore_Util.getBoolean("showOffsetLabel", false)
+        set(value) { dataStore_Util.edit().putBoolean("showOffsetLabel", value).commit() }
+    var UseNewLevelCalculationKey:Boolean
+        get() = dataStore_Util.getBoolean("UseNewLevelCalculationKey", false)
+        set(value) { dataStore_Util.edit().putBoolean("UseNewLevelCalculationKey", value).commit() }
+
+    var ShowGameSettings:Boolean
+        get() = dataStore_Util.getBoolean("ShowGameSettings", false)
+        set(value) { dataStore_Util.edit().putBoolean("ShowGameSettings", value).commit() }
+
+    // Run after music/level metadata has loaded; never send migration as new votes.
+    fun migrateFavoritesV2000() {
+        if (doneFavoriteUpdate_v2000 || MusicDataLists.levels.isEmpty()) return
+        val favorites = MyFavorite3; val likes = MyLike
+        var unresolved = false
+        for (levelID in MyFavoriteAll) {
+            val musicID = MusicDataLists.getLevelIDtoMusicID(levelID)
+            if (musicID == 0) { unresolved = true; continue }
+            favorites.add(musicID)
+            if (!likes.containsKey(levelID)) likes[levelID] = -2
+        }
+        MyFavorite3 = favorites; MyLike = likes;
+        if (!unresolved) doneFavoriteUpdate_v2000 = true
+    }
+
     //tagやソートの設定
     var SelectedMusicCondition:SelectConditions = SelectConditions("","")
         get() {
-            println("field.sortItem="+field.sortItem)
+            // println("field.sortItem="+field.sortItem)
             if( field.sortItem == "" ){
                 val tags = dataStore_Util.getString("SelectConditionsTags","@初期楽曲")!!
-                val sortItem = dataStore_Util.getString("SelectConditionsSortItem","曲の投稿が古い順")!!
+                val sortItem = dataStore_Util.getString("SelectConditionsSortItem","曲の投稿日時 昇順")!!
                 field = SelectConditions(tags,sortItem)
-                println("SMC field = "+field)
+                // println("SMC field = "+field)
             }
             return field
         }
@@ -333,7 +448,7 @@ object USERDATA {
             editor.putString("SelectConditionsTags",value.tags)
             editor.putString("SelectConditionsSortItem",value.sortItem)
             editor.commit()
-            println("SMC field保存")
+            // println("SMC field保存")
         }
     //
     var LevelSortCondition:Int = 0
@@ -362,7 +477,7 @@ object USERDATA {
             return judgeMap
         }
         set(value) {
-            println("judge set")
+            // println("judge set")
             var usString=""
             for( (id,offset) in value ){
                 usString += "$id,$offset|"
@@ -387,51 +502,13 @@ object USERDATA {
     var RepotedMusicID:MutableList<String> = mutableListOf()
         get() = dataStore_Util.getString("RepotedMusicID","")!!.split(",").toMutableList()
         set(value) {
-            println("report set")
+            // println("report set")
             dataStore_Util.edit().putString("RepotedMusicID",value.joinToString(",")).commit()
             field = value
         }
 
+    // 大量のサーバーデータはMetadataStorage / 各DataListsのSQLiteテーブルで管理する。
 
-//DataStore_MusicsJson
-    var MusicsJson:String = ""
-        get() = dataStore_MusicsJson.getString("MusicsJson","")!!
-        set(value) {
-            dataStore_MusicsJson.edit().putString("MusicsJson",value).commit()
-            field = value
-        }
-
-//DataStore_LevelsJson
-    var LevelsJson:String = ""
-        get() = dataStore_LevelsJson.getString("LevelsJson","")!!
-        set(value) {
-            dataStore_LevelsJson.edit().putString("LevelsJson",value).commit()
-            field = value
-        }
-
-//DataStore_UserNamesJson
-    var UserNamesJson:String = ""
-        get() = dataStore_UserNamesJson.getString("UserNamesJson","")!!
-        set(value) {
-            dataStore_UserNamesJson.edit().putString("UserNamesJson",value).commit()
-            field = value
-        }
-
-//DataStore_ScoresJson
-    var ScoresJson:String = ""
-        get() = dataStore_ScoresJson.getString("ScoresJson","")!!
-        set(value) {
-            dataStore_ScoresJson.edit().putString("ScoresJson",value).commit()
-            field = value
-        }
-
-//DataStore_CommentsJson
-    var CommentsJson:String = ""
-        get() = dataStore_CommentsJson.getString("CommentsJson","")!!
-        set(value) {
-            dataStore_CommentsJson.edit().putString("CommentsJson",value).commit()
-            field = value
-        }
 
 //
 // DataStore整理
@@ -496,7 +573,7 @@ object USERDATA {
 
         //SelectedMusicCondition
         val tags = dataStore.getString("SelectConditionsTags","@初期楽曲")!!
-        val sortItem = dataStore.getString("SelectConditionsSortItem","曲の投稿が古い順")!!
+        val sortItem = dataStore.getString("SelectConditionsSortItem","曲の投稿日時 昇順")!!
         val selecon = SelectConditions(tags,sortItem)
         SelectedMusicCondition = selecon
 
@@ -530,25 +607,7 @@ object USERDATA {
         val repoMuIDs = dataStore.getString("RepotedMusicID","")!!.split(",").toMutableList()
         RepotedMusicID = repoMuIDs
 
-        //DataStore_MusicsJson
-        val musiJson = dataStore.getString("MusicsJson","")!!
-        MusicsJson = musiJson
-
-        //DataStore_LevelsJson
-        val leveJson = dataStore.getString("LevelsJson","")!!
-        LevelsJson = leveJson
-
-        //DataStore_UserNamesJson
-        val useNamJson = dataStore.getString("UserNamesJson","")!!
-        UserNamesJson = useNamJson
-
-        //DataStore_ScoresJson
-        val scoJson = dataStore.getString("ScoresJson","")!!
-        ScoresJson = scoJson
-
-        //DataStore_CommentsJson
-        val commeJson = dataStore.getString("CommentsJson","")!!
-        CommentsJson = commeJson
+        // 旧ルート内のJSONもSQLite初回移行時に専用テーブルへ取り込み済み。
 
         //DataStore_Original DATA_REMOVE
         dataStore.edit().remove("UserScore").commit()
@@ -570,7 +629,7 @@ object USERDATA {
         dataStore.edit().remove("ScoresJson").commit()
         dataStore.edit().remove("CommentsJson").commit()
 
-        println("finish! _ Migration__Version1_9_0_0to1_10_0_0")
+        // println("finish! _ Migration__Version1_9_0_0to1_10_0_0")
     }
     fun SikkariRemove__Version1_9_0_0to1_10_0_0(){
         //DataStore_Original DATA_REMOVE
@@ -593,7 +652,7 @@ object USERDATA {
         dataStore.edit().remove("ScoresJson").commit()
         dataStore.edit().remove("CommentsJson").commit()
 
-        println("finish! _ SikkariRemove__Version1_9_0_0to1_10_0_0")
+        // println("finish! _ SikkariRemove__Version1_9_0_0to1_10_0_0")
     }
 }
 
@@ -605,7 +664,7 @@ class UserScore {
         const val FLG = 2
     }
 
-    fun setScore(levelID:Int, score:Int, rank:Int) : Boolean{
+    fun setScore(levelID:Int, score:Int, rank:Int, level:Int) : Boolean{
         var sup = false
         if( scores[levelID] != null ){
             //あった
@@ -635,15 +694,36 @@ class UserScore {
         }
         //保存
         USERDATA.Score = this
+        if (sup) {
+            val levels = USERDATA.ScoreLevel
+            levels[levelID] = level
+            USERDATA.ScoreLevel = levels
+        }
         return sup
     }
+    private fun bestScoresByMusic():Map<Int,Int> {
+        val result = mutableMapOf<Int,Int>()
+        for ((levelID, score) in scores) {
+            val musicID = MusicDataLists.getLevelIDtoMusicID(levelID)
+            if (musicID != 0) result[musicID] = maxOf(result[musicID] ?: 0, score[SCORE])
+        }
+        return result
+    }
+    fun getPlayedAllMusicScore():Int = bestScoresByMusic().values.sum()
+    fun getPlayedAverageMusicScore():Int {
+        val values = bestScoresByMusic().values
+        return values.sum() / maxOf(values.size, 1)
+    }
+
     //データベースに送るスコアセット文字列
     fun getSendScoresStr() : String {
+        val scoreLevels = USERDATA.ScoreLevel
         var scoreset = ""
         for( (levelID,us) in scores ){
             if( us[Companion.FLG] == 0 ){
                 val musicID = MusicDataLists.getLevelIDtoMusicID(levelID)
-                scoreset += "<$levelID,$musicID,${us[Companion.SCORE]}>"
+                val level = scoreLevels[levelID] ?: 0
+                scoreset += "<$levelID,$musicID,${us[Companion.SCORE]},$level,${us[Companion.RANK]}>"
             }
         }
         return scoreset
@@ -676,7 +756,8 @@ class UserJustPlayedScore {
         const val FLG = 2
     }
 
-    fun setScore(levelID:Int, score:Int, rank:Int){
+    fun setScore(levelID:Int, score:Int, rank:Int, level:Int){
+        val scoreUpdated = scores[levelID]?.get(SCORE)?.let { it < score } ?: true
         if( scores[levelID] != null ){
             //あった
             val us = scores[levelID]!!
@@ -703,14 +784,20 @@ class UserJustPlayedScore {
         }
         //保存
         USERDATA.JustPlayedScore = this
+        if (scoreUpdated) {
+            val levels = USERDATA.JustPlayedScoreLevel
+            levels[levelID] = level
+            USERDATA.JustPlayedScoreLevel = levels
+        }
         return
     }
     //データベースに送るスコアセット文字列
     fun appendSendScoresStr(scoreset: String) : String {
+        val scoreLevels = USERDATA.JustPlayedScoreLevel
         var scoreset = scoreset
         var scoresetIDs:ArrayList<Int> = arrayListOf()
         var ans:ArrayList<String> = arrayListOf()
-        if( scoreset.pregMatches(pattern= "<(\\d+),\\d+,\\d+>", matches= ans)){
+        if( scoreset.pregMatches(pattern= "<(\\d+),\\d+,\\d+,-?\\d+,-?\\d+>", matches= ans)){
             for( i in 0 until ans.size/2 ) {
                 val n = ans[i * 2 + 1].toInt()
                 scoresetIDs.add(n)
@@ -720,15 +807,17 @@ class UserJustPlayedScore {
             if( us[Companion.FLG] == 0 ){
                 if( scoresetIDs.contains(levelID) ){ continue }
                 val musicID = MusicDataLists.getLevelIDtoMusicID(levelID)
-                scoreset += "<$levelID,$musicID,${us[Companion.SCORE]}>"
+                val level = scoreLevels[levelID] ?: 0
+                scoreset += "<$levelID,$musicID,${us[Companion.SCORE]},$level,${us[Companion.RANK]}>"
             }
         }
         return scoreset
     }
     fun clearSendedData(){
-        println("clear sended data")
+        // println("clear sended data")
         //保存
         USERDATA.JustPlayedScore = UserJustPlayedScore()
+        USERDATA.JustPlayedScoreLevel = mutableMapOf()
     }
     //スコア送信後、FLGを送信済みにする
     fun setSendedFLG() {
@@ -856,18 +945,20 @@ class PFCounter {
 class SelectConditions(_tags:String="", _sortItem:String="") {
 
     val SortItem = arrayOf(
-        "曲の投稿が新しい順",
-        "曲の投稿が古い順",
-        "ゲームの投稿が新しい曲順",
-        "ゲームの投稿が古い曲順",
-        "ゲームプレイ回数が多い曲順",
-        "ゲームプレイ回数が少ない曲順",
+        "曲の投稿日時 昇順",
+        "曲の投稿日時 降順",
+        "ゲームの投稿日時 昇順",
+        "ゲームの投稿日時 降順",
+        "みんなのプレイ回数が多い曲順",
+        "みんなのプレイ回数が少ない曲順",
         "お気に入り数が多い曲順",
         "お気に入り数が少ない曲順",
-        "動画IDが大きい順",
-        "動画IDが小さい順",
+        "動画ID 昇順",
+        "動画ID 降順",
         "最近ハイスコアが更新された曲順",
-        "最近コメントされた曲順")
+        "最近コメントされた曲順",
+        "最近プレイした曲順",
+        "あなたのプレイ回数が多い曲順")
 
     var tags:String =""
         set(value) {
@@ -892,12 +983,12 @@ class SelectConditions(_tags:String="", _sortItem:String="") {
         sortStars = getSortStars(sortItem)
         inited = true //どうすれば．．．
         //setTag()
-        println("tag.size="+tag.size)
+        // println("tag.size="+tag.size)
     }
 
     private fun setTag(){
         tag = arrayListOf()
-        println("settag->"+tags)
+        // println("settag->"+tags)
         if(tags==""){
             return
         }
@@ -922,7 +1013,7 @@ class SelectConditions(_tags:String="", _sortItem:String="") {
                 }
             }
             tag.add(tagp(v,type))
-            println("set= "+tag.last().type+", "+tag.last().word)
+            // println("set= "+tag.last().type+", "+tag.last().word)
             type = "and"
         }
     }
@@ -964,3 +1055,8 @@ class SelectConditions(_tags:String="", _sortItem:String="") {
         return sortStars
     }
 }
+
+data class LevelPlayHistory(
+    var playCount: Int,
+    var lastPlayedAt: Date
+)

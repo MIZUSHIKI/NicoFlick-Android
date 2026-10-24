@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="level_like_dislike">明らかに\nノーツがおかしい！</string>
+    <string name="level_like_heart1">好き！</string>
+    <string name="level_like_heart2">大好き！\nノーツも完璧！</string>
+    <string name="level_like_sort">♥ を先頭に集める</string>
+    <string name="level_like_choose">%1$s を選択</string>
+    <string name="level_like_clear">%1$s を解除</string>
+    <string name="level_like_requires_score">最後までプレイしたことがあると選択できるようになります</string>
+    <string name="level_like_requires_play">プレイしたことがあると選択できるようになります</string>
+</resources>

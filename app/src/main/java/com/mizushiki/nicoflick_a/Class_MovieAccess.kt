@@ -29,133 +29,193 @@ class MovieAccess {
 
     var firstAttack = true
 
-    fun StreamingUrlNicoAccess(smNum:String, callback: (String) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
-
-        //先にキャッシュ内にあるか確認。あればもうニコニコの動画ページにすらアクセスしないことにする
-        if( CachedMovies.cachedMovies.any{ it.smNum == smNum }){
-            callback("cached")
-            return@launch
+    private fun launchRequest(
+        scope: CoroutineScope,
+        callback: (String) -> Unit,
+        request: suspend CoroutineScope.((String) -> Unit) -> Unit
+    ): Job = scope.launch(Dispatchers.Main) {
+        val result = try {
+            withTimeout(65_000L) {
+                var response = "error"
+                request(this) { response = it }
+                response
+            }
+        } catch (_: TimeoutCancellationException) {
+            "error"
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            MovieLoadLog.failure("url/request", error)
+            "error"
         }
-        println("smNum="+smNum)
+        ensureActive()
+        // Deliver once, outside the exception boundary for network/parsing work.
+        callback(result)
+    }
+
+    fun StreamingUrlNicoAccess(smNum: String, scope: CoroutineScope = CoroutineScope(Dispatchers.Main), callback: (String) -> Unit) = launchRequest(scope, callback) request@{ callback ->
+
+        val trace = MovieLoadLog.id("url", smNum)
+        MovieLoadLog.log(trace) { "URL_REQUEST_START" }
+        if (DiagnosticSettings.enabled) coroutineContext[Job]?.invokeOnCompletion { error ->
+            if (error != null) MovieLoadLog.failure(trace, error)
+            MovieLoadLog.log(trace) { "URL_REQUEST_END" }
+        }
+        //先にキャッシュ内にあるか確認。あればもうニコニコの動画ページにすらアクセスしないことにする
+        if( CachedMovies.cachedMovies.any{ it.smNum == smNum && it.simpleExoPlayer.playbackError == null }){
+            MovieLoadLog.log(trace) { "CACHE_HIT" }
+            callback("cached")
+            return@request
+        }
+        MovieLoadLog.log(trace) { "NETWORK wifi=${isWiFiConnected(GLOBAL.APPLICATIONCONTEXT)}" }
 
         val strURL = "https://www.nicovideo.jp/watch/"+smNum
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(strURL) }.await().let {
-            println("net")
+        MovieLoadLog.log(trace) { "WATCH_GET_QUEUED" }
+        async(Dispatchers.Default) {
+            MovieLoadLog.log(trace) { "WATCH_GET_WORKER_START" }
+            HttpUtil.httpGET(strURL, diagnosticId = "$trace/watch")
+        }.await().let {
+            // println("net")
             if (it == null) {
                 callback("error")
                 return@let
             }
-            var st = it.pregMatche_firstString("<div id=\"js-initial-watch-data\" data-api-data=\"(.*?)\" hidden></div>")
-            if( st=="" ){ return@let }
+            var st = it.pregMatche_firstString("<meta name=\"server-response\" content=\"(.*?)\"\\s*/><script>")
+            //var st = it.pregMatche_firstString("<div id=\"js-initial-watch-data\" data-api-data=\"(.*?)\" hidden></div>")
+            if (st.isEmpty()) {
+                MovieLoadLog.log(trace) { "PARSE_FAILED server-response missing" }
+                callback("error")
+                return@let
+            }
             st = HtmlCompat.fromHtml(st,HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
             //st = st.pregReplace("\\\\u([0-9a-f]{2})([0-9a-f]{2})","%$1%$2")
             //st = st.pregReplace("\\\\","")
             //st = URLDecoder.decode(st,"UTF16")
 
-            println(st)
+            MovieLoadLog.log(trace) { "WATCH_METADATA_PARSED" }
 
             val watchTrackId = st.pregMatche_firstString("\"watchTrackId\":\"([a-zA-Z0-9_]+?)\"")
-            println("watchTrackId=$watchTrackId")
+            MovieLoadLog.log(trace) { "watchTrackIdPresent=${watchTrackId.isNotBlank()}" }
             val accessRightKey = st.pregMatche_firstString("\"accessRightKey\":\"([a-zA-Z0-9_\\.-]+?)\"")
-            println("accessRightKey=$accessRightKey")
+            MovieLoadLog.log(trace) { "accessRightKeyPresent=${accessRightKey.isNotBlank()}" }
             var videos = st.pregMatche_strings("\"id\":\"(video-[a-zA-Z0-9]+-\\d+p(?:-low(?:est)?)?)\",\"isAvailable\":true")
-            println(videos.joinToString(", "))
+            // println(videos.joinToString(", "))
             var audios = st.pregMatche_strings("\"id\":\"(audio-[a-zA-Z0-9]+-\\d+kbps)\",\"isAvailable\":true")
-            println(audios.joinToString(", "))
+            MovieLoadLog.log(trace) { "FORMATS videos=${videos.size} audios=${audios.size}" }
             if (watchTrackId != "" && accessRightKey != "" && !videos.isEmpty() && !audios.isEmpty()) {
                 var video = ""
-                var audio = audios[1]
+                val audio = MediaInput.preferredFormat(audios) ?: return@let
                 if (isWiFiConnected(GLOBAL.APPLICATIONCONTEXT)){
-                    video = videos[1]
+                    video = MediaInput.preferredFormat(videos) ?: return@let
                 }else {
                     video = videos[videos.count() - 1]
                 }
 
                 val url = "https://nvapi.nicovideo.jp/v1/watch/"+smNum+"/access-rights/hls?actionTrackId="+watchTrackId
-                print("https://nvapi.nicovideo.jp/v1/watch/"+smNum+"/access-rights/hls?actionTrackId="+watchTrackId)
+                MovieLoadLog.log(trace) { "ACCESS_POST_QUEUED video=$video audio=$audio" }
                 val headers = mutableMapOf<String,String>()
                 headers.put("X-Access-Right-Key",accessRightKey)
                 headers.put("X-Frontend-Id", "6")
                 headers.put("X-Frontend-Version", "0")
                 headers.put("X-Request-With", "https://www.nicovideo.jp")
                 val body = "{\"outputs\": [[\"${video}\",\"${audio}\"]]}"
-                println(body)
-                print("CMAF:post")
-                async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, headers = headers.toMap(), eatCookie = true) }.await().let {
-                    println("it")
-                    it?.let{
-                        println(it)
-                        val contentUrl = it.pregMatche_firstString("\"contentUrl\":\"(.+?)\"")
-                        println(it)
-                        callback(contentUrl)
-                        return@let
-                    }
-                    callback("error")
+                // println(body)
+                // print("CMAF:post")
+                async(Dispatchers.Default) {
+                    MovieLoadLog.log(trace) { "ACCESS_POST_WORKER_START" }
+                    HttpUtil.httpPOST(url, body, headers = headers.toMap(), eatCookie = true, diagnosticId = "$trace/access")
+                }.await().let {
+                    // println("it")
+                    val contentUrl = it?.pregMatche_firstString("\"contentUrl\":\"(.+?)\"")
+                    // 成功と失敗を二重に通知しない。
+                    MovieLoadLog.log(trace) { "URL_RESULT success=${!contentUrl.isNullOrBlank()}" }
+                    callback(contentUrl?.takeIf { url -> url.isNotBlank() } ?: "error")
                 }
+            } else {
+                MovieLoadLog.log(trace) { "PARSE_FAILED required metadata/formats missing" }
+                callback("error")
             }
         }
     }
 
-    fun StreamingUrlNicoAccessForThumbMovie(smNum:String, callback: (String) -> Unit) = GlobalScope.launch(Dispatchers.Main) {
+    fun StreamingUrlNicoAccessForThumbMovie(smNum: String, scope: CoroutineScope = CoroutineScope(Dispatchers.Main), callback: (String) -> Unit) = launchRequest(scope, callback) request@{ callback ->
 
+        val trace = MovieLoadLog.id("url", smNum)
+        MovieLoadLog.log(trace) { "URL_REQUEST_START" }
+        if (DiagnosticSettings.enabled) coroutineContext[Job]?.invokeOnCompletion { error ->
+            if (error != null) MovieLoadLog.failure(trace, error)
+            MovieLoadLog.log(trace) { "URL_REQUEST_END" }
+        }
         //先にキャッシュ内にあるか確認。あればもうニコニコの動画ページにすらアクセスしないことにする
         if( CachedThumbMovies.containtsWithinExpiration(smNum)){
+            MovieLoadLog.log(trace) { "CACHE_HIT" }
             callback("cached")
-            return@launch
+            return@request
         }
-        println("smNum="+smNum)
+        MovieLoadLog.log(trace) { "NETWORK wifi=${isWiFiConnected(GLOBAL.APPLICATIONCONTEXT)}" }
 
         val strURL = "https://www.nicovideo.jp/watch/"+smNum
         //Mainスレッドでネットワーク関連処理を実行するとエラーになるためBackgroundで実行
-        async(Dispatchers.Default) { HttpUtil.httpGET(strURL) }.await().let {
-            println("net")
+        MovieLoadLog.log(trace) { "WATCH_GET_QUEUED" }
+        async(Dispatchers.Default) {
+            MovieLoadLog.log(trace) { "WATCH_GET_WORKER_START" }
+            HttpUtil.httpGET(strURL, diagnosticId = "$trace/watch")
+        }.await().let {
+            // println("net")
             if (it == null) {
                 callback("error")
                 return@let
             }
-            var st = it.pregMatche_firstString("<div id=\"js-initial-watch-data\" data-api-data=\"(.*?)\" hidden></div>")
-            if( st=="" ){ return@let }
+            var st = it.pregMatche_firstString("<meta name=\"server-response\" content=\"(.*?)\"\\s*/><script>")
+            //var st = it.pregMatche_firstString("<div id=\"js-initial-watch-data\" data-api-data=\"(.*?)\" hidden></div>")
+            if (st.isEmpty()) {
+                MovieLoadLog.log(trace) { "PARSE_FAILED server-response missing" }
+                callback("error")
+                return@let
+            }
             st = HtmlCompat.fromHtml(st,HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
             //st = st.pregReplace("\\\\u([0-9a-f]{2})([0-9a-f]{2})","%$1%$2")
             //st = st.pregReplace("\\\\","")
             //st = URLDecoder.decode(st,"UTF16")
 
-            println(st)
+            MovieLoadLog.log(trace) { "WATCH_METADATA_PARSED" }
 
             val watchTrackId = st.pregMatche_firstString("\"watchTrackId\":\"([a-zA-Z0-9_]+?)\"")
-            println("watchTrackId=$watchTrackId")
+            MovieLoadLog.log(trace) { "watchTrackIdPresent=${watchTrackId.isNotBlank()}" }
             val accessRightKey = st.pregMatche_firstString("\"accessRightKey\":\"([a-zA-Z0-9_\\.-]+?)\"")
-            println("accessRightKey=$accessRightKey")
+            MovieLoadLog.log(trace) { "accessRightKeyPresent=${accessRightKey.isNotBlank()}" }
             var videos = st.pregMatche_strings("\"id\":\"(video-[a-zA-Z0-9]+-\\d+p(?:-low(?:est)?)?)\",\"isAvailable\":true")
-            println(videos.joinToString(", "))
+            // println(videos.joinToString(", "))
             var audios = st.pregMatche_strings("\"id\":\"(audio-[a-zA-Z0-9]+-\\d+kbps)\",\"isAvailable\":true")
-            println(audios.joinToString(", "))
+            MovieLoadLog.log(trace) { "FORMATS videos=${videos.size} audios=${audios.size}" }
             if (watchTrackId != "" && accessRightKey != "" && !videos.isEmpty() && !audios.isEmpty()) {
                 var video = videos[videos.count() - 1]
-                var audio = audios[1]
+                val audio = MediaInput.preferredFormat(audios) ?: return@let
 
                 val url = "https://nvapi.nicovideo.jp/v1/watch/"+smNum+"/access-rights/hls?actionTrackId="+watchTrackId
-                print("https://nvapi.nicovideo.jp/v1/watch/"+smNum+"/access-rights/hls?actionTrackId="+watchTrackId)
+                MovieLoadLog.log(trace) { "ACCESS_POST_QUEUED video=$video audio=$audio" }
                 val headers = mutableMapOf<String,String>()
                 headers.put("X-Access-Right-Key",accessRightKey)
                 headers.put("X-Frontend-Id", "6")
                 headers.put("X-Frontend-Version", "0")
                 headers.put("X-Request-With", "https://www.nicovideo.jp")
                 val body = "{\"outputs\": [[\"${video}\",\"${audio}\"]]}"
-                println(body)
-                print("CMAF:post")
-                async(Dispatchers.Default) { HttpUtil.httpPOST(url, body, headers = headers.toMap(), eatCookie = true) }.await().let {
-                    println("it")
-                    it?.let{
-                        println(it)
-                        val contentUrl = it.pregMatche_firstString("\"contentUrl\":\"(.+?)\"")
-                        println(it)
-                        callback(contentUrl)
-                        return@let
-                    }
-                    callback("error")
+                // println(body)
+                // print("CMAF:post")
+                async(Dispatchers.Default) {
+                    MovieLoadLog.log(trace) { "ACCESS_POST_WORKER_START" }
+                    HttpUtil.httpPOST(url, body, headers = headers.toMap(), eatCookie = true, diagnosticId = "$trace/access")
+                }.await().let {
+                    // println("it")
+                    val contentUrl = it?.pregMatche_firstString("\"contentUrl\":\"(.+?)\"")
+                    // 成功と失敗を二重に通知しない。
+                    MovieLoadLog.log(trace) { "URL_RESULT success=${!contentUrl.isNullOrBlank()}" }
+                    callback(contentUrl?.takeIf { url -> url.isNotBlank() } ?: "error")
                 }
+            } else {
+                MovieLoadLog.log(trace) { "PARSE_FAILED required metadata/formats missing" }
+                callback("error")
             }
         }
     }
@@ -173,38 +233,40 @@ class MovieAccess {
     }
 }
 object CachedMovies {
+    // Keep the three most recently used game players; independent of legacy saved settings.
+    private const val MAX_CACHED_PLAYERS = 3
     //
     data class CachedMovie(var url:String, var smNum: String, var simpleExoPlayer: SimpleExoPlayer )
 
     var cachedMovies:MutableList<CachedMovie> = mutableListOf()
     fun access(url:String,smNum: String) : SimpleExoPlayer {
+        // Failed players must not be reused on a later retry.
+        val failed = cachedMovies.filter { it.simpleExoPlayer.playbackError != null }
+        failed.forEach { it.simpleExoPlayer.release() }
+        cachedMovies.removeAll(failed)
         //読み込み済みのものがあればそれを返す
         for ( i in 0 until cachedMovies.count()){
             if( cachedMovies[i].smNum == smNum ){
                 cachedMovies.add(cachedMovies[i])
                 cachedMovies.removeAt(i)
-                while (cachedMovies.count() > USERDATA.cachedMovieNum){
+                while (cachedMovies.count() > MAX_CACHED_PLAYERS){
                     cachedMovies[0].simpleExoPlayer.release()
                     cachedMovies.removeAt(0)
                 }
+                MovieLoadLog.log("cache/$smNum") { "REUSE state=${cachedMovies.last().simpleExoPlayer.playbackState} buffered=${cachedMovies.last().simpleExoPlayer.bufferedPercentage}%" }
                 return cachedMovies.last().simpleExoPlayer
             }
         }
-        for( bi in 0 until cachedMovies.count() ){
-            val i = cachedMovies.count() - bi - 1
-            if( cachedMovies[i].simpleExoPlayer.bufferedPercentage < 99 ){
-                cachedMovies[i].simpleExoPlayer.release()
-                cachedMovies.removeAt(i)
-                break
-            }
+        // Evict before allocating a replacement; do not temporarily retain an extra player.
+        while (cachedMovies.size >= MAX_CACHED_PLAYERS) {
+            cachedMovies.removeAt(0).simpleExoPlayer.release()
         }
-        val loadControl = DefaultLoadControl.Builder().setBackBuffer(10*60*1000, true).createDefaultLoadControl()
+        val loadControl = MoviePlaybackCache.loadControl(thumbnail = false)
         val simpleExoPlayer = SimpleExoPlayer.Builder(GLOBAL.APPLICATIONCONTEXT).setLoadControl(loadControl)
             .build()
-        val dataSourceFactory = DefaultHttpDataSourceFactory(
-            Util.getUserAgent(GLOBAL.APPLICATIONCONTEXT, GLOBAL.APPLICATIONCONTEXT.packageName)
-        )
+        val dataSourceFactory = MoviePlaybackCache.dataSourceFactory()
         val mediaSource = HlsMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(url))
+        MovieLoadLog.observe(simpleExoPlayer, "game", smNum)
         simpleExoPlayer.prepare(mediaSource)
 
         //simpleExoPlayer.playWhenReady = true
@@ -213,7 +275,7 @@ object CachedMovies {
         val cachedMovie = CachedMovie(url,smNum,simpleExoPlayer)
         cachedMovies.add(cachedMovie)
 
-        while (cachedMovies.count() > USERDATA.cachedMovieNum){
+        while (cachedMovies.count() > MAX_CACHED_PLAYERS){
             cachedMovies[0].simpleExoPlayer.release()
             cachedMovies.removeAt(0)
         }
@@ -236,11 +298,15 @@ object CachedThumbMovies {
             val index = num - 1 - i
             if( !withinExpiration(cachedMovies[index]) ){
                 cachedMovies[index].simpleExoPlayer.release()
-                println("cached削除 - ${cachedMovies[index].smNum}")
+                // println("cached削除 - ${cachedMovies[index].smNum}")
                 cachedMovies.removeAt(index)
             }
         }
 
+        // Failed players must not be reused on a later retry.
+        val failed = cachedMovies.filter { it.simpleExoPlayer.playbackError != null }
+        failed.forEach { it.simpleExoPlayer.release() }
+        cachedMovies.removeAll(failed)
         //読み込み済みのものがあればそれを返す
         for ( i in 0 until cachedMovies.count()){
             if( cachedMovies[i].smNum == smNum ){
@@ -251,17 +317,20 @@ object CachedThumbMovies {
                     cachedMovies.removeAt(0)
                 }
                 cachedMovies.last().check = 0
+                MovieLoadLog.log("cache/$smNum") { "REUSE state=${cachedMovies.last().simpleExoPlayer.playbackState} buffered=${cachedMovies.last().simpleExoPlayer.bufferedPercentage}%" }
                 return cachedMovies.last().simpleExoPlayer
             }
         }
 
-        val loadControl = DefaultLoadControl.Builder().setBackBuffer(10*60*1000, true).createDefaultLoadControl()
+        while (cachedMovies.size >= 3) {
+            cachedMovies.removeAt(0).simpleExoPlayer.release()
+        }
+        val loadControl = MoviePlaybackCache.loadControl(thumbnail = true)
         val simpleExoPlayer = SimpleExoPlayer.Builder(GLOBAL.APPLICATIONCONTEXT).setLoadControl(loadControl)
             .build()
-        val dataSourceFactory = DefaultHttpDataSourceFactory(
-            Util.getUserAgent(GLOBAL.APPLICATIONCONTEXT, GLOBAL.APPLICATIONCONTEXT.packageName)
-        )
+        val dataSourceFactory = MoviePlaybackCache.dataSourceFactory()
         val mediaSource = HlsMediaSource.Factory(dataSourceFactory).createMediaSource(Uri.parse(url))
+        MovieLoadLog.observe(simpleExoPlayer, "thumb", smNum)
         simpleExoPlayer.prepare(mediaSource)
 
         //simpleExoPlayer.playWhenReady = true
@@ -278,10 +347,11 @@ object CachedThumbMovies {
         return simpleExoPlayer
     }
     fun withinExpiration(cachedMovie:CachedMovie) : Boolean {
-        println("cachedMovie.check=${cachedMovie.check}")
-        println("(System.currentTimeMillis() - cachedMovie.time) =${(System.currentTimeMillis() - cachedMovie.time)}")
-        println("(System.currentTimeMillis() - cachedMovie.time) < 120000=${((System.currentTimeMillis() - cachedMovie.time) < 120000)}")
-        return cachedMovie.check != 2 && (System.currentTimeMillis() - cachedMovie.time) < 120000
+        // println("cachedMovie.check=${cachedMovie.check}")
+        // println("(System.currentTimeMillis() - cachedMovie.time) =${(System.currentTimeMillis() - cachedMovie.time)}")
+        // println("(System.currentTimeMillis() - cachedMovie.time) < 120000=${((System.currentTimeMillis() - cachedMovie.time) < 120000)}")
+        return cachedMovie.check != 2 && cachedMovie.simpleExoPlayer.playbackError == null &&
+            (System.currentTimeMillis() - cachedMovie.time) < 120000
     }
     fun containtsWithinExpiration(smNum: String) : Boolean {
         return cachedMovies.any { it.smNum == smNum && withinExpiration(it) }

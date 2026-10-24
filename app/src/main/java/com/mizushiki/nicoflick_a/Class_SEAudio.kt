@@ -24,7 +24,7 @@ object SEAudio {
         soundPool = SoundPool.Builder()
             .setAudioAttributes(audioAttributes)
             // ストリーム数に応じて
-            .setMaxStreams(5)
+            .setMaxStreams(20)
             .build()
 
         // wav をロードしておく

@@ -16,7 +16,7 @@ import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import com.eclipsesource.json.Json
 import com.squareup.picasso.Picasso
-import kotlinx.android.synthetic.main.activity_selector.*
+
 import kotlinx.coroutines.*
 import kotlinx.coroutines.Runnable
 import java.nio.channels.FileLock
@@ -265,8 +265,8 @@ class SlashShadeView(context: Context,
         if( Int(slashSpace) < 1 ){
             return
         }
-        println("canvas.width=${canvas.width}")
-        println("canvas.height=${canvas.height}")
+        // println("canvas.width=${canvas.width}")
+        // println("canvas.height=${canvas.height}")
         val w = canvas.width
         val h = canvas.height
         // ペイントする色の設定
@@ -323,7 +323,7 @@ class OutlineTextView(context: Context?, val firstRect:RectF) : AppCompatTextVie
     var strokeWidth = 4.0f
     var strokeColor = Color.rgb(200,200,200)
 
-    override fun onDraw(canvas: Canvas?) {
+    override fun onDraw(canvas: Canvas) {
         //super.onDraw(canvas)
         //canvas!!.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
         val text = text as String
@@ -338,11 +338,11 @@ class OutlineTextView(context: Context?, val firstRect:RectF) : AppCompatTextVie
         paint.setStrokeCap(Paint.Cap.ROUND)
         paint.setColor(strokeColor)
         paint.setStyle(Paint.Style.STROKE)
-        val textBounds = Rect()
-        paint.getTextBounds(text, 0, text.length, textBounds)
+        val metrics = paint.fontMetrics
         val posX: Float = 0.0f
-        val posY: Float = firstRect.height() / 2 + textBounds.height() / 2 - textBounds.bottom
-        canvas!!.drawText(text, posX, posY, paint)
+        // Use the same baseline for all glyphs so small kana retain their natural position.
+        val posY: Float = firstRect.height() / 2 - (metrics.ascent + metrics.descent) / 2
+        canvas.drawText(text, posX, posY, paint)
         paint.setStrokeWidth(0.0f)
         paint.setColor(textColor)
         paint.setStyle(Paint.Style.FILL)
@@ -351,6 +351,18 @@ class OutlineTextView(context: Context?, val firstRect:RectF) : AppCompatTextVie
     }
 }
 class DecolationLabel @JvmOverloads constructor (context: Context, val attrs: AttributeSet? = null, val defStyleAttr: Int = 0) : AppCompatTextView(context, attrs, defStyleAttr) {
+
+    // Viewのalpha・visibilityやクリップに影響されず、文字と装飾を画像化する。
+    fun createTextBitmap(inset: Int): Bitmap {
+        check(width > 0 && height > 0) { "レイアウト確定後に画像化してください" }
+        val bitmap = Bitmap.createBitmap(
+            width + inset * 2, height + inset * 2, Bitmap.Config.ARGB_8888
+        )
+        val canvas = Canvas(bitmap)
+        canvas.translate(inset.toFloat(), inset.toFloat())
+        drawDecoratedText(canvas)
+        return bitmap
+    }
 
     var strokeWidth:Float
     var strokeColor:Int
@@ -365,12 +377,64 @@ class DecolationLabel @JvmOverloads constructor (context: Context, val attrs: At
         strokeShadowX = a.getFloat(R.styleable.DecolationLabel_stroke_shadow_x, 0.0f )
         strokeShadowY = a.getFloat(R.styleable.DecolationLabel_stroke_shadow_y, 0.0f )
         strokeShadowColor = a.getColor(R.styleable.DecolationLabel_stroke_shadow_color, Color.argb(0,0,0,0) )
+        a.recycle()
+
+        // 指定のない既存ラベルは、従来どおり中央寄せにする。
+        val viewAttrs = context.obtainStyledAttributes(
+            attrs, intArrayOf(android.R.attr.gravity), defStyleAttr, 0
+        )
+        gravity = viewAttrs.getInt(0, android.view.Gravity.CENTER)
+        viewAttrs.recycle()
     }
 
-    override fun onDraw(canvas: Canvas?) {
-        //super.onDraw(canvas)
-        //canvas!!.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-        val text = text as String
+    // 装飾の余白を測定と描画の両方に反映する。XMLのpaddingには加算する。
+    private fun decorationInset(shadowOffset: Float): Int {
+        val hasOutline = Color.alpha(strokeColor) != 0
+        val hasShadow = Color.alpha(strokeShadowColor) != 0
+        if (!hasOutline && !hasShadow) return 0
+        val shadow = if (hasShadow) shadowOffset.coerceAtLeast(0f) else 0f
+        return kotlin.math.ceil(strokeWidth.coerceAtLeast(0f) / 2f + shadow).toInt() + 1
+    }
+
+    override fun getCompoundPaddingLeft(): Int =
+        super.getCompoundPaddingLeft() + decorationInset(-strokeShadowX)
+
+    override fun getCompoundPaddingRight(): Int =
+        super.getCompoundPaddingRight() + decorationInset(strokeShadowX)
+
+    override fun getCompoundPaddingTop(): Int =
+        super.getCompoundPaddingTop() + decorationInset(-strokeShadowY)
+
+    override fun getCompoundPaddingBottom(): Int =
+        super.getCompoundPaddingBottom() + decorationInset(strokeShadowY)
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        // 斜体などで文字の実際の輪郭が標準の文字幅からはみ出す場合も確保する。
+        val bounds = Rect()
+        val label = text.toString()
+        paint.getTextBounds(label, 0, label.length, bounds)
+        val desiredWidth = maxOf(
+            measuredWidth, bounds.width() + compoundPaddingLeft + compoundPaddingRight
+        )
+        val desiredHeight = maxOf(
+            measuredHeight, bounds.height() + compoundPaddingTop + compoundPaddingBottom
+        )
+        setMeasuredDimension(
+            View.resolveSizeAndState(desiredWidth, widthMeasureSpec, measuredState),
+            View.resolveSizeAndState(
+                desiredHeight, heightMeasureSpec,
+                measuredState shl View.MEASURED_HEIGHT_STATE_SHIFT
+            )
+        )
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        drawDecoratedText(canvas)
+    }
+
+    private fun drawDecoratedText(canvas: Canvas?) {
+        val text = text.toString()
         val textColor = currentTextColor
         val textSize = textSize.toFloat()
         val paint = Paint()
@@ -383,14 +447,41 @@ class DecolationLabel @JvmOverloads constructor (context: Context, val attrs: At
         paint.setStyle(Paint.Style.STROKE)
         val textBounds = Rect()
         paint.getTextBounds(text, 0, text.length, textBounds)
-        val posX: Float = rectF.width() / 2 - textBounds.width() / 2
-        var posY: Float = rectF.height() / 2 + textBounds.height() / 2 - textBounds.bottom
+        val isRtl = layoutDirection == View.LAYOUT_DIRECTION_RTL
+        val isTextRtl = layout?.getParagraphDirection(0) == -1
+        val horizontalGravity = when (textAlignment) {
+            View.TEXT_ALIGNMENT_CENTER -> android.view.Gravity.CENTER_HORIZONTAL
+            View.TEXT_ALIGNMENT_VIEW_START ->
+                if (isRtl) android.view.Gravity.RIGHT else android.view.Gravity.LEFT
+            View.TEXT_ALIGNMENT_VIEW_END ->
+                if (isRtl) android.view.Gravity.LEFT else android.view.Gravity.RIGHT
+            View.TEXT_ALIGNMENT_TEXT_START ->
+                if (isTextRtl) android.view.Gravity.RIGHT else android.view.Gravity.LEFT
+            View.TEXT_ALIGNMENT_TEXT_END ->
+                if (isTextRtl) android.view.Gravity.LEFT else android.view.Gravity.RIGHT
+            else -> android.view.Gravity.getAbsoluteGravity(gravity, layoutDirection) and
+                android.view.Gravity.HORIZONTAL_GRAVITY_MASK
+        }
+        val left = compoundPaddingLeft.toFloat()
+        val right = (width - compoundPaddingRight).toFloat()
+        val top = compoundPaddingTop.toFloat()
+        val bottom = (height - compoundPaddingBottom).toFloat()
+        val posX = when (horizontalGravity) {
+            android.view.Gravity.LEFT -> left - textBounds.left
+            android.view.Gravity.RIGHT -> right - textBounds.right
+            else -> (left + right - textBounds.width()) / 2f - textBounds.left
+        }
+        val posY = when (gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK) {
+            android.view.Gravity.TOP -> top - textBounds.top
+            android.view.Gravity.BOTTOM -> bottom - textBounds.bottom
+            else -> (top + bottom - textBounds.height()) / 2f - textBounds.top
+        }
 
         if(strokeShadowColor != Color.argb(0,0,0,0)){
             paint.setColor(strokeShadowColor)
             canvas!!.drawText(text, posX + strokeShadowX, posY + strokeShadowY, paint)
         }
-        println(strokeShadowColor)
+        // println(strokeShadowColor)
         paint.setColor(strokeColor)
         canvas!!.drawText(text, posX, posY, paint)
 
@@ -490,24 +581,12 @@ class ChainTextView @JvmOverloads constructor (context: Context, val attrs: Attr
 //Picasso
 fun PicassoLoadImage_NicoThumb(imageView:ImageView?, url:String){
     if(imageView == null){ return }
-    var url = url
-    var sz: Size = Size(130,74)
-    if(url.substring(url.length-1) != "?"){
-        Regex("/thumbnails/(\\d+)/").find(url)?.groupValues?.get(1)?.let {
-            if(it.toInt() >= 16371845){
-                url += ".L"
-                sz = Size(360,200)
-            }
-        }
-        Regex("\\?i=(\\d+)").find(url)?.groupValues?.get(1)?.let {
-            if(it.toInt() >= 16371845){
-                url += ".L"
-                sz = Size(360,200)
-            }
-        }
-    }else {
-        url = url.substring(0 until url.length-1)
+    val thumbnail = MediaInput.thumbnail(url)
+    if (thumbnail == null) {
+        Picasso.get().cancelRequest(imageView)
+        imageView.setImageDrawable(null)
+        return
     }
-    Picasso.get().load(url).resize(sz.width,sz.height).centerCrop().into(imageView)
+    Picasso.get().load(thumbnail.url).resize(thumbnail.width, thumbnail.height).centerCrop().into(imageView)
     return
 }
