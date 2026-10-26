@@ -21,7 +21,7 @@ import androidx.core.view.isVisible
 
 import kotlinx.coroutines.*
 
-class Activity_SettingsKeyboard : AppCompatActivity() {
+class Activity_SettingsKeyboard : SafeAreaActivity() {
 
     private lateinit var binding: ActivitySettingsKeyboardBinding
 
@@ -79,16 +79,24 @@ class Activity_SettingsKeyboard : AppCompatActivity() {
 
         val point = Point()
         windowManager.defaultDisplay.getSize(point)
-        val viewWidth = point.x.toDouble()
         val viewHeight = point.y.toDouble()
         binding.seekBar2.layoutParams.width = (viewHeight / 4).toInt()
         binding.seekBar2.progress = USERDATA.NicoFlickKeyboardHeightPer
 
-        Handler().postDelayed({
-            binding.seekBar2.center = PointF((viewWidth-50).toFloat(),(viewHeight.toFloat()-GLOBAL.NavigationBarHeight)*5/8 )
-            binding.textviewHeighter.y = (viewHeight.toFloat()-GLOBAL.NavigationBarHeight)*5/8 - binding.seekBar2.width/2 - binding.textviewHeighter.height
-            binding.seekBar2.alpha = 1.0f
-        },500)
+        // Use the actual safe-area bounds and reapply after constraints are laid out.
+        // Setting y only once leaves a translation relative to an outdated constraint position.
+        fun positionHeightSlider() {
+            val root = binding.root
+            val slider = binding.seekBar2
+            if (root.width == 0 || root.height == 0 || slider.width == 0) return
+            val centerY = root.height * 5f / 8f
+            slider.center = PointF(root.width - 50f, centerY)
+            binding.textviewHeighter.y = centerY - slider.width / 2f - binding.textviewHeighter.height
+            slider.alpha = 1f
+        }
+        binding.root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> positionHeightSlider() }
+        binding.seekBar2.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> positionHeightSlider() }
+        binding.textviewHeighter.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> positionHeightSlider() }
 
         binding.seekBar2.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener{
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {

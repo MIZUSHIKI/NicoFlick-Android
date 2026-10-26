@@ -15,7 +15,7 @@ import androidx.core.view.isVisible
 
 
 
-class Activity_SelectorMenu : AppCompatActivity() {
+class Activity_SelectorMenu : SafeAreaActivity() {
 
     private lateinit var binding: ActivitySelectorMenuBinding
     private var selectedMusic: musicData? = null

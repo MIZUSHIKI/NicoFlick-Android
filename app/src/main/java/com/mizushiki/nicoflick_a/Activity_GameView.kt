@@ -55,7 +55,7 @@ import kotlin.collections.ArrayList
 import kotlin.math.abs
 
 
-class Activity_GameView : AppCompatActivity() {
+class Activity_GameView : SafeAreaActivity() {
 
     // プロセス内だけ保持し、アプリのキル後は再び準備する。
     companion object {
@@ -213,12 +213,12 @@ class Activity_GameView : AppCompatActivity() {
             binding.root.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
                 override fun onPreDraw(): Boolean {
                     binding.root.viewTreeObserver.removeOnPreDrawListener(this)
-                    val location = IntArray(2); playerView.getLocationOnScreen(location)
+                    val location = IntArray(2); binding.gameMovieFrame.getLocationOnScreen(location)
                     val progressSpace = binding.progressBarLoaded.height
                     val available = (previousKeyboardTop - location[1] - progressSpace).coerceAtLeast(1)
-                    if (playerView.layoutParams.height == available) return true
-                    playerView.layoutParams.height = available
-                    playerView.requestLayout()
+                    if (binding.gameMovieFrame.layoutParams.height == available) return true
+                    binding.gameMovieFrame.layoutParams.height = available
+                    binding.gameMovieFrame.requestLayout()
                     // 高さを反映したレイアウトが終わるまで初回描画を待つ。
                     return false
                 }
@@ -247,7 +247,7 @@ class Activity_GameView : AppCompatActivity() {
             //println("word = ${it}")
             FlickInput(it)
         }
-        myKeybd?.setPaddingKeybd(top = (viewHeight / 4).toInt() * (10000 - USERDATA.NicoFlickKeyboardHeightPer) / 10000, bottom = GLOBAL.NavigationBarHeight)
+        myKeybd?.setPaddingKeybd(top = (viewHeight / 4).toInt() * (10000 - USERDATA.NicoFlickKeyboardHeightPer) / 10000, bottom = 0)
         myKeybd?.isHidden = !useMyKeybd
         binding.editText.isEnabled = !useMyKeybd
 
@@ -389,7 +389,7 @@ class Activity_GameView : AppCompatActivity() {
             }
             playerviewHeight = playerviewOriginalHeight * USERDATA.PlayerHeightPer / 10000
             if (!USERDATA.fitsMovieToKeyboardHeight) {
-                playerView.layoutParams.height = playerviewHeight
+                binding.gameMovieFrame.layoutParams.height = playerviewHeight
             }
 
             // FrameLayout のインスタンスを取得
@@ -516,7 +516,7 @@ class Activity_GameView : AppCompatActivity() {
 
         //最下のボタン非表示
         val view = window.decorView
-        view.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE
+        view.systemUiVisibility = view.systemUiVisibility or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE
     }
 
     fun setExo(nicodougaURL:String,smNum:String) {
@@ -839,14 +839,16 @@ class Activity_GameView : AppCompatActivity() {
     private fun updateMovieLayout() {
         if (!::binding.isInitialized) return
         val fitsMovie = USERDATA.fitsMovieToKeyboardHeight
+        layoutVideoBackground(playerView, binding.gameMovieFrame, fitsMovie)
+        layoutKeyboardBackdrop(binding.keyboardBackdrop, binding.progressBarLoaded)
         // 拡大時は縦横比を維持して領域を埋め、はみ出す左右を切り取る。
         val resizeMode = if (fitsMovie) AspectRatioFrameLayout.RESIZE_MODE_ZOOM
             else AspectRatioFrameLayout.RESIZE_MODE_FIT
         if (playerView.resizeMode != resizeMode) playerView.resizeMode = resizeMode
         val unset = ConstraintLayout.LayoutParams.UNSET
         val laneParams = binding.noteBarView.layoutParams as ConstraintLayout.LayoutParams
-        val laneTop = if (fitsMovie) unset else R.id.playerView
-        val laneBottom = if (fitsMovie) R.id.playerView else unset
+        val laneTop = if (fitsMovie) unset else R.id.gameMovieFrame
+        val laneBottom = if (fitsMovie) R.id.gameMovieFrame else unset
         val laneMargin = PX(48.0f)
         if (laneParams.topToBottom != laneTop || laneParams.bottomToBottom != laneBottom) {
             laneParams.topToBottom = laneTop
@@ -856,7 +858,7 @@ class Activity_GameView : AppCompatActivity() {
             binding.noteBarView.layoutParams = laneParams
         }
         val menuParams = binding.buttonMenu.layoutParams as ConstraintLayout.LayoutParams
-        val menuTop = if (fitsMovie) unset else R.id.playerView
+        val menuTop = if (fitsMovie) unset else R.id.gameMovieFrame
         if (menuParams.topToBottom != menuTop) {
             menuParams.topToBottom = menuTop
             binding.buttonMenu.layoutParams = menuParams
@@ -877,11 +879,11 @@ class Activity_GameView : AppCompatActivity() {
                 rect.bottom
             }
             USERDATA.maeKeyboardTop = bottom
-            val location = IntArray(2); playerView.getLocationOnScreen(location)
+            val location = IntArray(2); binding.gameMovieFrame.getLocationOnScreen(location)
             val progressSpace = binding.progressBarLoaded.bottom - binding.progressBarLoaded.top
             val available = (bottom - location[1] - progressSpace).coerceAtLeast(1)
-            if (playerView.layoutParams.height != available) {
-                playerView.layoutParams.height = available; playerView.requestLayout()
+            if (binding.gameMovieFrame.layoutParams.height != available) {
+                binding.gameMovieFrame.layoutParams.height = available; binding.gameMovieFrame.requestLayout()
             }
         }
     }
@@ -1188,7 +1190,7 @@ class Activity_GameView : AppCompatActivity() {
             binding.progressBar2.setProgress((noteData.score.borderScore * 10).toInt())
             val view = window.decorView
             //最下のボタン非表示
-            view.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE
+            view.systemUiVisibility = view.systemUiVisibility or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE
         }
     }
 
@@ -1288,8 +1290,8 @@ class Activity_GameView : AppCompatActivity() {
 
                 playerviewHeight = playerviewOriginalHeight * USERDATA.PlayerHeightPer / 10000
                 if (!USERDATA.fitsMovieToKeyboardHeight) {
-                    playerView.layoutParams.height = playerviewHeight
-                    playerView.requestLayout()
+                    binding.gameMovieFrame.layoutParams.height = playerviewHeight
+                    binding.gameMovieFrame.requestLayout()
                 }
                 updateMovieLayout()
             }

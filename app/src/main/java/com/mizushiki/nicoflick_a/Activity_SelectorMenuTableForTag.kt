@@ -21,7 +21,7 @@ import okhttp3.internal.format
 import okhttp3.internal.notifyAll
 
 
-class Activity_SelectorMenuTableForTag : AppCompatActivity() {
+class Activity_SelectorMenuTableForTag : SafeAreaActivity() {
 
     private lateinit var binding: ActivitySelectorMenuTableForTagBinding
     private var selectedMusic: musicData? = null

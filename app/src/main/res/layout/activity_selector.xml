@@ -186,7 +186,7 @@
             style="@style/back_button"
             android:onClick="Button_Back"/>
 
-    <FrameLayout
+    <com.mizushiki.nicoflick_a.FadingPickerLayout
             android:layout_width="match_parent"
             android:layout_height="200dp"
             tools:layout_editor_absoluteX="198dp" coverflow:layout_constraintTop_toTopOf="parent"
@@ -196,9 +196,6 @@
         <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:fadingEdge="vertical"
-                android:fadingEdgeLength="150dp"
-                android:requiresFadingEdge="vertical"
                 android:id="@+id/scrollview_levelScroller">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
                           android:orientation="vertical"
@@ -449,24 +446,7 @@
                 android:layout_marginBottom="60dp"
                 android:background="#DDDDDD"
                 android:layout_gravity="bottom"/>
-        <View
-                android:layout_width="match_parent"
-                android:layout_height="24dp"
-                android:layout_gravity="top"
-                android:background="@drawable/gradation"
-                android:clickable="false"
-                android:focusable="false"
-                android:importantForAccessibility="no"/>
-        <View
-                android:layout_width="match_parent"
-                android:layout_height="24dp"
-                android:layout_gravity="bottom"
-                android:background="@drawable/gradation_r"
-                android:clickable="false"
-                android:focusable="false"
-                android:importantForAccessibility="no"/>
-
-    </FrameLayout>
+    </com.mizushiki.nicoflick_a.FadingPickerLayout>
     <Button
             android:text="Ranking\nComment"
             android:layout_width="wrap_content"

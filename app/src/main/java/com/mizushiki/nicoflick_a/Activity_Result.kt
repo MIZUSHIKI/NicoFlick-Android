@@ -18,7 +18,7 @@ import java.util.*
 import kotlin.concurrent.schedule
 import kotlin.concurrent.timer
 
-class Activity_Result : AppCompatActivity() {
+class Activity_Result : SafeAreaActivity() {
 
     private lateinit var binding: ActivityResultBinding
     private val mHandler = Handler()

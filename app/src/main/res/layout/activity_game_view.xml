@@ -25,32 +25,44 @@
             android:inputType="textNoSuggestions"
             android:text=""
             android:id="@+id/editText"
-            app:layout_constraintBottom_toBottomOf="@+id/playerView"
-            app:layout_constraintEnd_toEndOf="@+id/playerView" app:layout_constraintStart_toStartOf="@+id/playerView"
-            app:layout_constraintTop_toTopOf="@+id/playerView"/>
+            android:alpha="0"
+            app:layout_constraintBottom_toBottomOf="@id/gameMovieFrame"
+            app:layout_constraintEnd_toEndOf="@id/gameMovieFrame" app:layout_constraintStart_toStartOf="@id/gameMovieFrame"
+            app:layout_constraintTop_toTopOf="@id/gameMovieFrame"/>
     <View
             android:layout_width="0dp"
             android:layout_height="300dp"
             android:id="@+id/mekakushiView"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="@+id/playerView"
+            app:layout_constraintTop_toTopOf="@id/gameMovieFrame"
             android:background="#FFF"/>
-    <com.google.android.exoplayer2.ui.PlayerView
-            android:id="@+id/playerView"
+    <!-- Controls stay attached to this safe-area anchor; only the video extends upward. -->
+    <FrameLayout
+            android:id="@+id/gameMovieFrame"
             android:layout_width="match_parent"
-            android:layout_height="300dp" app:layout_constraintTop_toTopOf="parent"
-            app:use_controller="false"
-            app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintVertical_bias="0.0"
-            android:background="@android:color/background_dark">
-    </com.google.android.exoplayer2.ui.PlayerView>
+            android:layout_height="300dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintVertical_bias="0.0">
+        <com.google.android.exoplayer2.ui.PlayerView
+                android:id="@+id/playerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:use_controller="false"
+                app:surface_type="texture_view"
+                android:background="@android:color/background_dark" />
+    </FrameLayout>
     <com.mizushiki.nicoflick_a.DecolationLabel
             android:layout_width="0dp"
             android:layout_height="wrap_content" android:id="@+id/textView_HighScore"
             android:textAlignment="viewStart"
-            app:layout_constraintTop_toTopOf="@+id/notesWindow" app:layout_constraintStart_toStartOf="@+id/playerView"
-            android:textSize="10sp" app:layout_constraintEnd_toEndOf="@+id/playerView"
+            app:layout_constraintTop_toTopOf="@+id/notesWindow" app:layout_constraintStart_toStartOf="@id/gameMovieFrame"
+            android:textSize="10sp" app:layout_constraintEnd_toEndOf="@id/gameMovieFrame"
             android:layout_marginStart="8dp" android:layout_marginTop="8dp"
             android:textColor="@android:color/white"
             app:stroke_size="6"
@@ -58,8 +70,8 @@
     <com.mizushiki.nicoflick_a.DecolationLabel
             android:layout_width="0dp"
             android:layout_height="wrap_content" android:id="@+id/textView_Score"
-            app:layout_constraintEnd_toEndOf="@+id/playerView" app:layout_constraintTop_toTopOf="@+id/notesWindow"
-            app:layout_constraintStart_toStartOf="@+id/playerView" android:textAlignment="viewEnd"
+            app:layout_constraintEnd_toEndOf="@id/gameMovieFrame" app:layout_constraintTop_toTopOf="@+id/notesWindow"
+            app:layout_constraintStart_toStartOf="@id/gameMovieFrame" android:textAlignment="viewEnd"
             android:layout_marginTop="8dp" android:layout_marginEnd="8dp"
             android:textColor="@android:color/white"
             app:stroke_size="6"
@@ -67,8 +79,8 @@
     <com.mizushiki.nicoflick_a.DecolationLabel
             android:layout_width="0dp"
             android:layout_height="wrap_content" android:id="@+id/textView_judgeOffset"
-            app:layout_constraintBottom_toBottomOf="@+id/playerView"
-            app:layout_constraintEnd_toEndOf="@+id/playerView" app:layout_constraintStart_toStartOf="@+id/playerView"
+            app:layout_constraintBottom_toBottomOf="@id/gameMovieFrame"
+            app:layout_constraintEnd_toEndOf="@id/gameMovieFrame" app:layout_constraintStart_toStartOf="@id/gameMovieFrame"
             android:textSize="8sp" android:textAlignment="viewEnd"
             android:textColor="#929292"
             app:stroke_size="6"
@@ -77,7 +89,7 @@
             android:text="@string/_menu"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" android:id="@+id/button_Menu"
-            app:layout_constraintTop_toBottomOf="@+id/playerView" app:layout_constraintEnd_toEndOf="@+id/playerView"
+            app:layout_constraintTop_toBottomOf="@id/gameMovieFrame" app:layout_constraintEnd_toEndOf="@id/gameMovieFrame"
             android:minWidth="32dp"
             android:minHeight="48dp"
             android:layout_marginRight="20dp"
@@ -90,7 +102,7 @@
             android:layout_width="0dp"
             android:layout_height="36dp"
             android:id="@+id/noteBarView" app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@+id/playerView"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/gameMovieFrame"
             android:layout_marginTop="32dp" android:background="#E9FDBB"/>
 
     <ImageView
@@ -171,14 +183,14 @@
             android:id="@+id/progressBar_Loaded"
             style="@style/Widget.AppCompat.ProgressBar.Horizontal"
             app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/playerView" android:progressTint="?attr/colorButtonNormal"
+            app:layout_constraintTop_toBottomOf="@id/gameMovieFrame" android:progressTint="?attr/colorButtonNormal"
             android:progressBackgroundTint="@color/design_default_color_background"/>
     <ProgressBar
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="0dp"
             android:layout_height="2dp"
             android:id="@+id/progressBar_Played" app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@+id/playerView"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/gameMovieFrame"
             android:progressTint="@android:color/holo_blue_dark"
             android:progressBackgroundTint="@color/design_default_color_background" android:max="100000"/>
 
@@ -195,7 +207,7 @@
         android:layout_marginStart="8dp" android:layout_marginEnd="8dp"
         android:layout_marginBottom="@dimen/practice_controls_menu_gap"
         app:layout_constraintBottom_toTopOf="@id/button_Menu"
-        app:layout_constraintStart_toStartOf="@id/playerView" app:layout_constraintEnd_toEndOf="@id/playerView">
+        app:layout_constraintStart_toStartOf="@id/gameMovieFrame" app:layout_constraintEnd_toEndOf="@id/gameMovieFrame">
         <LinearLayout android:layout_width="match_parent" android:layout_height="48dp"
             android:orientation="horizontal" android:gravity="center_vertical">
             <Switch android:id="@+id/practiceAutoPlay" android:layout_width="wrap_content"

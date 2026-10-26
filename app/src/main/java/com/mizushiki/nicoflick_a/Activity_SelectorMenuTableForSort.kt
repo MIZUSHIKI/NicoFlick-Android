@@ -17,7 +17,7 @@ import androidx.appcompat.app.AppCompatActivity
 import java.util.*
 
 
-class Activity_SelectorMenuTableForSort : AppCompatActivity() {
+class Activity_SelectorMenuTableForSort : SafeAreaActivity() {
 
     private lateinit var binding: ActivitySelectorMenuTableForSortBinding
 

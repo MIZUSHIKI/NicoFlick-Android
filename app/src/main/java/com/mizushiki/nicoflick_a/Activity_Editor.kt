@@ -24,7 +24,7 @@ import kotlin.coroutines.resume
 // AIに「iPhone版を真似てマージしてみて」のままのコード
 // - そのままではおおよそ使えないので修正する必要がある。
 // - 現状はコードのみ残し封印。将来に期待。
-class Activity_Editor : AppCompatActivity() {
+class Activity_Editor : SafeAreaActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var music: musicData

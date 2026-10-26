@@ -59,7 +59,7 @@ object GLOBAL {
     var NavigationBarHeight:Int = 0
 }
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : SafeAreaActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private var firstLaunchPending = false

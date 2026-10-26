@@ -21,7 +21,7 @@ import androidx.core.view.isVisible
 
 import java.net.URLDecoder
 
-class Activity_WikiPageWeb : AppCompatActivity() {
+class Activity_WikiPageWeb : SafeAreaActivity() {
 
     private lateinit var binding: ActivityWikipagewebBinding
 

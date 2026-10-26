@@ -10,7 +10,7 @@ import androidx.fragment.app.Fragment
 import androidx.viewpager.widget.ViewPager
 
 
-class Activity_HowToGame : AppCompatActivity() {
+class Activity_HowToGame : SafeAreaActivity() {
 
     private lateinit var binding: ActivityHowToGameBinding
 
@@ -43,7 +43,7 @@ class Activity_HowToGame : AppCompatActivity() {
         })
         //最下のボタン非表示
         val view = window.decorView
-        view.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE
+        view.systemUiVisibility = view.systemUiVisibility or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE
     }
 
     fun Button_NextPage(view: View) {

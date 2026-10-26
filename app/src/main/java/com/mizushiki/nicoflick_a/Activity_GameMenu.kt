@@ -23,7 +23,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class Activity_GameMenu : AppCompatActivity() {
+class Activity_GameMenu : SafeAreaActivity() {
 
     private lateinit var binding: ActivityGameMenuBinding
     private var blurEnabledListener: Consumer<Boolean>? = null

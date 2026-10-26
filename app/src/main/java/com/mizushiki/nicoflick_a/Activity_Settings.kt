@@ -27,7 +27,7 @@ import kotlinx.coroutines.Job
 
 
 
-class Activity_Settings : AppCompatActivity() {
+class Activity_Settings : SafeAreaActivity() {
 
     private lateinit var binding: ActivitySettingsBinding
 

@@ -18,7 +18,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
-class Activity_SelectorMenuTagEditor : AppCompatActivity() {
+class Activity_SelectorMenuTagEditor : SafeAreaActivity() {
 
     private lateinit var binding: ActivitySelectorMenuTagEditorBinding
 

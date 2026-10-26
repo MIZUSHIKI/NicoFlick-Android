@@ -52,7 +52,7 @@ import java.util.*
 import kotlin.concurrent.schedule
 
 
-class Activity_Selector : AppCompatActivity() {
+class Activity_Selector : SafeAreaActivity() {
 
     private lateinit var binding: ActivitySelectorBinding
 

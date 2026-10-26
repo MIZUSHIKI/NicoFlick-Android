@@ -10,7 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomnavigation.BottomNavigationView
 
 
-class Activity_RankingComment : AppCompatActivity(),BottomNavigationView.OnNavigationItemSelectedListener {
+class Activity_RankingComment : SafeAreaActivity(),BottomNavigationView.OnNavigationItemSelectedListener {
 
     private lateinit var binding: ActivityRankingCommentBinding
 
